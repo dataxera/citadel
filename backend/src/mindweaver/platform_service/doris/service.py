@@ -2,10 +2,11 @@
 # SPDX-License-Identifier: AGPLv3+
 
 import os
+import secrets
 import logging
 from typing import Any
 from mindweaver.platform_service.base import PlatformService
-from mindweaver.crypto import decrypt_password
+from mindweaver.crypto import decrypt_password, encrypt_password
 from .model import DorisPlatform, DorisPlatformState
 
 logger = logging.getLogger(__name__)
@@ -30,12 +31,12 @@ class DorisPlatformService(PlatformService[DorisPlatform]):
     @classmethod
     def internal_fields(cls) -> list[str]:
         """Fields not exposed in standard resource representations."""
-        return super().internal_fields() + ["admin_password"]
+        return super().internal_fields() + ["admin_password", "operator_password"]
 
     @classmethod
     def redacted_fields(cls) -> list[str]:
         """Fields that are redacted in API responses."""
-        return ["admin_password"]
+        return ["admin_password", "operator_password"]
 
     @classmethod
     def widgets(cls) -> dict[str, Any]:
@@ -140,6 +141,17 @@ class DorisPlatformService(PlatformService[DorisPlatform]):
                 vars["admin_password"] = decrypt_password(model.admin_password)
             except Exception:
                 vars["admin_password"] = model.admin_password
+
+        vars["operator_username"] = "doris_operator"
+        operator_pass = model.operator_password
+        if operator_pass:
+            try:
+                operator_pass = decrypt_password(operator_pass)
+            except Exception:
+                operator_pass = model.operator_password
+        else:
+            operator_pass = secrets.token_urlsafe(16)
+        vars["operator_password"] = operator_pass
 
         # Resolve FE image & tag
         vars["fe_image"], vars["fe_image_tag"] = await self.resolve_image(

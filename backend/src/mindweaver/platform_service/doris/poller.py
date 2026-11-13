@@ -6,6 +6,7 @@ import logging
 import tempfile
 from kubernetes import client, config
 from mindweaver.fw.model import ts_now
+from mindweaver.crypto import decrypt_password
 from .model import DorisPlatform
 from .service import DorisPlatformService
 
@@ -173,6 +174,14 @@ class DorisPoller:
         state.node_ports = node_ports
         state.cluster_nodes = cluster_nodes
 
+        # Resolve decrypted admin password for query URI and state
+        admin_pass = self.model.admin_password
+        if admin_pass:
+            try:
+                admin_pass = decrypt_password(admin_pass)
+            except Exception:
+                admin_pass = self.model.admin_password
+
         # Derive Query and HTTP URIs
         if status == "online":
             mysql_np = next((np for np in node_ports if np["port"] == 9030), None)
@@ -181,9 +190,9 @@ class DorisPoller:
 
             # Query URI
             if mysql_np and node_v4:
-                state.query_uri = f"mysql://root:{self.model.admin_password}@{node_v4['ipv4']}:{mysql_np['node_port']}"
+                state.query_uri = f"mysql://root:{admin_pass}@{node_v4['ipv4']}:{mysql_np['node_port']}"
             else:
-                state.query_uri = f"mysql://root:{self.model.admin_password}@{self.model.name}-fe-service.{namespace}.svc.cluster.local:9030"
+                state.query_uri = f"mysql://root:{admin_pass}@{self.model.name}-fe-service.{namespace}.svc.cluster.local:9030"
 
             # HTTP URI
             if project.ingress_domain:
@@ -197,6 +206,7 @@ class DorisPoller:
             state.fe_http_uri = None
 
         state.admin_user = "root"
-        state.admin_password = self.model.admin_password
+        state.admin_password = admin_pass
+        state.operator_user = "doris_operator"
         state.last_heartbeat = ts_now()
         await self.service.session.flush()

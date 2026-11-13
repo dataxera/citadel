@@ -26,6 +26,7 @@ class DorisState(DefaultPlatformState):
 
         state_dict["db_pass"] = admin_pass
         state_dict["admin_password"] = admin_pass
+        state_dict["operator_user"] = "doris_operator"
 
         return state_dict
 
@@ -37,5 +38,7 @@ class DorisState(DefaultPlatformState):
             state.fe_http_uri = None
             state.admin_user = None
             state.admin_password = None
+            state.operator_user = None
+            state.operator_password = None
         await super().clear()
 

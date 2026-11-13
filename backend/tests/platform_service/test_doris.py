@@ -5,9 +5,14 @@ import pytest
 from unittest.mock import MagicMock, AsyncMock, patch
 from fastapi import Request
 from pydantic import ValidationError
+from mindweaver.config import settings
+from mindweaver.crypto import encrypt_password
 from mindweaver.platform_service.doris import DorisPlatform, DorisPlatformService, DorisPlatformState
 from mindweaver.platform_service.doris.poller import DorisPoller
 from mindweaver.fw.model import AsyncSession
+
+# Ensure encryption key is configured for tests
+settings.fernet_key = "EFw4cCjDgHhGuZAGlwXmQhXg134ZdHjb9SeqcszWeSU="
 
 
 @pytest.fixture
@@ -41,6 +46,8 @@ def test_doris_resource_defaults():
     assert model.be_mem_limit == 4.0
     assert model.admin_password is not None
     assert len(model.admin_password) >= 16
+    assert model.operator_password is not None
+    assert len(model.operator_password) >= 16
 
 
 def test_doris_cpu_validation():
@@ -190,6 +197,8 @@ async def test_doris_template_vars(mock_service_dependencies):
     assert vars_dict["be_image_tag"] == "2.1.8"
     assert vars_dict["ingress_domain"] == "apps.example.com"
     assert vars_dict["namespace"] == "test-ns"
+    assert vars_dict["operator_username"] == "doris_operator"
+    assert vars_dict["operator_password"] is not None
 
 
 @pytest.mark.asyncio
@@ -217,7 +226,9 @@ async def test_doris_render_manifests(mock_service_dependencies):
     assert "kind: Application" in manifests
     assert "kind: Secret" in manifests
     assert "kind: HTTPRoute" in manifests
+    assert "kind: Job" in manifests
     assert "doris-main" in manifests
+    assert "doris_operator" in manifests
 
 
 @pytest.mark.asyncio
@@ -231,6 +242,7 @@ async def test_doris_poller(mock_service_dependencies):
         name="doris-test",
         title="Doris Test",
         project_id=1,
+        admin_password=encrypt_password("supersecret123"),
     )
 
     state = DorisPlatformState(platform_id=10, active=True)
@@ -255,6 +267,7 @@ async def test_doris_poller(mock_service_dependencies):
         await poller.poll()
 
         assert state.status == "online"
-        assert state.query_uri.startswith("mysql://root:")
-        assert "192.168.1.100:30930" in state.query_uri
+        assert state.query_uri == "mysql://root:supersecret123@192.168.1.100:30930"
+        assert state.admin_password == "supersecret123"
+        assert state.operator_user == "doris_operator"
         assert state.fe_http_uri == "https://doris-test.example.com"

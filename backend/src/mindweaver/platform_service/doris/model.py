@@ -31,6 +31,7 @@ class DorisPlatform(PlatformBase, table=True):
 
     # Authentication credentials
     admin_password: str = Field(default_factory=lambda: secrets.token_urlsafe(16))
+    operator_password: str = Field(default_factory=lambda: secrets.token_urlsafe(16))
 
     @field_validator("fe_replicas")
     @classmethod
@@ -71,3 +72,5 @@ class DorisPlatformState(PlatformStateBase, table=True):
     fe_http_uri: Optional[str] = Field(default=None)
     admin_user: Optional[str] = Field(default="root")
     admin_password: Optional[str] = Field(default=None)
+    operator_user: Optional[str] = Field(default="doris_operator")
+    operator_password: Optional[str] = Field(default=None)
