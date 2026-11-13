@@ -376,6 +376,86 @@ async def test_trino_mssql_ssl_rendering(mock_service_dependencies):
     assert "trustServerCertificate=false" in mssql_cat["properties"]["connection-url"]
 
 
+@pytest.mark.asyncio
+async def test_trino_oracle_catalog_rendering(mock_service_dependencies):
+    """Test that Oracle engine is correctly mapped to oracle connector and thin URL"""
+    request, session = mock_service_dependencies
+    svc = TrinoPlatformService(request, session)
+    svc._resolve_namespace = AsyncMock(return_value="trino-ns")
+    svc.project = AsyncMock(return_value=MagicMock(ldap_config_id=None))
+
+    # Mock Oracle Data Source (EZConnect service name)
+    ds_oracle = MagicMock()
+    ds_oracle.name = "odshits"
+    ds_oracle.engine = "oracle"
+    ds_oracle.host = "dwodsdev-scan.hasil.gov.my"
+    ds_oracle.port = 1521
+    ds_oracle.database = "odsdev.hasil.gov.my"
+    ds_oracle.login = "ODS_DMSTG"
+    ds_oracle.password = "secretpass"
+    ds_oracle.enable_ssl = False
+    ds_oracle.verify_ssl = False
+    ds_oracle.parameters = {}
+
+    mock_ds_svc = AsyncMock()
+    mock_ds_svc.get.return_value = ds_oracle
+
+    model = TrinoPlatform(
+        name="trino-test",
+        project_id=1,
+        database_source_ids=[1],
+    )
+
+    with patch("mindweaver.platform_service.trino.service.DatabaseSourceService.get_service", AsyncMock(return_value=mock_ds_svc)), \
+         patch("mindweaver.platform_service.trino.service.decrypt_password", lambda x: x):
+        vars = await svc.template_vars(model)
+
+    oracle_cat = next(c for c in vars["catalogs"] if c["catalog"] == "odshits")
+    assert oracle_cat["properties"]["connector.name"] == "oracle"
+    assert oracle_cat["properties"]["connection-url"] == "jdbc:oracle:thin:@//dwodsdev-scan.hasil.gov.my:1521/odsdev.hasil.gov.my"
+    assert oracle_cat["properties"]["connection-user"] == "ODS_DMSTG"
+    assert oracle_cat["properties"]["connection-password"] == "secretpass"
+
+
+@pytest.mark.asyncio
+async def test_trino_oracle_catalog_rendering_sid_and_defaults(mock_service_dependencies):
+    """Test that Oracle catalog handles SID syntax, default port, and empty database"""
+    request, session = mock_service_dependencies
+    svc = TrinoPlatformService(request, session)
+    svc._resolve_namespace = AsyncMock(return_value="trino-ns")
+    svc.project = AsyncMock(return_value=MagicMock(ldap_config_id=None))
+
+    # Mock Oracle Data Source with SID (starts with :) and default port
+    ds_oracle_sid = MagicMock()
+    ds_oracle_sid.name = "oracle-sid"
+    ds_oracle_sid.engine = "oracle"
+    ds_oracle_sid.host = "oracle-host"
+    ds_oracle_sid.port = None
+    ds_oracle_sid.database = ":ORCL"
+    ds_oracle_sid.login = "sys"
+    ds_oracle_sid.password = "pass"
+    ds_oracle_sid.parameters = {}
+
+    mock_ds_svc = AsyncMock()
+    mock_ds_svc.get.return_value = ds_oracle_sid
+
+    model = TrinoPlatform(
+        name="trino-test",
+        project_id=1,
+        database_source_ids=[1],
+    )
+
+    with patch("mindweaver.platform_service.trino.service.DatabaseSourceService.get_service", AsyncMock(return_value=mock_ds_svc)), \
+         patch("mindweaver.platform_service.trino.service.decrypt_password", lambda x: x):
+        vars = await svc.template_vars(model)
+
+    oracle_cat = next(c for c in vars["catalogs"] if c["catalog"] == "oracle-sid")
+    assert oracle_cat["properties"]["connector.name"] == "oracle"
+    assert oracle_cat["properties"]["connection-url"] == "jdbc:oracle:thin:@oracle-host:1521:ORCL"
+    assert oracle_cat["properties"]["connection-user"] == "sys"
+    assert oracle_cat["properties"]["connection-password"] == "pass"
+
+
 from mindweaver.datasource_service.database_source import DatabaseSourceService
 from mindweaver.service.ldap_config.model import LdapConfig
 

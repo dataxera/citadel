@@ -41,7 +41,7 @@ logger = logging.getLogger(__name__)
 class TrinoPlatformService(PlatformService[TrinoPlatform]):
     template_directory: str = os.path.join(os.path.dirname(__file__), "templates")
     state_model: type[TrinoPlatformState] = TrinoPlatformState
-    SUPPORTED_CATALOG_DRIVERS = ["postgresql", "mysql", "trino", "mssql"]
+    SUPPORTED_CATALOG_DRIVERS = ["postgresql", "mysql", "trino", "mssql", "oracle"]
 
     @classmethod
     def model_class(cls) -> type[TrinoPlatform]:
@@ -259,6 +259,8 @@ class TrinoPlatformService(PlatformService[TrinoPlatform]):
                     },
                 }
 
+                host_port = f"{ds.host}" + (f":{ds.port}" if ds.port else "")
+
                 # Common properties
                 if ds.engine == "mssql":
                     jdbc_prefix = "jdbc:sqlserver://"
@@ -266,16 +268,25 @@ class TrinoPlatformService(PlatformService[TrinoPlatform]):
                     encrypt = "true" if ds.enable_ssl else "false"
                     trust_cert = "false" if ds.verify_ssl else "true"
                     resource_path += f";encrypt={encrypt};trustServerCertificate={trust_cert}"
+                    connection_url = f"{jdbc_prefix}{host_port}{resource_path}"
+                elif ds.engine == "oracle":
+                    oracle_host_port = f"{ds.host}" + (f":{ds.port}" if ds.port else ":1521")
+                    if ds.database:
+                        if ds.database.startswith(":"):
+                            connection_url = f"jdbc:oracle:thin:@{oracle_host_port}{ds.database}"
+                        elif ds.database.startswith("/"):
+                            connection_url = f"jdbc:oracle:thin:@//{oracle_host_port}{ds.database}"
+                        else:
+                            connection_url = f"jdbc:oracle:thin:@//{oracle_host_port}/{ds.database}"
+                    else:
+                        connection_url = f"jdbc:oracle:thin:@//{oracle_host_port}"
                 else:
                     jdbc_prefix = f"jdbc:{ds.engine}://"
                     resource_path = f"/{ds.database}" if ds.database else ""
+                    connection_url = f"{jdbc_prefix}{host_port}{resource_path}"
 
-                host_port = f"{ds.host}" + (f":{ds.port}" if ds.port else "")
-
-                if ds.engine in ("postgresql", "mysql", "mssql"):
-                    catalog["properties"][
-                        "connection-url"
-                    ] = f"{jdbc_prefix}{host_port}{resource_path}"
+                if ds.engine in ("postgresql", "mysql", "mssql", "oracle"):
+                    catalog["properties"]["connection-url"] = connection_url
                     if ds.login:
                         catalog["properties"]["connection-user"] = ds.login
                     if ds.password:
