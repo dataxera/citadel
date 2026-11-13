@@ -723,6 +723,13 @@ async def test_install_nifikop():
         assert "chart: nifikop" in manifest
         assert "targetRevision: 1.17.0" in manifest
         assert "namespaces:\n          - \"\"" in manifest
+        assert "ignoreDifferences:" in manifest
+        assert "/status/terminatingReplicas" in manifest
+        assert "kind: ClusterRole" in manifest
+        assert "name: nifikop-cluster-role" in manifest
+        assert "kind: ClusterRoleBinding" in manifest
+        assert "name: nifikop-cluster-role-binding" in manifest
+        assert "nifi.konpyutaika.com" in manifest
 
 
 def test_install_nifikop_action_triggers_task(client: TestClient):

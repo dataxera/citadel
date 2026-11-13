@@ -37,31 +37,177 @@ spec:
     - CreateNamespace=true
     - RespectIgnoreDifferences=true
     - ServerSideApply=true
+  ignoreDifferences:
+    - group: apps
+      kind: Deployment
+      jsonPointers:
+        - /status/terminatingReplicas
+    - group: apps
+      kind: StatefulSet
+      jsonPointers:
+        - /status/terminatingReplicas
+    - group: apps
+      kind: ReplicaSet
+      jsonPointers:
+        - /status/terminatingReplicas
 ---
-# Supplemental ClusterRole to allow NiFiKop to list/watch Namespaces cluster-wide.
-# Required when namespaces:[""] (watch-all) is configured — the NiFiKop Helm chart
-# omits namespace list permissions from its generated ClusterRole.
+# ClusterRole granting NiFiKop permissions to manage resources across all namespaces.
+# Required because namespaces:[""] (watch-all / cluster-wide) is configured,
+# but the upstream NiFiKop Helm chart only generates namespaced Role/RoleBinding.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: nifikop-namespace-reader
+  name: nifikop-cluster-role
   labels:
+    {% if project_title %}
+    project: "{{ project_title }}"
+    {% endif %}
+    {% if service_title %}
+    service: "{{ service_title }}"
+    {% endif %}
     manager: mindweaver
 rules:
   - apiGroups: [""]
-    resources: ["namespaces"]
-    verbs: ["get", "list", "watch"]
+    resources:
+      - pods
+      - services
+      - services/finalizers
+      - endpoints
+      - persistentvolumeclaims
+      - events
+      - configmaps
+      - secrets
+      - namespaces
+      - nodes
+    verbs:
+      - create
+      - delete
+      - get
+      - list
+      - patch
+      - update
+      - watch
+  - apiGroups: ["apps"]
+    resources:
+      - deployments
+      - daemonsets
+      - replicasets
+      - statefulsets
+      - deployments/finalizers
+    verbs:
+      - create
+      - delete
+      - get
+      - list
+      - patch
+      - update
+      - watch
+  - apiGroups: ["monitoring.coreos.com"]
+    resources:
+      - servicemonitors
+    verbs:
+      - get
+      - create
+  - apiGroups: ["nifi.konpyutaika.com"]
+    resources:
+      - nifiusers
+      - nifiusergroups
+      - nificlusters
+      - nifidataflows
+      - nifiregistryclients
+      - nifiparametercontexts
+      - nifinodegroupautoscalers
+      - nificonnections
+      - nifiresources
+      - nifiusers/finalizers
+      - nificlusters/finalizers
+    verbs:
+      - create
+      - delete
+      - get
+      - list
+      - patch
+      - update
+      - watch
+      - deletecollection
+  - apiGroups: ["nifi.konpyutaika.com"]
+    resources:
+      - nifiusers/status
+      - nifiusergroups/status
+      - nificlusters/status
+      - nifidataflows/status
+      - nifiregistryclients/status
+      - nifiparametercontexts/status
+      - nifinodegroupautoscalers/status
+      - nificonnections/status
+      - nifiresources/status
+    verbs:
+      - get
+      - update
+      - patch
+  - apiGroups: ["autoscaling"]
+    resources:
+      - horizontalpodautoscalers
+    verbs:
+      - create
+      - delete
+      - get
+      - list
+      - patch
+      - update
+      - watch
+  - apiGroups: ["cert-manager.io"]
+    resources:
+      - issuers
+      - clusterissuers
+      - certificates
+    verbs:
+      - create
+      - delete
+      - get
+      - list
+      - patch
+      - update
+      - watch
+  - apiGroups: ["policy"]
+    resources:
+      - poddisruptionbudgets
+    verbs:
+      - create
+      - delete
+      - get
+      - list
+      - patch
+      - update
+      - watch
+  - apiGroups: ["coordination.k8s.io"]
+    resources:
+      - leases
+    verbs:
+      - get
+      - list
+      - watch
+      - create
+      - update
+      - patch
+      - delete
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: nifikop-namespace-reader-binding
+  name: nifikop-cluster-role-binding
   labels:
+    {% if project_title %}
+    project: "{{ project_title }}"
+    {% endif %}
+    {% if service_title %}
+    service: "{{ service_title }}"
+    {% endif %}
     manager: mindweaver
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: nifikop-namespace-reader
+  name: nifikop-cluster-role
 subjects:
   - kind: ServiceAccount
     name: nifikop
