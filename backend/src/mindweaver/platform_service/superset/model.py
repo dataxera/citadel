@@ -48,6 +48,7 @@ class SupersetPlatform(PlatformBase, table=True):
     # Data Source selection (to be automatically created in Superset)
     database_source_ids: list[int] = Field(default_factory=list, sa_type=JSONType())
     trino_ids: list[int] = Field(default_factory=list, sa_type=JSONType())
+    doris_ids: list[int] = Field(default_factory=list, sa_type=JSONType())
 
     # Auth Role Mapping (LDAP to Superset)
     auth_role_mapping: list[dict] = Field(
@@ -62,9 +63,20 @@ class SupersetPlatform(PlatformBase, table=True):
     mem_request: float = Field(default=2.0)
     mem_limit: float = Field(default=4.0)
 
+    @field_validator("database_source_ids", "trino_ids", "doris_ids", mode="before")
+    @classmethod
+    def validate_id_lists(cls, v: Any) -> list[int]:
+        """Ensure None is coerced to an empty list."""
+        if v is None:
+            return []
+        return v
+
     @field_validator("auth_role_mapping", mode="before")
     @classmethod
     def validate_auth_role_mapping(cls, v: Any) -> list[dict]:
+        """Validate auth role mappings and coerce None to an empty list."""
+        if v is None:
+            return []
         if isinstance(v, list):
             res = []
             for item in v:

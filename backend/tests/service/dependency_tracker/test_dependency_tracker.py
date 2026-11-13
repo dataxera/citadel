@@ -458,3 +458,97 @@ def test_multiselect_relationship_dependency_tracking(client: TestClient, test_p
         f"/api/v1/platform/hive-metastore/{hms2_id}/_decommission",
         headers={"X-Project-Id": str(test_project["id"]), "X-RESOURCE-NAME": "hms-multi-2"},
     ).status_code == 200
+
+
+def test_dependency_tracker_superset_doris(client: TestClient, test_project: dict):
+    """Test multi-select relationship tracking between Superset and Doris."""
+    # 1. Create a Doris cluster
+    doris_resp = client.post(
+        "/api/v1/platform/doris",
+        json={"name": "doris-superset-dep", "title": "Doris for Superset", "project_id": test_project["id"]},
+        headers={"X-Project-Id": str(test_project["id"])},
+    )
+    assert doris_resp.status_code == 200, doris_resp.text
+    doris_id = doris_resp.json()["data"]["id"]
+    doris_uuid = doris_resp.json()["data"]["uuid"]
+
+    # Deploy Doris
+    client.post(
+        f"/api/v1/platform/doris/{doris_id}/_deploy",
+        headers={"X-Project-Id": str(test_project["id"])},
+    )
+
+    # 2. Create PostgreSQL metadata DB for Superset
+    pgsql_resp = client.post(
+        "/api/v1/platform/pgsql",
+        json={"name": "pgsql-superset-dep", "title": "Postgres for Superset", "project_id": test_project["id"]},
+        headers={"X-Project-Id": str(test_project["id"])},
+    )
+    assert pgsql_resp.status_code == 200, pgsql_resp.text
+    pgsql_id = pgsql_resp.json()["data"]["id"]
+
+    # Deploy PostgreSQL
+    client.post(
+        f"/api/v1/platform/pgsql/{pgsql_id}/_deploy",
+        headers={"X-Project-Id": str(test_project["id"])},
+    )
+
+    # 3. Create Superset pointing to Doris
+    superset_resp = client.post(
+        "/api/v1/platform/superset",
+        json={
+            "name": "superset-doris-dep",
+            "title": "Superset with Doris",
+            "project_id": test_project["id"],
+            "platform_pgsql_id": pgsql_id,
+            "doris_ids": [doris_id],
+        },
+        headers={"X-Project-Id": str(test_project["id"])},
+    )
+    assert superset_resp.status_code == 200, superset_resp.text
+    superset_id = superset_resp.json()["data"]["id"]
+    superset_uuid = superset_resp.json()["data"]["uuid"]
+
+    # Deploy Superset
+    deploy_superset = client.post(
+        f"/api/v1/platform/superset/{superset_id}/_deploy",
+        headers={"X-Project-Id": str(test_project["id"])},
+    )
+    assert deploy_superset.status_code == 200, deploy_superset.text
+
+    # 4. Verify dependency tracker has an entry for Superset -> Doris
+    tracker_resp = client.get("/api/v1/dependency-tracker")
+    assert tracker_resp.status_code == 200
+    entries = tracker_resp.json()["data"]
+
+    doris_dep_entries = [
+        e for e in entries
+        if e["service_uuid"] == superset_uuid and e["dependency_uuid"] == doris_uuid
+    ]
+    assert len(doris_dep_entries) == 1
+    assert doris_dep_entries[0]["service_type"] == "superset"
+    assert doris_dep_entries[0]["dependency_type"] == "doris"
+    assert doris_dep_entries[0]["relationship"] == "doris_ids"
+
+    # 5. Attempting to decommission Doris should fail because Superset is active
+    decom_doris = client.post(
+        f"/api/v1/platform/doris/{doris_id}/_decommission",
+        headers={"X-Project-Id": str(test_project["id"]), "X-RESOURCE-NAME": "doris-superset-dep"},
+    )
+    assert decom_doris.status_code == 422
+    assert "superset-doris-dep" in decom_doris.text
+
+    # 6. Decommission Superset -> should succeed
+    decom_superset = client.post(
+        f"/api/v1/platform/superset/{superset_id}/_decommission",
+        headers={"X-Project-Id": str(test_project["id"]), "X-RESOURCE-NAME": "superset-doris-dep"},
+    )
+    assert decom_superset.status_code == 200
+
+    # 7. Now decommissioning Doris should succeed
+    decom_doris_after = client.post(
+        f"/api/v1/platform/doris/{doris_id}/_decommission",
+        headers={"X-Project-Id": str(test_project["id"]), "X-RESOURCE-NAME": "doris-superset-dep"},
+    )
+    assert decom_doris_after.status_code == 200
+

@@ -17,6 +17,7 @@ from mindweaver.platform_service.pgsql.service import PgSqlPlatformService
 from mindweaver.service.ldap_config.service import LdapConfigService
 from mindweaver.datasource_service import DatabaseSourceService
 from mindweaver.platform_service.trino.service import TrinoPlatformService
+from mindweaver.platform_service.doris.service import DorisPlatformService
 from mindweaver.crypto import decrypt_password
 
 from .model import SupersetPlatform, SupersetPlatformState
@@ -72,6 +73,14 @@ class SupersetPlatformService(PlatformService[SupersetPlatform]):
                 "label": "Trino Platforms",
                 "type": "relationship",
                 "endpoint": "/api/v1/platform/trino",
+                "field": "id",
+                "multiselect": True,
+            },
+            "doris_ids": {
+                "order": 22,
+                "label": "Doris Platforms",
+                "type": "relationship",
+                "endpoint": "/api/v1/platform/doris",
                 "field": "id",
                 "multiselect": True,
             },
@@ -260,6 +269,42 @@ class SupersetPlatformService(PlatformService[SupersetPlatform]):
                             "extra": extra_dict,
                             "encrypted_extra": encrypted_extra_dict,
                             "is_trino": True,
+                        }
+                    )
+
+        if model.doris_ids:
+            doris_svc = await DorisPlatformService.get_service(
+                self.request, self.session
+            )
+            for doris_id in model.doris_ids:
+                doris_model = await doris_svc.get(doris_id)
+                doris_state = await doris_svc.platform_state(doris_model)
+                if doris_state and doris_state.active:
+                    doris_namespace = await doris_svc._resolve_namespace(doris_model)
+                    admin_pass = doris_model.admin_password
+                    if admin_pass:
+                        try:
+                            admin_pass = decrypt_password(admin_pass)
+                        except Exception:
+                            admin_pass = doris_model.admin_password
+                    else:
+                        admin_pass = None
+
+                    url_kwargs = {
+                        "drivername": "mysql+pymysql",
+                        "username": "root",
+                        "password": admin_pass,
+                        "host": f"{doris_model.name}-fe-service.{doris_namespace}.svc.cluster.local",
+                        "port": 9030,
+                        "database": "",
+                    }
+                    url_kwargs = {k: v for k, v in url_kwargs.items() if v is not None}
+                    sqlalchemy_uri = URL.create(**url_kwargs).render_as_string(hide_password=False)
+                    datasources.append(
+                        {
+                            "database_name": doris_model.name,
+                            "sqlalchemy_uri": sqlalchemy_uri,
+                            "expose_in_sqllab": True,
                         }
                     )
 

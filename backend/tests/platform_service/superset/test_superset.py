@@ -113,7 +113,8 @@ async def test_superset_template_rendering(mock_service_dependencies):
         PgSqlPlatformService,
         LdapConfigService,
         DatabaseSourceService,
-        TrinoPlatformService
+        TrinoPlatformService,
+        DorisPlatformService
     )
 
     model = SupersetPlatform(
@@ -123,6 +124,7 @@ async def test_superset_template_rendering(mock_service_dependencies):
         platform_pgsql_id=10,
         database_source_ids=[20],
         trino_ids=[30],
+        doris_ids=[40],
         auth_role_mapping=[
             SupersetRoleMapping(entity="admin@mindweaver.io", role="Admin"),
             SupersetRoleMapping(entity="admin@mindweaver.io", role="Alpha"),
@@ -189,16 +191,29 @@ async def test_superset_template_rendering(mock_service_dependencies):
     mock_trino_svc.platform_state = AsyncMock(return_value=mock_trino_state)
     mock_trino_svc._resolve_namespace = AsyncMock(return_value="trino-ns")
 
+    # Mock DorisPlatformService
+    mock_doris_svc = MagicMock()
+    mock_doris_model = MagicMock()
+    mock_doris_model.name = "mydoris"
+    mock_doris_model.admin_password = "doris_pass"
+    mock_doris_svc.get = AsyncMock(return_value=mock_doris_model)
+    mock_doris_state = MagicMock()
+    mock_doris_state.active = True
+    mock_doris_svc.platform_state = AsyncMock(return_value=mock_doris_state)
+    mock_doris_svc._resolve_namespace = AsyncMock(return_value="doris-ns")
+
     with patch("mindweaver.platform_service.superset.service.PgSqlPlatformService") as mock_pg_class, \
          patch("mindweaver.platform_service.superset.service.LdapConfigService") as mock_ldap_class, \
          patch("mindweaver.platform_service.superset.service.DatabaseSourceService") as mock_ds_class, \
          patch("mindweaver.platform_service.superset.service.TrinoPlatformService") as mock_trino_class, \
+         patch("mindweaver.platform_service.superset.service.DorisPlatformService") as mock_doris_class, \
          patch("mindweaver.platform_service.superset.service.decrypt_password", side_effect=lambda x: x):
         
         mock_pg_class.get_service = AsyncMock(return_value=mock_pgsql_svc)
         mock_ldap_class.get_service = AsyncMock(return_value=mock_ldap_svc)
         mock_ds_class.get_service = AsyncMock(return_value=mock_ds_svc)
         mock_trino_class.get_service = AsyncMock(return_value=mock_trino_svc)
+        mock_doris_class.get_service = AsyncMock(return_value=mock_doris_svc)
         
         # Mock project relationship
         mock_project = MagicMock()
@@ -214,13 +229,17 @@ async def test_superset_template_rendering(mock_service_dependencies):
         assert vars["ldap"]["server_url"] == "ldap://ldap:389"
         assert vars["auth_role_mapping"]["admin@mindweaver.io"] == ["Admin", "Alpha"]
         assert vars["auth_role_mapping"]["user@mindweaver.io"] == ["Gamma", "sql_lab"]
-        assert len(vars["datasources"]) == 2
+        assert len(vars["datasources"]) == 3
         
         ds_pg = next(ds for ds in vars["datasources"] if ds["database_name"] == "mypsql")
         assert "postgresql+psycopg2://usr:pass@pg-host:5432/mydb" in ds_pg["sqlalchemy_uri"]
 
         ds_trino = next(ds for ds in vars["datasources"] if ds["database_name"] == "mytrino")
         assert "trino://admin@mytrino.trino-ns.svc.cluster.local:8443" in ds_trino["sqlalchemy_uri"]
+
+        ds_doris = next(ds for ds in vars["datasources"] if ds["database_name"] == "mydoris")
+        assert "mysql+pymysql://root:doris_pass@mydoris-fe-service.doris-ns.svc.cluster.local:9030/" in ds_doris["sqlalchemy_uri"]
+        assert ds_doris["expose_in_sqllab"] is True
 
         # Verify rendered manifests (Application and Certificate)
         docs = [d for d in yaml.safe_load_all(manifest) if d is not None]
@@ -583,5 +602,155 @@ async def test_superset_datasource_trino_and_optional_fields(mock_service_depend
 
         pg_entry = next(d for d in vars["datasources"] if d["database_name"] == "pg-ds")
         assert pg_entry["sqlalchemy_uri"] == "postgresql+psycopg2://pguser:pgpass@pg-host:5432/pgdb"
+
+
+@pytest.mark.asyncio
+async def test_superset_doris_datasource_handling(mock_service_dependencies):
+    """Test Superset Doris datasource generation with special password characters and inactive cluster handling."""
+    request, session = mock_service_dependencies
+    svc = SupersetPlatformService(request, session)
+
+    model = SupersetPlatform(
+        name="test-superset-doris",
+        title="Test Superset Doris",
+        project_id=1,
+        platform_pgsql_id=1,
+        doris_ids=[101, 102],
+    )
+    assert model.doris_ids == [101, 102]
+
+    # Mock PostgreSQL
+    mock_pgsql_svc = MagicMock()
+    mock_pgsql_model = MagicMock()
+    mock_pgsql_model.name = "my-db"
+    mock_pgsql_svc.get = AsyncMock(return_value=mock_pgsql_model)
+    mock_pgsql_state = MagicMock()
+    mock_pgsql_state.active = True
+    mock_pgsql_state.db_user = "app"
+    mock_pgsql_state.db_name = "app"
+    mock_pgsql_state.db_pass = "pass"
+    mock_pgsql_state.extra_data = {"pgbouncer_host": "my-db-pooler-rw.superset-ns.svc.cluster.local"}
+    mock_pgsql_svc.platform_state = AsyncMock(return_value=mock_pgsql_state)
+    mock_pgsql_svc._resolve_namespace = AsyncMock(return_value="superset-ns")
+
+    # Mock Doris:
+    # 101: Active Doris cluster with special password chars
+    # 102: Inactive Doris cluster (should be excluded)
+    mock_doris_svc = MagicMock()
+
+    doris_active = MagicMock()
+    doris_active.id = 101
+    doris_active.name = "doris-prod"
+    doris_active.admin_password = "p@ss:word/123"
+
+    doris_inactive = MagicMock()
+    doris_inactive.id = 102
+    doris_inactive.name = "doris-dev"
+    doris_inactive.admin_password = "simplepassword"
+
+    async def get_doris(doris_id):
+        return doris_active if doris_id == 101 else doris_inactive
+
+    state_active = MagicMock()
+    state_active.active = True
+
+    state_inactive = MagicMock()
+    state_inactive.active = False
+
+    async def get_doris_state(doris_m):
+        return state_active if doris_m.id == 101 else state_inactive
+
+    mock_doris_svc.get = AsyncMock(side_effect=get_doris)
+    mock_doris_svc.platform_state = AsyncMock(side_effect=get_doris_state)
+    mock_doris_svc._resolve_namespace = AsyncMock(return_value="doris-ns")
+
+    with patch("mindweaver.platform_service.superset.service.PgSqlPlatformService") as mock_pg_class, \
+         patch("mindweaver.platform_service.superset.service.DorisPlatformService") as mock_doris_class, \
+         patch("mindweaver.platform_service.superset.service.decrypt_password", side_effect=lambda x: x):
+
+        mock_pg_class.get_service = AsyncMock(return_value=mock_pgsql_svc)
+        mock_doris_class.get_service = AsyncMock(return_value=mock_doris_svc)
+
+        mock_project = MagicMock()
+        mock_project.ldap_config_id = None
+        mock_project.ingress_domain = None
+        mock_project.name = "myproject"
+        svc.project = AsyncMock(return_value=mock_project)
+
+        vars = await svc.template_vars(model)
+        # Only active Doris (101) should be in datasources
+        assert len(vars["datasources"]) == 1
+
+        doris_entry = vars["datasources"][0]
+        assert doris_entry["database_name"] == "doris-prod"
+        assert doris_entry["expose_in_sqllab"] is True
+        # Verify URL escaping for special characters in password
+        assert "mysql+pymysql://root:p%40ss%3Aword%2F123@doris-prod-fe-service.doris-ns.svc.cluster.local:9030/" == doris_entry["sqlalchemy_uri"]
+
+
+def test_superset_none_list_fields_validation():
+    """Test that None values for list fields are gracefully coerced to empty lists."""
+    model = SupersetPlatform.model_validate(
+        {
+            "name": "test-superset-none",
+            "title": "Test Superset None",
+            "project_id": 1,
+            "platform_pgsql_id": 1,
+            "doris_ids": None,
+            "trino_ids": None,
+            "database_source_ids": None,
+            "auth_role_mapping": None,
+        }
+    )
+    assert model.doris_ids == []
+    assert model.trino_ids == []
+    assert model.database_source_ids == []
+    assert model.auth_role_mapping == []
+
+    # Also test direct instantiation with None
+    model2 = SupersetPlatform(
+        name="test-superset-none-2",
+        title="Test Superset None 2",
+        project_id=1,
+        platform_pgsql_id=1,
+        doris_ids=None,
+        trino_ids=None,
+        database_source_ids=None,
+        auth_role_mapping=None,
+    )
+    assert model2.doris_ids == []
+    assert model2.trino_ids == []
+    assert model2.database_source_ids == []
+    assert model2.auth_role_mapping == []
+
+
+@pytest.mark.asyncio
+async def test_superset_post_process_model_with_none_doris_ids(mock_service_dependencies):
+    """Test post_process_model when doris_ids or other list fields are None (e.g. from existing DB rows)."""
+    request, session = mock_service_dependencies
+    svc = SupersetPlatformService(request, session)
+
+    model = SupersetPlatform(
+        name="test-existing-db-row",
+        title="Test Existing DB Row",
+        project_id=1,
+        platform_pgsql_id=1,
+        admin_password="secret_pass",
+        superset_secret_key="secret_key",
+    )
+    # Simulate existing DB row loaded by SQLAlchemy where columns are NULL
+    object.__setattr__(model, "doris_ids", None)
+    object.__setattr__(model, "trino_ids", None)
+    object.__setattr__(model, "database_source_ids", None)
+    object.__setattr__(model, "auth_role_mapping", None)
+
+    redacted_model = await svc.post_process_model(model)
+    assert redacted_model.doris_ids == []
+    assert redacted_model.trino_ids == []
+    assert redacted_model.database_source_ids == []
+    assert redacted_model.auth_role_mapping == []
+    assert redacted_model.admin_password == "__REDACTED__"
+
+
 
 
