@@ -214,6 +214,12 @@ class SupersetPlatformService(PlatformService[SupersetPlatform]):
                 engine = ds.engine
                 if engine == "postgresql":
                     engine = "postgresql+psycopg2"
+                elif engine in ("mysql", "mariadb"):
+                    engine = "mysql+pymysql"
+                elif engine == "mssql":
+                    engine = "mssql+pymssql"
+                elif engine == "oracle":
+                    engine = "oracle+oracledb"
                 url_kwargs = {
                     "drivername": engine,
                     "username": ds.login,

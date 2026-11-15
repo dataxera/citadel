@@ -775,5 +775,80 @@ async def test_superset_post_process_model_with_none_doris_ids(mock_service_depe
     assert redacted_model.admin_password == "__REDACTED__"
 
 
+@pytest.mark.asyncio
+async def test_superset_datasource_engine_driver_mapping(mock_service_dependencies):
+    """Test that all supported data source engines are properly mapped to their respective drivers for Superset."""
+    request, session = mock_service_dependencies
+    svc = SupersetPlatformService(request, session)
+
+    engines = [
+        ("pg", "postgresql", "postgresql+psycopg2"),
+        ("my", "mysql", "mysql+pymysql"),
+        ("maria", "mariadb", "mysql+pymysql"),
+        ("ms", "mssql", "mssql+pymssql"),
+        ("ora", "oracle", "oracle+oracledb"),
+        ("tr", "trino", "trino"),
+        ("mongo", "mongodb", "mongodb"),
+    ]
+
+    mock_sources = {}
+    for idx, (prefix, eng, _) in enumerate(engines, start=1):
+        m = MagicMock()
+        m.id = idx
+        m.name = f"{prefix}-source"
+        m.engine = eng
+        m.host = f"{prefix}-host"
+        m.port = 1234
+        m.database = f"{prefix}-db"
+        m.login = "user"
+        m.password = "pass"
+        mock_sources[idx] = m
+
+    model = SupersetPlatform(
+        name="test-superset-engines",
+        title="Test Superset Engines",
+        project_id=1,
+        platform_pgsql_id=1,
+        database_source_ids=list(mock_sources.keys()),
+    )
+
+    mock_pgsql_svc = MagicMock()
+    mock_pgsql_model = MagicMock()
+    mock_pgsql_model.name = "my-db"
+    mock_pgsql_svc.get = AsyncMock(return_value=mock_pgsql_model)
+    mock_pgsql_state = MagicMock()
+    mock_pgsql_state.active = True
+    mock_pgsql_state.db_user = "app"
+    mock_pgsql_state.db_name = "app"
+    mock_pgsql_state.db_pass = "pass"
+    mock_pgsql_state.extra_data = {"pgbouncer_host": "my-db-pooler.ns.svc.cluster.local"}
+    mock_pgsql_svc.platform_state = AsyncMock(return_value=mock_pgsql_state)
+    mock_pgsql_svc._resolve_namespace = AsyncMock(return_value="ns")
+
+    mock_ds_svc = MagicMock()
+    mock_ds_svc.get = AsyncMock(side_effect=lambda ds_id: mock_sources[ds_id])
+
+    with patch("mindweaver.platform_service.superset.service.PgSqlPlatformService") as mock_pg_class, \
+         patch("mindweaver.platform_service.superset.service.DatabaseSourceService") as mock_ds_class, \
+         patch("mindweaver.platform_service.superset.service.decrypt_password", side_effect=lambda x: x):
+
+        mock_pg_class.get_service = AsyncMock(return_value=mock_pgsql_svc)
+        mock_ds_class.get_service = AsyncMock(return_value=mock_ds_svc)
+
+        mock_project = MagicMock()
+        mock_project.ldap_config_id = None
+        mock_project.ingress_domain = None
+        mock_project.name = "myproject"
+        svc.project = AsyncMock(return_value=mock_project)
+
+        vars = await svc.template_vars(model)
+        assert len(vars["datasources"]) == len(engines)
+
+        for prefix, eng, expected_driver in engines:
+            ds_entry = next(d for d in vars["datasources"] if d["database_name"] == f"{prefix}-source")
+            assert ds_entry["sqlalchemy_uri"].startswith(f"{expected_driver}://")
+
+
+
 
 
