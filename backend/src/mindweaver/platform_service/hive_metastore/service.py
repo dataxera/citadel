@@ -92,11 +92,12 @@ class HiveMetastorePlatformService(PlatformService[HiveMetastorePlatform]):
 
     async def template_vars(self, model: HiveMetastorePlatform) -> dict:
         vars = model.model_dump()
-        vars["image"], _ = await self.resolve_image(
-            model, "hive_metastore", "ghcr.io/kagesenshi/mindweaver/hive-metastore:latest"
+        resolved_img, resolved_tag = await self.resolve_image(
+            model, "hive_metastore", "ghcr.io/kagesenshi/mindweaver/hive-metastore:4.2.0-rev.6"
         )
+        vars["image"] = f"{resolved_img}:{resolved_tag}"
         chart_repo, chart_name, chart_version = await self.resolve_chart(
-            model, "hive_metastore", "main", "oci://ghcr.io/kagesenshi/mindweaver/charts/hive-metastore", "hive-metastore", "0.1.8"
+            model, "hive_metastore", "main", "oci://ghcr.io/kagesenshi/mindweaver/charts/hive-metastore", "hive-metastore", "0.1.11"
         )
         vars["chart_repo"] = chart_repo
         vars["chart_name"] = chart_name

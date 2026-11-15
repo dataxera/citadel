@@ -840,6 +840,98 @@ def test_install_doris_operator_action_triggers_task(client: TestClient):
         assert resp_state.json()["doris_operator_installed"] is True
 
 
+@pytest.mark.asyncio
+async def test_install_doris_operator_locks_image():
+    """Verify InstallDorisOperatorAction renders locked dorisOperator image repository and tag."""
+    from mindweaver.service.k8s_cluster.model import K8sCluster, K8sClusterType
+    from mindweaver.service.k8s_cluster.actions import InstallDorisOperatorAction
+    import os
+
+    cluster = K8sCluster(
+        name="test-cluster-doris",
+        title="Test Cluster Doris",
+        type=K8sClusterType.REMOTE,
+        kubeconfig="fake-kubeconfig",
+    )
+
+    mock_svc = MagicMock()
+    mock_svc.kubeconfig = pytest.importorskip("unittest.mock").AsyncMock(
+        return_value="fake-kubeconfig"
+    )
+
+    applied_manifests = []
+
+    def mock_subprocess(*args, **kwargs):
+        cmd = args
+        if len(cmd) > 0 and "kubectl" in cmd:
+            path = cmd[-1]
+            if os.path.exists(path):
+                with open(path, "r") as f:
+                    applied_manifests.append(f.read())
+        mock_proc = MagicMock()
+        mock_proc.returncode = 0
+        mock_proc.communicate = pytest.importorskip("unittest.mock").AsyncMock(
+            return_value=(b"success", b"")
+        )
+        return mock_proc
+
+    with patch("asyncio.create_subprocess_exec", side_effect=mock_subprocess):
+        action = InstallDorisOperatorAction(cluster, mock_svc)
+        await action.run()
+
+    assert len(applied_manifests) == 1
+    manifest = applied_manifests[0]
+    assert "repository: apache/doris" in manifest
+    assert 'tag: "operator-26.0.1"' in manifest
+
+
+@pytest.mark.asyncio
+async def test_install_cert_manager_locks_images():
+    """Verify InstallCertManagerAction renders locked image tags for controller, cainjector, and webhook."""
+    from mindweaver.service.k8s_cluster.model import K8sCluster, K8sClusterType
+    from mindweaver.service.k8s_cluster.actions import InstallCertManagerAction
+    import os
+
+    cluster = K8sCluster(
+        name="test-cluster-cm-tags",
+        title="Test Cluster CM Tags",
+        type=K8sClusterType.REMOTE,
+        kubeconfig="fake-kubeconfig",
+    )
+
+    mock_svc = MagicMock()
+    mock_svc.kubeconfig = pytest.importorskip("unittest.mock").AsyncMock(
+        return_value="fake-kubeconfig"
+    )
+
+    applied_manifests = []
+
+    def mock_subprocess(*args, **kwargs):
+        cmd = args
+        if len(cmd) > 0 and "kubectl" in cmd:
+            path = cmd[-1]
+            if os.path.exists(path):
+                with open(path, "r") as f:
+                    applied_manifests.append(f.read())
+        mock_proc = MagicMock()
+        mock_proc.returncode = 0
+        mock_proc.communicate = pytest.importorskip("unittest.mock").AsyncMock(
+            return_value=(b"success", b"")
+        )
+        return mock_proc
+
+    with patch("asyncio.create_subprocess_exec", side_effect=mock_subprocess):
+        action = InstallCertManagerAction(cluster, mock_svc)
+        await action.run()
+
+    assert len(applied_manifests) == 1
+    manifest = applied_manifests[0]
+    assert 'tag: "v1.20.0"' in manifest
+    assert "cainjector:" in manifest
+    assert "webhook:" in manifest
+
+
+
 
 
 

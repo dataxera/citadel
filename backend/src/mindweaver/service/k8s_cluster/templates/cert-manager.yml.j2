@@ -25,6 +25,14 @@ spec:
     helm:
       values: |
         installCRDs: true
+        image:
+          tag: "{{ controller_tag }}"
+        cainjector:
+          image:
+            tag: "{{ cainjector_tag }}"
+        webhook:
+          image:
+            tag: "{{ webhook_tag }}"
   destination:
     server: https://kubernetes.default.svc
     namespace: cert-manager

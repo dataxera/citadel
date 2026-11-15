@@ -241,3 +241,42 @@ async def test_hms_fullname_override(mock_service_dependencies):
     assert "fullnameOverride: my-custom-hms" in manifest
 
 
+@pytest.mark.asyncio
+async def test_hms_image_tag_preserved(mock_service_dependencies):
+    """Test that HiveMetastorePlatformService preserves the resolved image tag in manifests."""
+    request, session = mock_service_dependencies
+    svc = HiveMetastorePlatformService(request, session)
+
+    model = HiveMetastorePlatform(
+        name="hms-tag-test",
+        title="HMS Tag Test",
+        project_id=1,
+        database_id=10,
+    )
+
+    svc._resolve_namespace = AsyncMock(return_value="hms-ns")
+    svc.resolve_image = AsyncMock(
+        return_value=("ghcr.io/kagesenshi/mindweaver/hive-metastore", "4.2.0-rev.6")
+    )
+
+    mock_pgsql_svc = AsyncMock()
+    mock_pgsql_model = MagicMock()
+    mock_pgsql_model.name = "test-pgsql"
+    mock_pgsql_svc.get.return_value = mock_pgsql_model
+
+    mock_pgsql_state = MagicMock()
+    mock_pgsql_state.active = True
+    mock_pgsql_state.db_user = "hms_user"
+    mock_pgsql_state.db_name = "metastore"
+    mock_pgsql_state.db_pass = "secret"
+    mock_pgsql_svc.platform_state.return_value = mock_pgsql_state
+
+    with patch("mindweaver.platform_service.hive_metastore.service.PgSqlPlatformService.get_service", AsyncMock(return_value=mock_pgsql_svc)):
+        manifest = await svc.render_manifests(model)
+
+    assert 'tag: "4.2.0-rev.6"' in manifest
+    assert 'repository: "ghcr.io/kagesenshi/mindweaver/hive-metastore"' in manifest
+    assert 'tag: "latest"' not in manifest
+
+
+

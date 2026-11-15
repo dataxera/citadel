@@ -50,19 +50,11 @@ class InstallArgoCDAction(BaseAction):
             "message": "ArgoCD installation triggered and status being refreshed.",
         }
 
-    async def resolve_integration_chart(
-        self,
-        component_name: str,
-        chart_key: str = "main",
-        default_repo: str = "",
-        default_chart: str = "",
-        default_version: str = "",
-    ) -> tuple[str, str, str]:
-        """Resolve integration chart (repo, chart, version) based on stack linked to project or fall back"""
+    async def _resolve_stack(self):
+        """Resolve stack linked via projects using this cluster or fall back to latest stack."""
         if hasattr(self.session, "_mock_name") or "mock" in type(self.session).__name__.lower():
-            return default_repo, default_chart, default_version
+            return None
 
-        # 1. Find stack linked via projects using this cluster
         from mindweaver.service.project.model import Project
         from mindweaver.service.stack.model import Stack
 
@@ -79,18 +71,43 @@ class InstallArgoCDAction(BaseAction):
             logger.warning(f"Failed to query project/stack for cluster: {e}")
 
         if not stack:
-            # Fallback to latest stack
             try:
                 res_stack = await self.session.exec(select(Stack).order_by(Stack.version.desc()))
                 stack = res_stack.first()
             except Exception as e:
                 logger.warning(f"Failed to query any stack: {e}")
+        return stack
 
+    async def resolve_integration_chart(
+        self,
+        component_name: str,
+        chart_key: str = "main",
+        default_repo: str = "",
+        default_chart: str = "",
+        default_version: str = "",
+    ) -> tuple[str, str, str]:
+        """Resolve integration chart (repo, chart, version) based on stack linked to project or fall back"""
+        stack = await self._resolve_stack()
         if stack:
             repo, chart, version = stack.get_chart_for_component(component_name, chart_key)
             if repo or chart or version:
                 return repo or default_repo, chart or default_chart, version or default_version
         return default_repo, default_chart, default_version
+
+    async def resolve_integration_image(
+        self,
+        component_name: str,
+        image_key: str = "main",
+        default_image: str = "",
+        default_tag: str = "",
+    ) -> tuple[str, str]:
+        """Resolve integration image (repository, tag) based on stack linked to project or fall back."""
+        stack = await self._resolve_stack()
+        if stack:
+            img, tag = stack.get_image_for_component(component_name, image_key)
+            if img or tag:
+                return img or default_image, tag or default_tag
+        return default_image, default_tag
 
     async def resolve_integration_version(self, component_name: str, default_version: str) -> str:
         """Resolve component integration version based on stack linked to project or fall back"""
@@ -342,11 +359,23 @@ class InstallCertManagerAction(InstallArgoCDAction):
         chart_repo, chart_name, chart_version = await self.resolve_integration_chart(
             "cert-manager", "main", "https://charts.jetstack.io", "cert-manager", "v1.20.0"
         )
+        _, controller_tag = await self.resolve_integration_image(
+            "cert-manager", "main", "quay.io/jetstack/cert-manager-controller", "v1.20.0"
+        )
+        _, cainjector_tag = await self.resolve_integration_image(
+            "cert-manager", "cainjector", "quay.io/jetstack/cert-manager-cainjector", "v1.20.0"
+        )
+        _, webhook_tag = await self.resolve_integration_image(
+            "cert-manager", "webhook", "quay.io/jetstack/cert-manager-webhook", "v1.20.0"
+        )
         await self._apply_template(
             "cert-manager.yml.j2",
             chart_repo=chart_repo,
             chart_name=chart_name,
             chart_version=chart_version,
+            controller_tag=controller_tag,
+            cainjector_tag=cainjector_tag,
+            webhook_tag=webhook_tag,
         )
 
 
@@ -699,10 +728,15 @@ class InstallDorisOperatorAction(InstallArgoCDAction):
         chart_repo, chart_name, chart_version = await self.resolve_integration_chart(
             "doris-operator", "main", "https://charts.selectdb.com", "doris-operator", "25.8.0"
         )
+        image, image_tag = await self.resolve_integration_image(
+            "doris-operator", "main", "apache/doris", "operator-26.0.1"
+        )
         await self._apply_template(
             "doris-operator.yml.j2",
             chart_repo=chart_repo,
             chart_name=chart_name,
             chart_version=chart_version,
+            image=image,
+            image_tag=image_tag,
         )
 

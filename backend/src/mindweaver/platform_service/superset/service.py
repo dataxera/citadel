@@ -135,9 +135,14 @@ class SupersetPlatformService(PlatformService[SupersetPlatform]):
     async def template_vars(self, model: SupersetPlatform) -> dict:
         vars = model.model_dump()
         resolved_img, resolved_tag = await self.resolve_image(
-            model, "superset", "ghcr.io/kagesenshi/mindweaver/superset:latest"
+            model, "superset", "ghcr.io/kagesenshi/mindweaver/superset:6.1.0-rev.1"
         )
         vars["image"] = f"{resolved_img}:{resolved_tag}"
+        redis_img, redis_tag = await self.resolve_image(
+            model, "superset", "bitnamilegacy/redis", "7.0.10-debian-11-r4", image_key="redis"
+        )
+        vars["redis_image"] = redis_img
+        vars["redis_image_tag"] = redis_tag
         chart_repo, chart_name, chart_version = await self.resolve_chart(
             model, "superset", "main", "https://apache.github.io/superset", "superset", "0.15.0"
         )

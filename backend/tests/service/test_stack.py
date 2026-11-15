@@ -206,3 +206,58 @@ async def test_resolve_integration_version(mock_service_dependencies):
     version = await action.resolve_integration_version("cert-manager", "v1.20.0")
     assert version == "v1.99.0"
 
+
+def test_default_stack_file_versions_locked():
+    """Verify the default stack YAML locks chart and image versions for all components."""
+    from pathlib import Path
+    import yaml
+
+    stack_path = (
+        Path(__file__).resolve().parents[2]
+        / "src"
+        / "mindweaver"
+        / "resources"
+        / "stacks"
+        / "mindweaver-0.1.0-alpha.1.yml"
+    )
+    data = yaml.safe_load(stack_path.read_text())
+    components = data["configuration"]["components"]
+
+    expected_components = [
+        "pgsql",
+        "nifi",
+        "airflow",
+        "kafka",
+        "superset",
+        "hive_metastore",
+        "trino",
+        "argocd",
+        "cert-manager",
+        "cnpg",
+        "envoy-gateway",
+        "kafka-operator",
+        "nifikop-operator",
+        "dex",
+        "doris-operator",
+    ]
+    assert "doris" not in components, "Non-operator doris should not be in stack"
+    for comp_name in expected_components:
+        assert comp_name in components, f"Missing component {comp_name} in stack"
+        comp = components[comp_name]
+        assert "charts" in comp and "main" in comp["charts"], f"{comp_name} missing charts.main"
+        assert comp["charts"]["main"]["version"], f"{comp_name} chart version is empty"
+        assert "images" in comp and comp["images"], f"{comp_name} missing images"
+        for img_key, img_cfg in comp["images"].items():
+            assert img_cfg.get("image"), f"{comp_name}.images.{img_key} missing image"
+            assert img_cfg.get("tag"), f"{comp_name}.images.{img_key} missing tag"
+            assert img_cfg["tag"] != "latest", f"{comp_name}.images.{img_key} uses unpinned latest tag"
+            assert not img_cfg["tag"].endswith("-latest"), (
+                f"{comp_name}.images.{img_key} uses unpinned -latest tag"
+            )
+
+    assert components["doris-operator"]["images"]["main"]["tag"] == "operator-26.0.1"
+    assert components["cert-manager"]["images"]["main"]["tag"] == "v1.20.0"
+    assert components["cert-manager"]["images"]["cainjector"]["tag"] == "v1.20.0"
+    assert components["cert-manager"]["images"]["webhook"]["tag"] == "v1.20.0"
+
+

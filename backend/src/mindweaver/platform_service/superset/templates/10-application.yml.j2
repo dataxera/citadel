@@ -76,7 +76,8 @@ spec:
         redis:
           enabled: true # Internal redis for caching/celery is fine for now
           image:
-            repository: bitnamilegacy/redis
+            repository: {{ redis_image }}
+            tag: "{{ redis_image_tag }}"
         
         supersetNode:
           connections:

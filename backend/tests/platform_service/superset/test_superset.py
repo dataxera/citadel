@@ -849,6 +849,51 @@ async def test_superset_datasource_engine_driver_mapping(mock_service_dependenci
             assert ds_entry["sqlalchemy_uri"].startswith(f"{expected_driver}://")
 
 
+@pytest.mark.asyncio
+async def test_superset_redis_image_version_locked(mock_service_dependencies):
+    """Test that Superset template_vars and manifest lock the Redis image and tag."""
+    request, session = mock_service_dependencies
+    svc = SupersetPlatformService(request, session)
+
+    model = SupersetPlatform(
+        name="superset-redis-test",
+        title="Superset Redis Test",
+        project_id=1,
+        platform_pgsql_id=10,
+    )
+
+    svc._resolve_namespace = AsyncMock(return_value="ns")
+
+    mock_pgsql_svc = MagicMock()
+    mock_pgsql_model = MagicMock()
+    mock_pgsql_model.name = "my-db"
+    mock_pgsql_svc.get = AsyncMock(return_value=mock_pgsql_model)
+    mock_pgsql_state = MagicMock()
+    mock_pgsql_state.active = True
+    mock_pgsql_state.db_user = "app"
+    mock_pgsql_state.db_name = "app"
+    mock_pgsql_state.db_pass = "pass"
+    mock_pgsql_state.extra_data = {"pgbouncer_host": "my-db-pooler.ns.svc.cluster.local"}
+    mock_pgsql_svc.platform_state = AsyncMock(return_value=mock_pgsql_state)
+    mock_pgsql_svc._resolve_namespace = AsyncMock(return_value="ns")
+
+    with patch("mindweaver.platform_service.superset.service.PgSqlPlatformService") as mock_pg_class, \
+         patch("mindweaver.platform_service.superset.service.decrypt_password", side_effect=lambda x: x):
+        mock_pg_class.get_service = AsyncMock(return_value=mock_pgsql_svc)
+
+        mock_project = MagicMock()
+        mock_project.ldap_config_id = None
+        mock_project.ingress_domain = None
+        mock_project.name = "myproject"
+        svc.project = AsyncMock(return_value=mock_project)
+
+        manifest = await svc.render_manifests(model)
+
+    assert "repository: bitnamilegacy/redis" in manifest
+    assert 'tag: "7.0.10-debian-11-r4"' in manifest
+
+
+
 
 
 

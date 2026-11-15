@@ -13,6 +13,9 @@ configuration:
         main:
           image: ghcr.io/cloudnative-pg/postgresql
           tag: "18.4"
+        pgbouncer:
+          image: ghcr.io/cloudnative-pg/pgbouncer
+          tag: "1.25.1"
     nifi:
       charts:
         main:
@@ -33,6 +36,15 @@ configuration:
         main:
           image: ghcr.io/kagesenshi/mindweaver/airflow
           tag: "3.2.2-rev.5"
+        redis:
+          image: redis
+          tag: "7.2-bookworm"
+        statsd_exporter:
+          image: quay.io/prometheus/statsd-exporter
+          tag: "v0.30.0"
+        git_sync:
+          image: registry.k8s.io/git-sync/git-sync
+          tag: "v4.4.2"
 
     kafka:
       charts:
@@ -55,6 +67,12 @@ configuration:
         main:
           image: ghcr.io/kagesenshi/mindweaver/superset
           tag: "6.1.0-rev.1"
+        redis:
+          image: bitnamilegacy/redis
+          tag: "7.0.10-debian-11-r4"
+        init:
+          image: apache/superset
+          tag: "dockerize"
     hive_metastore:
       charts:
         main:
@@ -75,19 +93,9 @@ configuration:
         main:
           image: trinodb/trino
           tag: "482"
-    doris:
-      charts:
-        main:
-          repo: https://charts.selectdb.com
-          chart: doris
-          version: "25.8.0"
-      images:
-        fe:
-          image: selectdb/doris.fe-ubuntu
-          tag: "2.1.8"
-        be:
-          image: selectdb/doris.be-ubuntu
-          tag: "2.1.8"
+        prepare_tls:
+          image: eclipse-temurin
+          tag: "17-jre-alpine"
 
     # Core Kubernetes integrations
     argocd:
@@ -96,46 +104,93 @@ configuration:
           repo: https://argoproj.github.io/argo-helm
           chart: argo/argo-cd
           version: "9.4.4"
+      images:
+        main:
+          image: quay.io/argoproj/argocd
+          tag: "v2.14.2"
+        dex:
+          image: ghcr.io/dexidp/dex
+          tag: "v2.41.1"
+        redis:
+          image: public.ecr.aws/docker/library/redis
+          tag: "7.4.2-alpine"
     cert-manager:
       charts:
         main:
           repo: https://charts.jetstack.io
           chart: cert-manager
           version: "v1.20.0"
+      images:
+        main:
+          image: quay.io/jetstack/cert-manager-controller
+          tag: "v1.20.0"
+        cainjector:
+          image: quay.io/jetstack/cert-manager-cainjector
+          tag: "v1.20.0"
+        webhook:
+          image: quay.io/jetstack/cert-manager-webhook
+          tag: "v1.20.0"
     cnpg:
       charts:
         main:
           repo: https://cloudnative-pg.github.io/charts
           chart: cloudnative-pg
           version: "0.27.1"
+      images:
+        main:
+          image: ghcr.io/cloudnative-pg/cloudnative-pg
+          tag: "1.28.1"
     envoy-gateway:
       charts:
         main:
           repo: docker.io/envoyproxy
           chart: gateway-helm
           version: "1.8.1"
+      images:
+        main:
+          image: docker.io/envoyproxy/gateway
+          tag: "v1.8.1"
+        envoy:
+          image: docker.io/envoyproxy/envoy
+          tag: "distroless-v1.38.1"
     kafka-operator:
       charts:
         main:
           repo: https://strimzi.io/charts/
           chart: strimzi-kafka-operator
           version: "0.50.1"
+      images:
+        main:
+          image: quay.io/strimzi/operator
+          tag: "0.50.1"
     nifikop-operator:
       charts:
         main:
           repo: ghcr.io/konpyutaika/helm-charts
           chart: nifikop
           version: "1.17.0"
+      images:
+        main:
+          image: ghcr.io/konpyutaika/docker-images/nifikop
+          tag: "v1.17.0-release"
     dex:
       charts:
         main:
           repo: https://charts.dexidp.io
           chart: dex
           version: "0.24.1"
+      images:
+        main:
+          image: ghcr.io/dexidp/dex
+          tag: "v2.41.1"
     doris-operator:
       charts:
         main:
           repo: https://charts.selectdb.com
           chart: doris-operator
           version: "25.8.0"
+      images:
+        main:
+          image: apache/doris
+          tag: "operator-26.0.1"
 
