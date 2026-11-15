@@ -143,7 +143,35 @@ const ServiceView = ({
             });
         }
 
+        if (platformState?.kafka_external_url) {
+            endpoints.push({
+                title: 'External Kafka Bootstrap Servers (LoadBalancer)',
+                code: platformState.kafka_external_url,
+                description: 'External Kafka bootstrap connection string via LoadBalancer.'
+            });
+        }
+
+        const externalPorts = [];
+        const lbIps = platformState?.extra_data?.load_balancer_ips || [];
+        const isLbEnabled = selectedPlatform?.enable_loadbalancer || lbIps.length > 0;
+
+        if (isLbEnabled) {
+            externalPorts.push({
+                label: 'Kafka SSL LoadBalancer',
+                port: 9094,
+                load_balancer_ips: lbIps
+            });
+        }
+
         const externalPort = platformState?.node_ports?.find(np => np.port === 9094 || np.name?.endsWith('-external-bootstrap'));
+        if (externalPort) {
+            externalPorts.push({
+                label: 'Kafka SSL NodePort',
+                node_port: externalPort.node_port
+            });
+        }
+
+        const externalTarget = platformState?.kafka_external_url || (lbIps.length > 0 ? `${lbIps[0]}:9094` : (externalPort ? `${platformState?.cluster_nodes?.[0]?.ipv4 || '[NODE_IP]'}:${externalPort.node_port}` : ''));
 
         return (
             <div className="space-y-6">
@@ -155,16 +183,13 @@ const ServiceView = ({
                     />
                 )}
 
-                {externalPort && (
+                {externalPorts.length > 0 && (
                     <ExternalNetworkAccessBlock
                         darkMode={darkMode}
-                        ports={[{
-                            label: 'Kafka SSL NodePort',
-                            node_port: externalPort.node_port
-                        }]}
-                        clusterNodes={platformState.cluster_nodes}
+                        ports={externalPorts}
+                        clusterNodes={platformState?.cluster_nodes}
                         cliInfo={{
-                            command: `kcat -b ${platformState.cluster_nodes?.[0]?.ipv4 || '[NODE_IP]'}:${externalPort.node_port} -L -X security.protocol=SSL`,
+                            command: `kcat -b ${externalTarget || '[LOADBALANCER_OR_NODE_IP]:9094'} -L -X security.protocol=SSL`,
                             languageButtons: []
                         }}
                     />

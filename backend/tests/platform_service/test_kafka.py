@@ -30,6 +30,7 @@ def test_kafka_resource_defaults():
     assert model.cpu_limit == 1.0
     assert model.mem_request == 1.0
     assert model.mem_limit == 2.0
+    assert model.enable_loadbalancer is False
 
 
 def test_kafka_cpu_validation():
@@ -138,6 +139,7 @@ async def test_kafka_render_manifests(mock_service_dependencies):
     assert "github.com/kagesenshi/mindweaver" in manifests
     assert "size: \"20Gi\"" in manifests
     assert "namespace: test-ns" in manifests
+    assert "enableLoadBalancer: false" in manifests
 
 
 @pytest.mark.asyncio
@@ -222,7 +224,8 @@ async def test_kafka_ssl_certificate_rendering(mock_service_dependencies):
     assert "secretName: my-kafka-tls" in manifests
     assert "name: mock-project-selfsigned-issuer" in manifests
     assert "kind: Issuer" in manifests
-    assert "my-kafka-kafka-external-bootstrap" in manifests
+    assert "my-kafka-kafka-bootstrap" in manifests
+    assert "my-kafka-kafka-external-bootstrap" not in manifests
 
 
 @pytest.mark.asyncio
@@ -259,6 +262,95 @@ async def test_kafka_poll_status_with_nodeports(mock_service_dependencies):
 
             assert mock_state.node_ports == node_ports
             assert mock_state.cluster_nodes == cluster_nodes
+
+
+@pytest.mark.asyncio
+async def test_kafka_render_manifests_with_loadbalancer(mock_service_dependencies):
+    """Test that manifests include enableLoadBalancer: true and certificate includes external bootstrap when enabled."""
+    request, session = mock_service_dependencies
+    svc = KafkaPlatformService(request, session)
+
+    model = KafkaPlatform(
+        name="lb-kafka",
+        project_id=1,
+        replica_count=3,
+        storage_size="20Gi",
+        enable_loadbalancer=True,
+    )
+
+    svc._resolve_namespace = AsyncMock(return_value="test-ns")
+    mock_project = MagicMock(ingress_domain=None)
+    mock_project.name = "mock-project"
+    svc.project = AsyncMock(return_value=mock_project)
+
+    manifests = await svc.render_manifests(model)
+
+    assert "enableLoadBalancer: true" in manifests
+    assert "lb-kafka-kafka-bootstrap" in manifests
+    assert "lb-kafka-kafka-external-bootstrap" in manifests
+
+
+@pytest.mark.asyncio
+async def test_kafka_poll_status_with_loadbalancer(mock_service_dependencies):
+    """Test that load balancer ingress IP is discovered and kafka_external_url is populated."""
+    from mindweaver.platform_service.kafka.model import KafkaPlatformState
+    request, session = mock_service_dependencies
+    svc = KafkaPlatformService(request, session)
+
+    model = KafkaPlatform(
+        name="test-kafka",
+        project_id=1,
+        enable_loadbalancer=True,
+    )
+
+    mock_state = MagicMock(spec=KafkaPlatformState)
+    mock_state.active = True
+
+    with patch.object(svc, "platform_state", AsyncMock(return_value=mock_state)), \
+         patch.object(svc, "kubeconfig", AsyncMock(return_value="mock-kubeconfig")), \
+         patch.object(svc, "_resolve_namespace", AsyncMock(return_value="test-ns")):
+
+        node_ports = []
+        cluster_nodes = [{"hostname": "node1", "ipv4": "1.2.3.4", "ipv6": None}]
+        load_balancer_ips = ["198.51.100.50"]
+
+        async def mock_poll(*args):
+            return "online", "Healthy", {"load_balancer_ips": load_balancer_ips}, node_ports, cluster_nodes, "test-kafka-kafka-bootstrap"
+
+        with patch("mindweaver.platform_service.kafka.service.asyncio.to_thread", side_effect=mock_poll):
+            mock_project = MagicMock()
+            mock_project.ingress_domain = None
+            svc.project = AsyncMock(return_value=mock_project)
+
+            await svc.poll_status(model)
+
+            assert mock_state.kafka_external_url == "198.51.100.50:9094"
+            assert mock_state.extra_data.get("load_balancer_ips") == ["198.51.100.50"]
+
+
+@pytest.mark.asyncio
+async def test_kafka_rbac_rendering(mock_service_dependencies):
+    """Test that ClusterRole and ClusterRoleBinding for node access are generated."""
+    request, session = mock_service_dependencies
+    svc = KafkaPlatformService(request, session)
+
+    model = KafkaPlatform(
+        name="my-kafka",
+        project_id=1,
+    )
+
+    svc._resolve_namespace = AsyncMock(return_value="custom-ns")
+    mock_project = MagicMock(ingress_domain=None)
+    mock_project.name = "mock-project"
+    svc.project = AsyncMock(return_value=mock_project)
+
+    manifests = await svc.render_manifests(model)
+
+    assert "kind: ClusterRole" in manifests
+    assert "name: my-kafka-custom-ns-node-reader" in manifests
+    assert "kind: ClusterRoleBinding" in manifests
+    assert "name: my-kafka-custom-ns-node-reader-binding" in manifests
+    assert "name: my-kafka-kafka" in manifests
 
 
 def test_register_poller_invalid_frequency():

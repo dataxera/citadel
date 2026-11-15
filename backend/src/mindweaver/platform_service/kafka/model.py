@@ -22,6 +22,8 @@ class KafkaPlatform(PlatformBase, table=True):
     mem_request: float = Field(default=1.0)
     mem_limit: float = Field(default=2.0)
 
+    enable_loadbalancer: bool = Field(default=False)
+
     additional_properties: dict[str, str] = Field(
         default_factory=dict,
         sa_type=JSONType(),
@@ -46,3 +48,4 @@ class KafkaPlatformState(PlatformStateBase, table=True):
 
     kafka_url: Optional[str] = Field(default=None)
     kafka_url_ipv6: Optional[str] = Field(default=None)
+    kafka_external_url: Optional[str] = Field(default=None)

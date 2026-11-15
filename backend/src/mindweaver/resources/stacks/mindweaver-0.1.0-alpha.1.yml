@@ -39,7 +39,7 @@ configuration:
         main:
           repo: ghcr.io/kagesenshi/mindweaver/charts
           chart: kafka
-          version: "0.1.2"
+          version: "0.1.3"
       images:
         main:
           image: ghcr.io/kagesenshi/mindweaver/kafka

@@ -19,3 +19,5 @@ controller:
       memory: 2
   persistence:
     size: "20Gi"
+
+enableLoadBalancer: false

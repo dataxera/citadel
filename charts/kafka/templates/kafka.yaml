@@ -32,9 +32,10 @@ spec:
             secretName: {{ .Values.fullnameOverride }}-tls
             certificate: tls.crt
             key: tls.key
+      {{- if .Values.enableLoadBalancer }}
       - name: external
         port: 9094
-        type: nodeport
+        type: loadbalancer
         tls: true
         authentication:
           type: tls
@@ -43,6 +44,7 @@ spec:
             secretName: {{ .Values.fullnameOverride }}-tls
             certificate: tls.crt
             key: tls.key
+      {{- end }}
     config:
       offsets.topic.replication.factor: {{ .Values.controller.replicaCount }}
       transaction.state.log.replication.factor: {{ .Values.controller.replicaCount }}

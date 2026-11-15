@@ -1,0 +1,32 @@
+# SPDX-FileCopyrightText: Copyright © 2026 Mohd Izhar Firdaus Bin Ismail
+# SPDX-License-Identifier: AGPLv3+
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ name }}-{{ namespace }}-node-reader
+  labels:
+    app.kubernetes.io/name: kafka
+    app.kubernetes.io/instance: {{ name }}
+    manager: mindweaver
+rules:
+  - apiGroups: [""]
+    resources: ["nodes"]
+    verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ name }}-{{ namespace }}-node-reader-binding
+  labels:
+    app.kubernetes.io/name: kafka
+    app.kubernetes.io/instance: {{ name }}
+    manager: mindweaver
+subjects:
+  - kind: ServiceAccount
+    name: {{ name }}-kafka
+    namespace: {{ namespace }}
+roleRef:
+  kind: ClusterRole
+  name: {{ name }}-{{ namespace }}-node-reader
+  apiGroup: rbac.authorization.k8s.io

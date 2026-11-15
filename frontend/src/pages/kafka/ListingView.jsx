@@ -48,6 +48,9 @@ const ListingView = ({
         if (platform.replica_count) {
             badges.push({ text: `${platform.replica_count} replica(s)`, variant: "mw-badge-info" });
         }
+        if (platform.enable_loadbalancer) {
+            badges.push({ text: "LoadBalancer", variant: "mw-badge-accent" });
+        }
         if (state.message) {
             badges.push({ text: state.message, variant: "mw-badge-info" });
         }

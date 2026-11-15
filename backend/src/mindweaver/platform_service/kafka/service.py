@@ -74,6 +74,11 @@ class KafkaPlatformService(PlatformService[KafkaPlatform]):
                 "step": 0.5,
                 "label": "Memory Limit (Gi)",
             },
+            "enable_loadbalancer": {
+                "order": 15,
+                "type": "boolean",
+                "label": "Enable Load Balancer",
+            },
             "additional_properties": {
                 "order": 100,
                 "label": "Additional Properties",

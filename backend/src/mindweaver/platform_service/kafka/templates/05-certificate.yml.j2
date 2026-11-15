@@ -31,10 +31,12 @@ spec:
     - {{ name }}-kafka-bootstrap.{{ namespace }}
     - {{ name }}-kafka-bootstrap.{{ namespace }}.svc
     - {{ name }}-kafka-bootstrap.{{ namespace }}.svc.cluster.local
+    {% if enable_loadbalancer %}
     - {{ name }}-kafka-external-bootstrap
     - {{ name }}-kafka-external-bootstrap.{{ namespace }}
     - {{ name }}-kafka-external-bootstrap.{{ namespace }}.svc
     - {{ name }}-kafka-external-bootstrap.{{ namespace }}.svc.cluster.local
+    {% endif %}
     - "*.{{ name }}-kafka-brokers"
     - "*.{{ name }}-kafka-brokers.{{ namespace }}"
     - "*.{{ name }}-kafka-brokers.{{ namespace }}.svc"

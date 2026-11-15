@@ -97,6 +97,7 @@ class KafkaPoller:
             # 3. Discover Kafka service
             node_ports = []
             service_name = None
+            load_balancer_ips = []
             try:
                 services = core_v1.list_namespaced_service(namespace=namespace)
                 candidate_svcs = [
@@ -109,6 +110,16 @@ class KafkaPoller:
                     service_name = bootstrap_svc.metadata.name
                 elif candidate_svcs:
                     service_name = next((svc.metadata.name for svc in candidate_svcs if svc.metadata.name == self.model.name or svc.metadata.name.endswith("-kafka")), candidate_svcs[0].metadata.name)
+
+                # Check LoadBalancer service for external access
+                ext_bootstrap_svc = next((svc for svc in candidate_svcs if svc.metadata.name == f"{self.model.name}-kafka-external-bootstrap"), None)
+                if ext_bootstrap_svc and ext_bootstrap_svc.spec.type == "LoadBalancer":
+                    if ext_bootstrap_svc.status and ext_bootstrap_svc.status.load_balancer and ext_bootstrap_svc.status.load_balancer.ingress:
+                        for ing in ext_bootstrap_svc.status.load_balancer.ingress:
+                            if ing.ip:
+                                load_balancer_ips.append(ing.ip)
+                            elif ing.hostname:
+                                load_balancer_ips.append(ing.hostname)
 
                 for svc in candidate_svcs:
                     if svc.spec.type == "NodePort":
@@ -142,10 +153,13 @@ class KafkaPoller:
             except Exception as e:
                 logger.error(f"Failed to fetch nodes: {e}")
 
+            argo_status = argo_app.get("status", {}) or {}
+            argo_status["load_balancer_ips"] = load_balancer_ips
+
             return (
                 status,
                 message,
-                argo_app.get("status", {}),
+                argo_status,
                 node_ports,
                 cluster_nodes,
                 service_name,
@@ -185,9 +199,15 @@ class KafkaPoller:
             svc_name = service_name or self.model.name
             state.kafka_url = f"{svc_name}.{namespace}.svc.cluster.local:9092"
             state.kafka_url_ipv6 = None
+            lb_ips = extra_data.get("load_balancer_ips", [])
+            if lb_ips:
+                state.kafka_external_url = f"{lb_ips[0]}:9094"
+            else:
+                state.kafka_external_url = None
         else:
             state.kafka_url = None
             state.kafka_url_ipv6 = None
+            state.kafka_external_url = None
 
         state.last_heartbeat = ts_now()
         await self.service.session.flush()

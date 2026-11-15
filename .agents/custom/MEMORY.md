@@ -15,3 +15,9 @@ Fix: `kubectl delete secret {nifi-name}-{nodeId}-server-certificate -n {namespac
 ## Force Decommission vs Active Service Dependencies (2026-10-26)
 
 Force decommission (`force=True`) is intended to bypass Kubernetes cluster communication issues (unreachable cluster or cluster resource deletion errors), but it MUST NOT bypass the dependency check when there are still active/deployed running services depending on this service. Decommissioning a dependency while consumers are still running orphans the consumers and prevents them from rendering manifests or decommissioning cleanly. Only when dependent services are inactive (`active=False`) or already decommissioned should decommissioning proceed.
+
+## Container Management: start.sh and stop.sh (2026-11-15)
+
+Always use `./stop.sh` and `./start.sh` in the project root to stop and start the local development containers rather than manual `docker compose` or `docker compose restart` commands.
+- `./stop.sh`: invokes `docker compose --profile=app down` ensuring all profiled services (`web`, `worker`, `scheduler`, `frontend`, `proxy`, `migrate`) are cleanly brought down.
+- `./start.sh`: invokes `docker compose --profile=app up -d` ensuring the full stack and migration checks run properly.

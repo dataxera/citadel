@@ -41,6 +41,7 @@ spec:
               memory: "{{ mem_limit }}Gi"
           persistence:
             size: "{{ storage_size }}"
+        enableLoadBalancer: {{ "true" if enable_loadbalancer else "false" }}
         {% if override_image %}
         image:
           repository: "{{ image }}"
