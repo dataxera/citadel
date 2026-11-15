@@ -66,6 +66,11 @@ spec:
           tag: 6.1.0-rev.1
           {% endif %}
           pullPolicy: IfNotPresent
+
+        initImage:
+          repository: {{ init_image }}
+          tag: "{{ init_image_tag }}"
+          pullPolicy: IfNotPresent
         
         service:
           type: NodePort

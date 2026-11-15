@@ -34,6 +34,18 @@ spec:
             tag: 3.2.2-rev.9
             {% endif %}
             pullPolicy: IfNotPresent
+          redis:
+            repository: "{{ redis_image }}"
+            tag: "{{ redis_image_tag }}"
+            pullPolicy: IfNotPresent
+          statsd:
+            repository: "{{ statsd_image }}"
+            tag: "{{ statsd_image_tag }}"
+            pullPolicy: IfNotPresent
+          gitSync:
+            repository: "{{ git_sync_image }}"
+            tag: "{{ git_sync_image_tag }}"
+            pullPolicy: IfNotPresent
 
         executor: "{{ executor }}"
 

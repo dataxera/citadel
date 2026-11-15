@@ -891,6 +891,9 @@ async def test_superset_redis_image_version_locked(mock_service_dependencies):
 
     assert "repository: bitnamilegacy/redis" in manifest
     assert 'tag: "7.0.10-debian-11-r4"' in manifest
+    assert "initImage:" in manifest
+    assert "repository: apache/superset" in manifest
+    assert 'tag: "dockerize"' in manifest
 
 
 

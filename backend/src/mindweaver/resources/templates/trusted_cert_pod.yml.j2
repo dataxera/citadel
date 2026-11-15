@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: AGPLv3+
 
 - name: prepare-tls
-  image: "eclipse-temurin:17-jre-alpine"
+  image: "{{ prepare_tls_image | default('eclipse-temurin:17-jre-alpine') }}"
   command:
     - sh
     - -c

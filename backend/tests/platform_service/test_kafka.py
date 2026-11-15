@@ -135,8 +135,8 @@ async def test_kafka_render_manifests(mock_service_dependencies):
 
     assert "name: test-kafka" in manifests
     assert "replicaCount: 3" in manifests
-    assert "charts/kafka" in manifests
-    assert "github.com/kagesenshi/mindweaver" in manifests
+    assert "chart: kafka" in manifests
+    assert "ghcr.io/kagesenshi/mindweaver/charts" in manifests
     assert "size: \"20Gi\"" in manifests
     assert "namespace: test-ns" in manifests
     assert "enableLoadBalancer: false" in manifests
@@ -359,4 +359,24 @@ def test_register_poller_invalid_frequency():
         @KafkaPlatformService.register_poller(frequency=25)
         class InvalidPoller:
             pass
+
+
+@pytest.mark.asyncio
+async def test_kafka_default_image_and_chart_locked(mock_service_dependencies):
+    """Test that Kafka defaults match the locked stack image and chart versions."""
+    request, session = mock_service_dependencies
+    svc = KafkaPlatformService(request, session)
+    model = KafkaPlatform(name="my-kafka", project_id=1)
+
+    svc._resolve_namespace = AsyncMock(return_value="ns")
+    mock_project = MagicMock(ingress_domain=None)
+    mock_project.name = "mock-project"
+    svc.project = AsyncMock(return_value=mock_project)
+
+    vars = await svc.template_vars(model)
+    assert vars["image"] == "ghcr.io/kagesenshi/mindweaver/kafka"
+    assert vars["image_tag"] == "4.0.0-rev.1"
+    assert vars["chart_repo"] == "ghcr.io/kagesenshi/mindweaver/charts"
+    assert vars["chart_name"] == "kafka"
+    assert vars["chart_version"] == "0.1.3"
 

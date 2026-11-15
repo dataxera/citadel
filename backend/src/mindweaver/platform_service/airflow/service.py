@@ -143,6 +143,29 @@ class AirflowPlatformService(PlatformService[AirflowPlatform]):
             model, "airflow", "ghcr.io/kagesenshi/mindweaver/airflow:3.2.2-rev.5"
         )
         vars["image"] = f"{resolved_img}:{resolved_tag}"
+        redis_img, redis_tag = await self.resolve_image(
+            model, "airflow", "redis", "7.2-bookworm", image_key="redis"
+        )
+        vars["redis_image"] = redis_img
+        vars["redis_image_tag"] = redis_tag
+        statsd_img, statsd_tag = await self.resolve_image(
+            model,
+            "airflow",
+            "quay.io/prometheus/statsd-exporter",
+            "v0.30.0",
+            image_key="statsd_exporter",
+        )
+        vars["statsd_image"] = statsd_img
+        vars["statsd_image_tag"] = statsd_tag
+        git_sync_img, git_sync_tag = await self.resolve_image(
+            model,
+            "airflow",
+            "registry.k8s.io/git-sync/git-sync",
+            "v4.4.2",
+            image_key="git_sync",
+        )
+        vars["git_sync_image"] = git_sync_img
+        vars["git_sync_image_tag"] = git_sync_tag
         chart_repo, chart_name, chart_version = await self.resolve_chart(
             model, "airflow", "main", "https://airflow.apache.org", "airflow", "1.22.0"
         )

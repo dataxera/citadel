@@ -297,6 +297,7 @@ def test_default_stack_file_versions_locked():
         "superset",
         "hive_metastore",
         "trino",
+        "doris",
         "argocd",
         "cert-manager",
         "cnpg",
@@ -305,7 +306,6 @@ def test_default_stack_file_versions_locked():
         "nifikop-operator",
         "doris-operator",
     ]
-    assert "doris" not in components, "Non-operator doris should not be in stack"
     for comp_name in expected_components:
         assert comp_name in components, f"Missing component {comp_name} in stack"
         comp = components[comp_name]
@@ -327,6 +327,10 @@ def test_default_stack_file_versions_locked():
             )
 
     assert components["doris-operator"]["images"]["main"]["tag"] == "operator-26.0.1"
+    assert components["doris"]["images"]["fe"]["repository"] == "selectdb/doris.fe-ubuntu"
+    assert components["doris"]["images"]["fe"]["tag"] == "2.1.8"
+    assert components["doris"]["images"]["be"]["repository"] == "selectdb/doris.be-ubuntu"
+    assert components["doris"]["images"]["be"]["tag"] == "2.1.8"
     assert components["cert-manager"]["images"]["main"]["tag"] == "v1.20.0"
     assert components["cert-manager"]["images"]["cainjector"]["tag"] == "v1.20.0"
     assert components["cert-manager"]["images"]["webhook"]["tag"] == "v1.20.0"

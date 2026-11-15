@@ -477,3 +477,57 @@ async def test_airflow_redis_password_persistence_in_template_vars(test_project)
         assert vars1["redis_password"] == vars2["redis_password"]
 
 
+@pytest.mark.asyncio
+async def test_airflow_images_resolved_and_rendered():
+    """Test that Airflow resolves and renders main, redis, statsd_exporter, and git_sync images."""
+    from mindweaver.platform_service.pgsql.service import PgSqlPlatformService
+
+    req = MagicMock()
+    session = MagicMock()
+    svc = AirflowPlatformService(req, session)
+    svc._resolve_namespace = AsyncMock(return_value="ns")
+    mock_project = MagicMock()
+    mock_project.name = "myproject"
+    mock_project.ingress_domain = None
+    mock_project.ldap_config_id = None
+    svc.project = AsyncMock(return_value=mock_project)
+
+    mock_pgsql_svc = MagicMock()
+    mock_pgsql_model = MagicMock()
+    mock_pgsql_model.name = "test-pg"
+    mock_pgsql_svc.get = AsyncMock(return_value=mock_pgsql_model)
+
+    mock_pgsql_state = MagicMock()
+    mock_pgsql_state.active = True
+    mock_pgsql_state.db_user = "app"
+    mock_pgsql_state.db_name = "app"
+    mock_pgsql_state.db_pass = "pass"
+    mock_pgsql_state.extra_data = {"pgbouncer_host": "test-pg-pooler.ns.svc.cluster.local"}
+    mock_pgsql_svc.platform_state = AsyncMock(return_value=mock_pgsql_state)
+    mock_pgsql_svc._resolve_namespace = AsyncMock(return_value="ns")
+
+    async def get_service_mock(req, sess):
+        return mock_pgsql_svc
+
+    airflow_model = AirflowPlatform(
+        name="test-airflow-imgs",
+        title="Test Airflow Images",
+        project_id=1,
+        platform_pgsql_id=1,
+        redis_password=encrypt_password("redis-pwd"),
+    )
+
+    with patch.object(PgSqlPlatformService, "get_service", new=get_service_mock):
+        manifest = await svc.render_manifests(airflow_model)
+
+    assert "repository: \"ghcr.io/kagesenshi/mindweaver/airflow\"" in manifest
+    assert "tag: \"3.2.2-rev.5\"" in manifest
+    assert "repository: \"redis\"" in manifest
+    assert "tag: \"7.2-bookworm\"" in manifest
+    assert "repository: \"quay.io/prometheus/statsd-exporter\"" in manifest
+    assert "tag: \"v0.30.0\"" in manifest
+    assert "repository: \"registry.k8s.io/git-sync/git-sync\"" in manifest
+    assert "tag: \"v4.4.2\"" in manifest
+
+
+

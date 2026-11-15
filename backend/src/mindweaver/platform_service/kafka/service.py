@@ -90,10 +90,10 @@ class KafkaPlatformService(PlatformService[KafkaPlatform]):
         """Resolves template variables required for rendering manifests."""
         vars = model.model_dump()
         vars["image"], vars["image_tag"] = await self.resolve_image(
-            model, "kafka", "apache/kafka", "4.0.0-rev.0"
+            model, "kafka", "ghcr.io/kagesenshi/mindweaver/kafka", "4.0.0-rev.1"
         )
         chart_repo, chart_name, chart_version = await self.resolve_chart(
-            model, "kafka", "main", "https://github.com/kagesenshi/mindweaver.git", "charts/kafka", "0.1.0"
+            model, "kafka", "main", "ghcr.io/kagesenshi/mindweaver/charts", "kafka", "0.1.3"
         )
         vars["chart_repo"] = chart_repo
         vars["chart_name"] = chart_name

@@ -143,6 +143,11 @@ class SupersetPlatformService(PlatformService[SupersetPlatform]):
         )
         vars["redis_image"] = redis_img
         vars["redis_image_tag"] = redis_tag
+        init_img, init_tag = await self.resolve_image(
+            model, "superset", "apache/superset", "dockerize", image_key="init"
+        )
+        vars["init_image"] = init_img
+        vars["init_image_tag"] = init_tag
         chart_repo, chart_name, chart_version = await self.resolve_chart(
             model, "superset", "main", "https://apache.github.io/superset", "superset", "0.15.0"
         )

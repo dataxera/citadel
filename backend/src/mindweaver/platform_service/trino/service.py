@@ -158,10 +158,14 @@ class TrinoPlatformService(PlatformService[TrinoPlatform]):
         for f in self.redacted_fields():
             vars.pop(f, None)
         resolved_img, resolved_tag = await self.resolve_image(
-            model, "trino", "trinodb/trino:latest"
+            model, "trino", "trinodb/trino:482"
         )
         vars["image"] = f"{resolved_img}:{resolved_tag}"
         vars["image_tag"] = resolved_tag
+        tls_img, tls_tag = await self.resolve_image(
+            model, "trino", "eclipse-temurin", "17-jre-alpine", image_key="prepare_tls"
+        )
+        vars["prepare_tls_image"] = f"{tls_img}:{tls_tag}"
         chart_repo, chart_name, chart_version = await self.resolve_chart(
             model, "trino", "main", "https://trinodb.github.io/charts", "trino", "1.41.0"
         )

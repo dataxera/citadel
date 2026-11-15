@@ -69,6 +69,11 @@ spec:
             type: rw
             poolMode: {{ pgbouncer_pool_mode }}
             instances: 1
+            template:
+              spec:
+                containers:
+                  - name: pgbouncer
+                    image: {{ pgbouncer_image }}
             parameters:
               max_client_conn: "1000"
               default_pool_size: "{{ pgbouncer_pool_size }}"

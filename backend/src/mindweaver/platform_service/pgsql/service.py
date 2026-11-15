@@ -128,7 +128,7 @@ class PgSqlPlatformService(PlatformService[PgSqlPlatform]):
 
         # Parse image catalog and version from model
         image_resolved, tag_resolved = await self.resolve_image(
-            model, "pgsql", "ghcr.io/cloudnative-pg/postgresql:18"
+            model, "pgsql", "ghcr.io/cloudnative-pg/postgresql:18.4"
         )
         vars["image_name"] = f"{image_resolved}:{tag_resolved}"
         if tag_resolved.isdigit():
@@ -137,6 +137,11 @@ class PgSqlPlatformService(PlatformService[PgSqlPlatform]):
         else:
             vars["image_catalog_name"] = "default"
             vars["image_major_version"] = 18
+
+        pgbouncer_img, pgbouncer_tag = await self.resolve_image(
+            model, "pgsql", "ghcr.io/cloudnative-pg/pgbouncer", "1.25.1", image_key="pgbouncer"
+        )
+        vars["pgbouncer_image"] = f"{pgbouncer_img}:{pgbouncer_tag}"
 
 
         if model.s3_storage_id:
