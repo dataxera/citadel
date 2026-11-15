@@ -30,6 +30,7 @@ Currently, the frontend relies on manual verification. When implementing new UI 
 - Verify responsiveness across different screen sizes.
 - Ensure that dynamic forms render correctly based on backend metadata.
 - Check that all interactive elements have semantic identifiers for future automation.
+- Follow the comprehensive **[Human Tester Manual](../tester-manual.md)** to validate all core application workflows end-to-end.
 
 ## CI/CD
 
