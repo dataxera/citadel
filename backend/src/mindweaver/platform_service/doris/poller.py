@@ -102,25 +102,30 @@ class DorisPoller:
             except Exception as e:
                 logger.error(f"Failed to fetch pods for {self.model.name}: {e}")
 
-            # 3. Fetch NodePorts
+            # 3. NodePorts are intentionally disabled (FE/BE are internal ClusterIP services; Web UI uses Ingress)
             node_ports = []
+
+            # Fetch LoadBalancer IPs for MySQL query service
+            load_balancer_ips = []
             try:
-                services = core_v1.list_namespaced_service(namespace=namespace)
-                for svc in services.items:
-                    if svc.metadata.name.startswith(self.model.name):
-                        if svc.spec.type == "NodePort":
-                            for port in svc.spec.ports:
-                                protocol = "mysql" if port.port == 9030 else ("https" if port.port == 443 else "http")
-                                node_ports.append(
-                                    {
-                                        "name": svc.metadata.name,
-                                        "port": port.port,
-                                        "node_port": port.node_port,
-                                        "protocol": protocol,
-                                    }
-                                )
+                lb_svc = core_v1.read_namespaced_service(
+                    name=f"{self.model.name}-mysql-lb",
+                    namespace=namespace,
+                )
+                if (
+                    lb_svc.spec
+                    and lb_svc.spec.type == "LoadBalancer"
+                    and lb_svc.status
+                    and lb_svc.status.load_balancer
+                    and lb_svc.status.load_balancer.ingress
+                ):
+                    for ing in lb_svc.status.load_balancer.ingress:
+                        if ing.ip:
+                            load_balancer_ips.append(ing.ip)
+                        elif ing.hostname:
+                            load_balancer_ips.append(ing.hostname)
             except Exception as e:
-                logger.error(f"Failed to fetch services for {self.model.name}: {e}")
+                logger.debug(f"LoadBalancer service {self.model.name}-mysql-lb not ready or not found: {e}")
 
             # 4. Fetch Nodes for IP info
             cluster_nodes = []
@@ -140,10 +145,13 @@ class DorisPoller:
             except Exception as e:
                 logger.error(f"Failed to fetch nodes: {e}")
 
+            argo_status = argo_app.get("status", {}) or {}
+            argo_status["load_balancer_ips"] = load_balancer_ips
+
             return (
                 status,
                 message,
-                argo_app.get("status", {}),
+                argo_status,
                 node_ports,
                 cluster_nodes,
             )
@@ -191,21 +199,15 @@ class DorisPoller:
 
         # Derive Query and HTTP URIs
         if status == "online":
-            mysql_np = next((np for np in node_ports if np["port"] == 9030), None)
-            http_np = next((np for np in node_ports if np["port"] == 8030), None)
-            node_v4 = next((n for n in cluster_nodes if n["ipv4"]), None)
-
-            # Query URI
-            if mysql_np and node_v4:
-                state.query_uri = f"mysql://root:{admin_pass}@{node_v4['ipv4']}:{mysql_np['node_port']}"
+            lb_ips = extra_data.get("load_balancer_ips", [])
+            if lb_ips:
+                state.query_uri = f"mysql://root:{admin_pass}@{lb_ips[0]}:3306"
             else:
                 state.query_uri = f"mysql://root:{admin_pass}@{self.model.name}-fe-service.{namespace}.svc.cluster.local:9030"
 
-            # HTTP URI
+            # HTTP URI (Ingress when configured, otherwise internal ClusterIP service)
             if project.ingress_domain:
                 state.fe_http_uri = f"https://{self.model.name}.{project.ingress_domain}"
-            elif http_np and node_v4:
-                state.fe_http_uri = f"http://{node_v4['ipv4']}:{http_np['node_port']}"
             else:
                 state.fe_http_uri = f"http://{self.model.name}-fe-service.{namespace}.svc.cluster.local:8030"
 

@@ -157,20 +157,15 @@ const ServiceView = ({
             isIngressUsed = true;
         }
 
-        if (platformState?.node_ports && platformState.node_ports.length > 0) {
-            platformState.node_ports.forEach(np => {
-                ports.push({
-                    label: np.port === 9030 ? 'MySQL Query' : (np.port === 8030 ? 'Web UI' : np.name),
-                    node_port: np.node_port,
-                    port: np.port,
-                    scheme: np.port === 8030 ? 'http' : (np.port === 443 ? 'https' : undefined),
-                });
-            });
-        }
+        const lbIps = platformState?.extra_data?.load_balancer_ips || [];
+        ports.push({
+            label: 'MySQL Query (LoadBalancer)',
+            port: 3306,
+            load_balancer_ips: lbIps
+        });
 
-        const mysqlNodePort = platformState?.node_ports?.find(np => np.port === 9030);
-        const cliInfo = mysqlNodePort ? {
-            command: (node) => `mysql -h ${node?.hostname || platformState?.cluster_nodes?.[0]?.hostname || '[NODE_HOSTNAME]'} -P ${mysqlNodePort.node_port} -u root -p`,
+        const cliInfo = lbIps.length > 0 ? {
+            command: () => `mysql -h ${lbIps[0]} -P 3306 -u root -p`,
             languageButtons: []
         } : null;
 

@@ -33,7 +33,7 @@ spec:
             repository: "{{ fe_image }}"
             tag: "{{ fe_image_tag }}"
           service:
-            type: NodePort
+            type: ClusterIP
           resource:
             requests:
               cpu: "{{ fe_cpu_request }}"
@@ -53,7 +53,7 @@ spec:
             repository: "{{ be_image }}"
             tag: "{{ be_image_tag }}"
           service:
-            type: NodePort
+            type: ClusterIP
           resource:
             requests:
               cpu: "{{ be_cpu_request }}"

@@ -225,10 +225,17 @@ async def test_doris_render_manifests(mock_service_dependencies):
     manifests = await svc.render_manifests(model)
     assert "kind: Application" in manifests
     assert "kind: Secret" in manifests
+    assert "kind: Service" in manifests
     assert "kind: HTTPRoute" in manifests
     assert "kind: Job" in manifests
     assert "doris-main" in manifests
+    assert "doris-main-mysql-lb" in manifests
     assert "doris_operator" in manifests
+    assert "type: ClusterIP" in manifests
+    assert "type: LoadBalancer" in manifests
+    assert "port: 3306" in manifests
+    assert "targetPort: 9030" in manifests
+    assert "type: NodePort" not in manifests
 
 
 @pytest.mark.asyncio
@@ -255,11 +262,12 @@ async def test_doris_poller(mock_service_dependencies):
         mock_thread.return_value = (
             "online",
             "Sync: Synced, Health: Healthy | Pods: FE 3/3, BE 3/3",
-            {"sync": {"status": "Synced"}, "health": {"status": "Healthy"}},
-            [
-                {"name": "doris-test-fe-service", "port": 9030, "node_port": 30930, "protocol": "mysql"},
-                {"name": "doris-test-fe-service", "port": 8030, "node_port": 30830, "protocol": "http"},
-            ],
+            {
+                "sync": {"status": "Synced"},
+                "health": {"status": "Healthy"},
+                "load_balancer_ips": ["10.20.30.40"],
+            },
+            [],
             [{"hostname": "node1", "ipv4": "192.168.1.100", "ipv6": None}],
         )
 
@@ -267,7 +275,20 @@ async def test_doris_poller(mock_service_dependencies):
         await poller.poll()
 
         assert state.status == "online"
-        assert state.query_uri == "mysql://root:supersecret123@192.168.1.100:30930"
+        assert state.node_ports == []
+        assert state.extra_data["load_balancer_ips"] == ["10.20.30.40"]
+        assert state.query_uri == "mysql://root:supersecret123@10.20.30.40:3306"
         assert state.admin_password == "supersecret123"
         assert state.operator_user == "doris_operator"
         assert state.fe_http_uri == "https://doris-test.example.com"
+
+        # Fallback to internal service when LoadBalancer IP is not yet assigned
+        mock_thread.return_value = (
+            "online",
+            "Sync: Synced, Health: Healthy | Pods: FE 3/3, BE 3/3",
+            {"sync": {"status": "Synced"}, "health": {"status": "Healthy"}},
+            [],
+            [{"hostname": "node1", "ipv4": "192.168.1.100", "ipv6": None}],
+        )
+        await poller.poll()
+        assert state.query_uri == "mysql://root:supersecret123@doris-test-fe-service.default.svc.cluster.local:9030"
