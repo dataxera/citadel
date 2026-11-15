@@ -15,7 +15,7 @@ class Stack(NamedBase, table=True):
 
     def get_image_for_component(self, component_name: str, image_key: str = "main") -> tuple[str | None, str | None]:
         """
-        Returns (image_url, image_tag) for the given component and image key.
+        Returns (image_repository, image_tag) for the given component and image key.
         """
         components = self.configuration.get("components", {})
         comp = components.get(component_name)
@@ -25,7 +25,22 @@ class Stack(NamedBase, table=True):
         img_info = images.get(image_key)
         if not img_info:
             return None, None
-        return img_info.get("image"), img_info.get("tag")
+        return img_info.get("repository"), img_info.get("tag")
+
+    def get_package_type_for_component(self, component_name: str) -> str | None:
+        """
+        Returns the package type ('helm' or 'yml') for the given component, or None if not found.
+        """
+        components = self.configuration.get("components", {})
+        comp = components.get(component_name)
+        if not comp:
+            return None
+        package_type = comp.get("package_type")
+        if package_type in ("helm", "yml"):
+            return package_type
+        if comp.get("charts") or comp.get("chart_version"):
+            return "helm"
+        return "yml"
 
     def get_custom_config(self, component_name: str) -> dict[str, Any]:
         """

@@ -137,7 +137,6 @@ const ServiceView = ({
     const [isCreateOpen, setIsCreateOpen] = useState(false);
     const [editItem, setEditItem] = useState(null);
     const [deleteItem, setDeleteItem] = useState(null);
-    const [isInstallingDex, setIsInstallingDex] = useState(false);
     const [isSyncing, setIsSyncing] = useState(false);
     const [enableDex, setEnableDex] = useState(false);
 
@@ -218,21 +217,6 @@ const ServiceView = ({
     useVisibilityPolling(pollProjectState, Boolean(selectedProjectId));
 
     const projectUsers = localUsers.filter(u => u.project_id === selectedProjectId);
-
-    const handleInstallDex = async () => {
-        setIsInstallingDex(true);
-        try {
-            await projectsHook.executeAction(selectedProjectId, 'install_dex');
-            showSuccess("Dex installation triggered for this project");
-            const newState = await getProjectState(selectedProjectId);
-            setProjectState(newState);
-        } catch (e) {
-            console.error(e);
-            showError("Failed to trigger Dex installation");
-        } finally {
-            setIsInstallingDex(false);
-        }
-    };
 
     const resourceCards = [
         {
@@ -458,73 +442,6 @@ ${projectState.cluster_node_ips?.map((ip, idx) => `    server node${idx + 1} ${i
                     </div>
                 )}
             </div>
-
-            {/* Dex OIDC Integration */}
-            {enableDex && (
-                <div className="mw-card p-8 space-y-6 animate-in slide-in-from-bottom duration-700">
-                    <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-4">
-                            <div className="mw-icon-box text-indigo-500">
-                                <Shield size={24} />
-                            </div>
-                            <div>
-                                <h3 className="text-2xl font-bold text-slate-900 dark:text-white">Dex OIDC Integration</h3>
-                                <p className="text-sm text-slate-500 font-medium uppercase tracking-tight">Federated identity provider for project components</p>
-                            </div>
-                        </div>
-                        {projectState?.dex_installed ? (
-                            <div className="flex items-center gap-3">
-                                <span className="text-sm font-bold bg-green-500/10 text-green-500 px-3 py-1.5 rounded-xl border border-green-500/20 flex items-center gap-1.5">
-                                    <span className="w-2 h-2 rounded-full bg-green-500" />
-                                    {projectState.dex_version || "ACTIVE"}
-                                </span>
-                                <button
-                                    onClick={handleInstallDex}
-                                    disabled={isInstallingDex}
-                                    className="mw-btn-secondary px-6 py-2.5 flex items-center gap-2"
-                                >
-                                    {isInstallingDex ? <RefreshCw size={16} className="animate-spin" /> : <RefreshCw size={16} />}
-                                    UPDATE DEX
-                                </button>
-                            </div>
-                        ) : (
-                            <button
-                                onClick={handleInstallDex}
-                                disabled={isInstallingDex}
-                                className="mw-btn-primary px-6 py-2.5 flex items-center gap-2"
-                            >
-                                {isInstallingDex ? <RefreshCw size={16} className="animate-spin" /> : <Shield size={16} />}
-                                {isInstallingDex ? 'INSTALLING...' : 'INSTALL DEX OIDC'}
-                            </button>
-                        )}
-                    </div>
-
-                    {projectState?.dex_installed && (
-                        <div className="mt-6 border-t border-slate-100 dark:border-slate-800/80 pt-6 space-y-4" id="dex-connection-details">
-                            <h4 className="text-sm font-bold uppercase tracking-wider text-slate-400">Connection Details</h4>
-                            <div className="grid grid-cols-1 gap-4">
-                                <div className="bg-slate-50 dark:bg-slate-900/50 p-4 rounded-xl border border-slate-100 dark:border-slate-800/50">
-                                    <span className="text-xs font-bold uppercase tracking-wider text-slate-400">OIDC Discovery URL</span>
-                                    <div className="mt-1 flex items-center justify-between gap-2">
-                                        <a
-                                            href={selectedProject.ingress_domain 
-                                                ? `https://dex.${selectedProject.ingress_domain}/dex/.well-known/openid-configuration` 
-                                                : `http://dex.${selectedProject.k8s_namespace || selectedProject.name}.svc.cluster.local:5556/dex/.well-known/openid-configuration`}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="text-sm font-mono text-indigo-500 hover:text-indigo-600 dark:text-indigo-400 dark:hover:text-indigo-300 break-all transition-colors"
-                                        >
-                                            {selectedProject.ingress_domain 
-                                                ? `https://dex.${selectedProject.ingress_domain}/dex/.well-known/openid-configuration` 
-                                                : `http://dex.${selectedProject.k8s_namespace || selectedProject.name}.svc.cluster.local:5556/dex/.well-known/openid-configuration`}
-                                        </a>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    )}
-                </div>
-            )}
 
             {/* Project Local Users Management */}
             {enableDex && (

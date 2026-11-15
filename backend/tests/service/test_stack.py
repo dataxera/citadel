@@ -35,7 +35,7 @@ def test_stack_chart_version_resolution():
                 "trino": {
                     "chart_version": "2.0.0",
                     "images": {
-                        "main": {"image": "trinodb/trino", "tag": "400"}
+                        "main": {"repository": "trinodb/trino", "tag": "400"}
                     }
                 },
                 "nifi": {
@@ -85,6 +85,72 @@ def test_stack_chart_resolution():
     assert stack.get_chart_for_component("nifi", "custom") == ("my-repo", "my-chart", "2.0.0")
     assert stack.get_chart_for_component("nifi", "nonexistent") == (None, None, None)
     assert stack.get_chart_for_component("nonexistent") == (None, None, None)
+
+
+def test_stack_image_resolution():
+    """Test get_image_for_component returns (repository, tag) for single and multiple images."""
+    stack = Stack(
+        name="test-stack",
+        version="1.0.0",
+        configuration={
+            "components": {
+                "pgsql": {
+                    "package_type": "helm",
+                    "images": {
+                        "main": {
+                            "repository": "ghcr.io/cloudnative-pg/postgresql",
+                            "tag": "18.4",
+                        },
+                        "pgbouncer": {
+                            "repository": "ghcr.io/cloudnative-pg/pgbouncer",
+                            "tag": "1.25.1",
+                        },
+                    },
+                }
+            }
+        },
+    )
+
+    assert stack.get_image_for_component("pgsql", "main") == (
+        "ghcr.io/cloudnative-pg/postgresql",
+        "18.4",
+    )
+    assert stack.get_image_for_component("pgsql", "pgbouncer") == (
+        "ghcr.io/cloudnative-pg/pgbouncer",
+        "1.25.1",
+    )
+    assert stack.get_image_for_component("pgsql", "nonexistent") == (None, None)
+    assert stack.get_image_for_component("nonexistent") == (None, None)
+
+
+def test_stack_package_type_resolution():
+    """Test get_package_type_for_component handles explicit and inferred package types."""
+    stack = Stack(
+        name="test-stack",
+        version="1.0.0",
+        configuration={
+            "components": {
+                "explicit_helm": {"package_type": "helm"},
+                "explicit_yml": {"package_type": "yml"},
+                "inferred_helm": {
+                    "charts": {
+                        "main": {"repo": "https://example.com", "chart": "app", "version": "1.0.0"}
+                    }
+                },
+                "inferred_yml": {
+                    "images": {
+                        "main": {"repository": "example/app", "tag": "1.0.0"}
+                    }
+                },
+            }
+        },
+    )
+
+    assert stack.get_package_type_for_component("explicit_helm") == "helm"
+    assert stack.get_package_type_for_component("explicit_yml") == "yml"
+    assert stack.get_package_type_for_component("inferred_helm") == "helm"
+    assert stack.get_package_type_for_component("inferred_yml") == "yml"
+    assert stack.get_package_type_for_component("nonexistent") is None
 
 
 @pytest.mark.asyncio
@@ -237,18 +303,23 @@ def test_default_stack_file_versions_locked():
         "envoy-gateway",
         "kafka-operator",
         "nifikop-operator",
-        "dex",
         "doris-operator",
     ]
     assert "doris" not in components, "Non-operator doris should not be in stack"
     for comp_name in expected_components:
         assert comp_name in components, f"Missing component {comp_name} in stack"
         comp = components[comp_name]
-        assert "charts" in comp and "main" in comp["charts"], f"{comp_name} missing charts.main"
-        assert comp["charts"]["main"]["version"], f"{comp_name} chart version is empty"
+        assert comp.get("package_type") in ("helm", "yml"), (
+            f"{comp_name} missing or invalid package_type"
+        )
+        if comp["package_type"] == "helm":
+            assert "charts" in comp and "main" in comp["charts"], f"{comp_name} missing charts.main"
+            assert comp["charts"]["main"].get("repo"), f"{comp_name} chart repo is empty"
+            assert comp["charts"]["main"].get("chart"), f"{comp_name} chart name is empty"
+            assert comp["charts"]["main"].get("version"), f"{comp_name} chart version is empty"
         assert "images" in comp and comp["images"], f"{comp_name} missing images"
         for img_key, img_cfg in comp["images"].items():
-            assert img_cfg.get("image"), f"{comp_name}.images.{img_key} missing image"
+            assert img_cfg.get("repository"), f"{comp_name}.images.{img_key} missing repository"
             assert img_cfg.get("tag"), f"{comp_name}.images.{img_key} missing tag"
             assert img_cfg["tag"] != "latest", f"{comp_name}.images.{img_key} uses unpinned latest tag"
             assert not img_cfg["tag"].endswith("-latest"), (

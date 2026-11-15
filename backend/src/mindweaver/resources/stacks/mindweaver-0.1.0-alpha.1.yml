@@ -4,6 +4,7 @@ version: 0.1.0-alpha.1
 configuration:
   components:
     pgsql:
+      package_type: helm
       charts:
         main:
           repo: https://cloudnative-pg.github.io/charts
@@ -11,12 +12,13 @@ configuration:
           version: "0.5.0"
       images:
         main:
-          image: ghcr.io/cloudnative-pg/postgresql
+          repository: ghcr.io/cloudnative-pg/postgresql
           tag: "18.4"
         pgbouncer:
-          image: ghcr.io/cloudnative-pg/pgbouncer
+          repository: ghcr.io/cloudnative-pg/pgbouncer
           tag: "1.25.1"
     nifi:
+      package_type: helm
       charts:
         main:
           repo: ghcr.io/konpyutaika/helm-charts
@@ -24,9 +26,10 @@ configuration:
           version: "1.17.0"
       images:
         main:
-          image: apache/nifi
+          repository: apache/nifi
           tag: "2.9.0"
     airflow:
+      package_type: helm
       charts:
         main:
           repo: https://airflow.apache.org
@@ -34,19 +37,19 @@ configuration:
           version: "1.22.0"
       images:
         main:
-          image: ghcr.io/kagesenshi/mindweaver/airflow
+          repository: ghcr.io/kagesenshi/mindweaver/airflow
           tag: "3.2.2-rev.5"
         redis:
-          image: redis
+          repository: redis
           tag: "7.2-bookworm"
         statsd_exporter:
-          image: quay.io/prometheus/statsd-exporter
+          repository: quay.io/prometheus/statsd-exporter
           tag: "v0.30.0"
         git_sync:
-          image: registry.k8s.io/git-sync/git-sync
+          repository: registry.k8s.io/git-sync/git-sync
           tag: "v4.4.2"
-
     kafka:
+      package_type: helm
       charts:
         main:
           repo: ghcr.io/kagesenshi/mindweaver/charts
@@ -54,10 +57,10 @@ configuration:
           version: "0.1.3"
       images:
         main:
-          image: ghcr.io/kagesenshi/mindweaver/kafka
+          repository: ghcr.io/kagesenshi/mindweaver/kafka
           tag: "4.0.0-rev.1"
-
     superset:
+      package_type: helm
       charts:
         main:
           repo: https://apache.github.io/superset
@@ -65,15 +68,16 @@ configuration:
           version: "0.15.0"
       images:
         main:
-          image: ghcr.io/kagesenshi/mindweaver/superset
+          repository: ghcr.io/kagesenshi/mindweaver/superset
           tag: "6.1.0-rev.1"
         redis:
-          image: bitnamilegacy/redis
+          repository: bitnamilegacy/redis
           tag: "7.0.10-debian-11-r4"
         init:
-          image: apache/superset
+          repository: apache/superset
           tag: "dockerize"
     hive_metastore:
+      package_type: helm
       charts:
         main:
           repo: ghcr.io/kagesenshi/mindweaver/charts
@@ -81,9 +85,10 @@ configuration:
           version: "0.1.11"
       images:
         main:
-          image: ghcr.io/kagesenshi/mindweaver/hive-metastore
+          repository: ghcr.io/kagesenshi/mindweaver/hive-metastore
           tag: "4.2.0-rev.6"
     trino:
+      package_type: helm
       charts:
         main:
           repo: https://trinodb.github.io/charts
@@ -91,14 +96,15 @@ configuration:
           version: "1.41.0"
       images:
         main:
-          image: trinodb/trino
+          repository: trinodb/trino
           tag: "482"
         prepare_tls:
-          image: eclipse-temurin
+          repository: eclipse-temurin
           tag: "17-jre-alpine"
 
     # Core Kubernetes integrations
     argocd:
+      package_type: helm
       charts:
         main:
           repo: https://argoproj.github.io/argo-helm
@@ -106,15 +112,16 @@ configuration:
           version: "9.4.4"
       images:
         main:
-          image: quay.io/argoproj/argocd
+          repository: quay.io/argoproj/argocd
           tag: "v2.14.2"
         dex:
-          image: ghcr.io/dexidp/dex
+          repository: ghcr.io/dexidp/dex
           tag: "v2.41.1"
         redis:
-          image: public.ecr.aws/docker/library/redis
+          repository: public.ecr.aws/docker/library/redis
           tag: "7.4.2-alpine"
     cert-manager:
+      package_type: helm
       charts:
         main:
           repo: https://charts.jetstack.io
@@ -122,15 +129,16 @@ configuration:
           version: "v1.20.0"
       images:
         main:
-          image: quay.io/jetstack/cert-manager-controller
+          repository: quay.io/jetstack/cert-manager-controller
           tag: "v1.20.0"
         cainjector:
-          image: quay.io/jetstack/cert-manager-cainjector
+          repository: quay.io/jetstack/cert-manager-cainjector
           tag: "v1.20.0"
         webhook:
-          image: quay.io/jetstack/cert-manager-webhook
+          repository: quay.io/jetstack/cert-manager-webhook
           tag: "v1.20.0"
     cnpg:
+      package_type: helm
       charts:
         main:
           repo: https://cloudnative-pg.github.io/charts
@@ -138,9 +146,10 @@ configuration:
           version: "0.27.1"
       images:
         main:
-          image: ghcr.io/cloudnative-pg/cloudnative-pg
+          repository: ghcr.io/cloudnative-pg/cloudnative-pg
           tag: "1.28.1"
     envoy-gateway:
+      package_type: helm
       charts:
         main:
           repo: docker.io/envoyproxy
@@ -148,12 +157,13 @@ configuration:
           version: "1.8.1"
       images:
         main:
-          image: docker.io/envoyproxy/gateway
+          repository: docker.io/envoyproxy/gateway
           tag: "v1.8.1"
         envoy:
-          image: docker.io/envoyproxy/envoy
+          repository: docker.io/envoyproxy/envoy
           tag: "distroless-v1.38.1"
     kafka-operator:
+      package_type: helm
       charts:
         main:
           repo: https://strimzi.io/charts/
@@ -161,9 +171,10 @@ configuration:
           version: "0.50.1"
       images:
         main:
-          image: quay.io/strimzi/operator
+          repository: quay.io/strimzi/operator
           tag: "0.50.1"
     nifikop-operator:
+      package_type: helm
       charts:
         main:
           repo: ghcr.io/konpyutaika/helm-charts
@@ -171,19 +182,10 @@ configuration:
           version: "1.17.0"
       images:
         main:
-          image: ghcr.io/konpyutaika/docker-images/nifikop
+          repository: ghcr.io/konpyutaika/docker-images/nifikop
           tag: "v1.17.0-release"
-    dex:
-      charts:
-        main:
-          repo: https://charts.dexidp.io
-          chart: dex
-          version: "0.24.1"
-      images:
-        main:
-          image: ghcr.io/dexidp/dex
-          tag: "v2.41.1"
     doris-operator:
+      package_type: helm
       charts:
         main:
           repo: https://charts.selectdb.com
@@ -191,6 +193,5 @@ configuration:
           version: "25.8.0"
       images:
         main:
-          image: apache/doris
+          repository: apache/doris
           tag: "operator-26.0.1"
-
