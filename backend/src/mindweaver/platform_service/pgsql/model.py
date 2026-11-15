@@ -33,6 +33,9 @@ class PgSqlPlatform(PlatformBase, table=True):
     pgbouncer_pool_mode: str = Field(default="transaction")
     pgbouncer_pool_size: int = Field(default=50)
 
+    # Network exposure configuration
+    enable_loadbalancer: bool = Field(default=False)
+
     @field_validator("pgbouncer_pool_mode")
     @classmethod
     def validate_pgbouncer_pool_mode(cls, v: str) -> str:

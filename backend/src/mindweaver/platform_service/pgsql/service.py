@@ -106,6 +106,11 @@ class PgSqlPlatformService(PlatformService[PgSqlPlatform]):
                 "max": 500,
                 "step": 10,
             },
+            "enable_loadbalancer": {
+                "order": 27,
+                "type": "boolean",
+                "label": "Enable Load Balancer",
+            },
         }
 
     async def template_vars(self, model: PgSqlPlatform) -> dict:

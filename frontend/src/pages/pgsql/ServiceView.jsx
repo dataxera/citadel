@@ -148,7 +148,8 @@ const ServiceView = ({
     };
 
     const renderConnectTab = () => {
-        const pgbouncerPort = platformState?.node_ports?.find(np => np.name.endsWith('-pgbouncer-nodeport'));
+        const lbIps = platformState?.extra_data?.load_balancer_ips || [];
+        const isLbEnabled = selectedPlatform?.enable_loadbalancer || lbIps.length > 0;
 
         return (
             <div className="space-y-6">
@@ -167,18 +168,19 @@ const ServiceView = ({
                     />
                 )}
 
-                {pgbouncerPort && (
+                {isLbEnabled && (
                     <ExternalNetworkAccessBlock
                         darkMode={darkMode}
                         ports={[{
-                            label: 'PgBouncer',
-                            node_port: pgbouncerPort.node_port
+                            label: 'PgBouncer (LoadBalancer)',
+                            port: 5432,
+                            load_balancer_ips: lbIps
                         }]}
-                        clusterNodes={platformState.cluster_nodes}
-                        cliInfo={{
-                            command: (node) => `psql "host=${node?.hostname || platformState.cluster_nodes?.[0]?.hostname || '[NODE_HOSTNAME]'} port=${pgbouncerPort.node_port} user=${platformState?.db_user || 'pending'} dbname=${platformState?.db_name || 'pending'}"`,
+                        clusterNodes={platformState?.cluster_nodes || []}
+                        cliInfo={lbIps.length > 0 ? {
+                            command: () => `psql "host=${lbIps[0]} port=5432 user=${platformState?.db_user || 'pending'} dbname=${platformState?.db_name || 'pending'}"`,
                             languageButtons: ['python']
-                        }}
+                        } : null}
                     />
                 )}
 

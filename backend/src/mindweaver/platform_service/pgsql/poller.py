@@ -83,36 +83,42 @@ class PgSQLPoller:
                         except Exception:
                             status = "error"
                             message = f"Cluster is unreachable: {str(e)}"
-                            return status, message, {}, [], [], {}, None
+                            return status, message, {}, [], [], {}
                 else:
                     status = "error"
                     message = f"Cluster is unreachable: {str(e)}"
-                    return status, message, {}, [], [], {}, None
+                    return status, message, {}, [], [], {}
                 status_data = {}
             except Exception as e:
                 status = "error"
                 message = f"Cluster is unreachable: {str(e)}"
-                return status, message, {}, [], [], {}, None
+                return status, message, {}, [], [], {}
 
-            # 2. Fetch NodePort status if any
+            # 2. NodePorts are intentionally disabled; fetch LoadBalancer IPs if enabled
             node_ports = []
-            pgbouncer_port = None
-            try:
-                services = core_v1.list_namespaced_service(namespace=namespace)
-                for svc in services.items:
-                    if svc.metadata.name.startswith(self.model.name):
-                        if svc.spec.type == "NodePort":
-                            for port in svc.spec.ports:
-                                entry = {
-                                    "name": svc.metadata.name,
-                                    "port": port.port,
-                                    "node_port": port.node_port,
-                                }
-                                node_ports.append(entry)
-                                if svc.metadata.name == f"{self.model.name}-pgbouncer-nodeport":
-                                    pgbouncer_port = port.node_port
-            except Exception as e:
-                logger.error(f"Failed to fetch services: {e}")
+            load_balancer_ips = []
+            if self.model.enable_loadbalancer:
+                try:
+                    lb_svc = core_v1.read_namespaced_service(
+                        name=f"{self.model.name}-pgbouncer-lb",
+                        namespace=namespace,
+                    )
+                    if (
+                        lb_svc.spec
+                        and lb_svc.spec.type == "LoadBalancer"
+                        and lb_svc.status
+                        and lb_svc.status.load_balancer
+                        and lb_svc.status.load_balancer.ingress
+                    ):
+                        for ing in lb_svc.status.load_balancer.ingress:
+                            if ing.ip:
+                                load_balancer_ips.append(ing.ip)
+                            elif ing.hostname:
+                                load_balancer_ips.append(ing.hostname)
+                except Exception as e:
+                    logger.debug(
+                        f"LoadBalancer service {self.model.name}-pgbouncer-lb not ready or not found: {e}"
+                    )
 
             # 3. Fetch Cluster Nodes
             cluster_nodes = []
@@ -186,6 +192,8 @@ class PgSQLPoller:
                 except Exception as e:
                     logger.debug(f"Failed to fetch secret {self.model.name}-tls: {e}")
 
+            status_data["load_balancer_ips"] = load_balancer_ips
+
             return (
                 status,
                 message,
@@ -193,10 +201,9 @@ class PgSQLPoller:
                 node_ports,
                 cluster_nodes,
                 db_credentials,
-                pgbouncer_port,
             )
 
-        status, message, extra_data, node_ports, cluster_nodes, db_credentials, pgbouncer_port = (
+        status, message, extra_data, node_ports, cluster_nodes, db_credentials = (
             await asyncio.to_thread(_poll, is_active)
         )
 
@@ -224,8 +231,7 @@ class PgSQLPoller:
         if extra_data is None:
             extra_data = {}
         extra_data["namespace"] = namespace
-        if pgbouncer_port:
-            extra_data["pgbouncer_host"] = f"{self.model.name}-pooler-rw.{namespace}.svc.cluster.local"
+        extra_data["pgbouncer_host"] = f"{self.model.name}-pooler-rw.{namespace}.svc.cluster.local"
         state.extra_data = extra_data
         state.node_ports = node_ports
         state.cluster_nodes = cluster_nodes

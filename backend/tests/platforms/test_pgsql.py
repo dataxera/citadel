@@ -2,10 +2,16 @@
 # SPDX-License-Identifier: AGPLv3+
 
 import pytest
-from unittest.mock import patch, AsyncMock
+import yaml
+from unittest.mock import patch, AsyncMock, MagicMock
+from sqlalchemy.ext.asyncio import create_async_engine
 from fastapi.testclient import TestClient
+from sqlmodel.ext.asyncio.session import AsyncSession
 from mindweaver.app import app
-from mindweaver.platform_service.pgsql import PgSqlPlatformService
+from mindweaver.config import settings
+from mindweaver.platform_service.pgsql import PgSqlPlatformService, PgSqlPlatform
+from mindweaver.platform_service.pgsql.model import PgSqlPlatformState
+from mindweaver.platform_service.pgsql.poller import PgSQLPoller
 
 
 def test_pgsql_platform_crud(client: TestClient, test_project):
@@ -442,3 +448,178 @@ async def test_pgsql_image_selection(client: TestClient, test_project):
     vars = await svc.template_vars(model)
 
     assert vars["image_name"] == "ghcr.io/cloudnative-pg/postgresql:16"
+
+
+def test_pgsql_enable_loadbalancer_default_and_override(client: TestClient, test_project):
+    """Test that enable_loadbalancer defaults to False and can be enabled/updated."""
+    headers = {"X-Project-Id": str(test_project["id"])}
+
+    # Default should be False
+    resp = client.post(
+        "/api/v1/platform/pgsql",
+        json={
+            "name": "pg-lb-default",
+            "title": "PG LB Default",
+            "project_id": test_project["id"],
+        },
+        headers=headers,
+    )
+    assert resp.status_code == 200, resp.text
+    data = resp.json()["data"]
+    assert data["enable_loadbalancer"] is False
+
+    # Update to True
+    resp = client.put(
+        f"/api/v1/platform/pgsql/{data['id']}",
+        json={
+            "name": "pg-lb-default",
+            "title": "PG LB Default",
+            "project_id": test_project["id"],
+            "enable_loadbalancer": True,
+        },
+        headers=headers,
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["data"]["enable_loadbalancer"] is True
+
+    # Explicit True on create
+    resp = client.post(
+        "/api/v1/platform/pgsql",
+        json={
+            "name": "pg-lb-enabled",
+            "title": "PG LB Enabled",
+            "project_id": test_project["id"],
+            "enable_loadbalancer": True,
+        },
+        headers=headers,
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["data"]["enable_loadbalancer"] is True
+
+
+@pytest.mark.asyncio
+async def test_pgsql_render_manifests_no_nodeport_and_loadbalancer_toggle():
+    """Test that manifests never render NodePort and only render LoadBalancer when enabled."""
+    mock_request = MagicMock()
+    mock_session = MagicMock()
+    svc = PgSqlPlatformService(mock_request, mock_session)
+    svc._resolve_namespace = AsyncMock(return_value="test-ns")
+    svc.resolve_chart = AsyncMock(
+        return_value=("https://cloudnative-pg.github.io/charts", "cluster", "0.5.0")
+    )
+    svc.resolve_image = AsyncMock(
+        return_value=("ghcr.io/cloudnative-pg/postgresql", "18")
+    )
+    svc._fetch_trusted_certs = AsyncMock(return_value=[])
+    svc.project = AsyncMock(return_value=MagicMock(name="proj", title="Project"))
+
+    # 1. Default (enable_loadbalancer=False): no NodePort, no LoadBalancer
+    model_disabled = PgSqlPlatform(
+        name="pg-no-lb",
+        title="PG No LB",
+        project_id=1,
+    )
+    assert model_disabled.enable_loadbalancer is False
+    manifests_disabled = await svc.render_manifests(model_disabled)
+    assert "NodePort" not in manifests_disabled
+    assert "pgbouncer-nodeport" not in manifests_disabled
+    assert "LoadBalancer" not in manifests_disabled
+    assert "pgbouncer-lb" not in manifests_disabled
+
+    # 2. Enabled (enable_loadbalancer=True): no NodePort, has LoadBalancer Service
+    model_enabled = PgSqlPlatform(
+        name="pg-with-lb",
+        title="PG With LB",
+        project_id=1,
+        enable_loadbalancer=True,
+    )
+    manifests_enabled = await svc.render_manifests(model_enabled)
+    assert "NodePort" not in manifests_enabled
+    assert "pgbouncer-nodeport" not in manifests_enabled
+
+    docs = [d for d in yaml.safe_load_all(manifests_enabled) if d]
+    lb_svcs = [
+        d
+        for d in docs
+        if d.get("kind") == "Service" and d.get("spec", {}).get("type") == "LoadBalancer"
+    ]
+    assert len(lb_svcs) == 1
+    lb_svc = lb_svcs[0]
+    assert lb_svc["metadata"]["name"] == "pg-with-lb-pgbouncer-lb"
+    assert lb_svc["metadata"]["namespace"] == "test-ns"
+    assert lb_svc["spec"]["ports"][0]["port"] == 5432
+    assert lb_svc["spec"]["ports"][0]["targetPort"] == 5432
+    assert lb_svc["spec"]["selector"]["cnpg.io/poolerName"] == "pg-with-lb-pooler-rw"
+
+
+@pytest.mark.asyncio
+async def test_pgsql_poller_loadbalancer_and_no_nodeport(postgresql_proc, test_project):
+    """Test PgSQLPoller populates load_balancer_ips when enabled, omits node_ports, and keeps pgbouncer_host."""
+    settings.db_host = postgresql_proc.host
+    settings.db_port = postgresql_proc.port
+    settings.db_name = postgresql_proc.dbname
+    settings.db_user = postgresql_proc.user
+    settings.db_pass = postgresql_proc.password
+
+    engine = create_async_engine(settings.db_async_uri)
+    async with AsyncSession(engine) as session:
+        platform = PgSqlPlatform(
+            name="test-pg-lb-poll",
+            title="Test PG LB Poll",
+            project_id=test_project["id"],
+            enable_loadbalancer=True,
+        )
+        session.add(platform)
+        await session.flush()
+
+        state = PgSqlPlatformState(
+            platform_id=platform.id,
+            status="pending",
+            active=True,
+        )
+        session.add(state)
+        await session.commit()
+        await session.refresh(platform)
+
+        class MockRequest:
+            headers = {}
+
+        svc = PgSqlPlatformService(MockRequest(), session)
+        svc.kubeconfig = AsyncMock(return_value="apiVersion: v1\nkind: Config\n")
+        svc._resolve_namespace = AsyncMock(return_value="test-ns")
+        poller = PgSQLPoller(svc, platform)
+
+        mock_lb_svc = MagicMock()
+        mock_lb_svc.spec.type = "LoadBalancer"
+        mock_ing = MagicMock()
+        mock_ing.ip = "198.51.100.42"
+        mock_ing.hostname = None
+        mock_lb_svc.status.load_balancer.ingress = [mock_ing]
+
+        with patch("kubernetes.config.new_client_from_config"), patch(
+            "kubernetes.client.CustomObjectsApi"
+        ) as mock_custom, patch("kubernetes.client.CoreV1Api") as mock_core_v1:
+            mock_custom.return_value.get_namespaced_custom_object.return_value = {
+                "status": {
+                    "phase": "Cluster in healthy state",
+                    "instances": 3,
+                    "readyInstances": 3,
+                }
+            }
+            mock_core_v1.return_value.read_namespaced_service.return_value = mock_lb_svc
+            mock_core_v1.return_value.list_node.return_value.items = []
+            mock_core_v1.return_value.read_namespaced_secret.side_effect = Exception("no secret")
+
+            await poller.poll()
+            await session.commit()
+
+        await session.refresh(state)
+        assert state.status == "online"
+        assert state.node_ports == []
+        assert state.extra_data["load_balancer_ips"] == ["198.51.100.42"]
+        assert (
+            state.extra_data["pgbouncer_host"]
+            == f"test-pg-lb-poll-pooler-rw.{state.extra_data['namespace']}.svc.cluster.local"
+        )
+
+    await engine.dispose()
