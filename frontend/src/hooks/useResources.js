@@ -3,7 +3,7 @@ import apiClient from '../services/api';
 
 export const useProjects = () => {
     const [projects, setProjects] = useState([]);
-    const [loading, setLoading] = useState(false);
+    const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
     const fetchProjects = useCallback(async () => {
@@ -101,7 +101,7 @@ export const useProjects = () => {
 const createGenericSourceHook = (endpoint) => {
     return () => {
         const [items, setItems] = useState([]);
-        const [loading, setLoading] = useState(false);
+        const [loading, setLoading] = useState(true);
         const [error, setError] = useState(null);
 
         const fetchItems = useCallback(async () => {
@@ -153,7 +153,7 @@ export const useDatabaseSources = createGenericSourceHook('/database-sources');
 
 export const usePgSql = () => {
     const [platforms, setPlatforms] = useState([]);
-    const [loading, setLoading] = useState(false);
+    const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
     const fetchPlatforms = useCallback(async () => {
@@ -229,7 +229,7 @@ export const usePgSql = () => {
 
 export const useK8sClusters = () => {
     const [clusters, setClusters] = useState([]);
-    const [loading, setLoading] = useState(false);
+    const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
     const fetchClusters = useCallback(async () => {
@@ -298,7 +298,7 @@ export const useK8sClusters = () => {
 
 export const useS3Storages = () => {
     const [storages, setStorages] = useState([]);
-    const [loading, setLoading] = useState(false);
+    const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
     const fetchStorages = useCallback(async () => {
@@ -400,7 +400,7 @@ export const useS3Storages = () => {
 
 export const useLdapConfigs = () => {
     const [configs, setConfigs] = useState([]);
-    const [loading, setLoading] = useState(false);
+    const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
     const fetchConfigs = useCallback(async () => {
@@ -449,7 +449,7 @@ export const useLdapConfigs = () => {
 
 export const useHiveMetastore = () => {
     const [platforms, setPlatforms] = useState([]);
-    const [loading, setLoading] = useState(false);
+    const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
     const fetchPlatforms = useCallback(async () => {
@@ -525,7 +525,7 @@ export const useHiveMetastore = () => {
 
 export const useTrino = () => {
     const [platforms, setPlatforms] = useState([]);
-    const [loading, setLoading] = useState(false);
+    const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
     const fetchPlatforms = useCallback(async () => {
@@ -601,7 +601,7 @@ export const useTrino = () => {
 
 export const useAirflow = () => {
     const [platforms, setPlatforms] = useState([]);
-    const [loading, setLoading] = useState(false);
+    const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
     const fetchPlatforms = useCallback(async () => {
@@ -677,7 +677,7 @@ export const useAirflow = () => {
 
 export const useSuperset = () => {
     const [platforms, setPlatforms] = useState([]);
-    const [loading, setLoading] = useState(false);
+    const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
     const fetchPlatforms = useCallback(async () => {
@@ -755,7 +755,7 @@ export const useProjectLocalUsers = createGenericSourceHook('/project-local-user
 
 export const useKafka = () => {
     const [platforms, setPlatforms] = useState([]);
-    const [loading, setLoading] = useState(false);
+    const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
     const fetchPlatforms = useCallback(async () => {
@@ -831,7 +831,7 @@ export const useKafka = () => {
 
 export const useNifi = () => {
     const [platforms, setPlatforms] = useState([]);
-    const [loading, setLoading] = useState(false);
+    const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
     const fetchPlatforms = useCallback(async () => {
@@ -907,7 +907,7 @@ export const useNifi = () => {
 
 export const useDoris = () => {
     const [platforms, setPlatforms] = useState([]);
-    const [loading, setLoading] = useState(false);
+    const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
     const fetchPlatforms = useCallback(async () => {
@@ -983,7 +983,7 @@ export const useDoris = () => {
 
 export const useSSHKeys = () => {
     const [keys, setKeys] = useState([]);
-    const [loading, setLoading] = useState(false);
+    const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
     const fetchKeys = useCallback(async () => {
@@ -1027,7 +1027,7 @@ export const useSSHKeys = () => {
 
 export const useGitRepos = () => {
     const [repos, setRepos] = useState([]);
-    const [loading, setLoading] = useState(false);
+    const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
     const fetchRepos = useCallback(async () => {
@@ -1076,7 +1076,7 @@ export const useGitRepos = () => {
 
 export const useContainerRegistries = () => {
     const [registries, setRegistries] = useState([]);
-    const [loading, setLoading] = useState(false);
+    const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
     const fetchRegistries = useCallback(async () => {
@@ -1125,7 +1125,7 @@ export const useContainerRegistries = () => {
 
 export const useStacks = () => {
     const [stacks, setStacks] = useState([]);
-    const [loading, setLoading] = useState(false);
+    const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
     const fetchStacks = useCallback(async () => {
@@ -1151,7 +1151,7 @@ export const useUsers = createGenericSourceHook('/users');
 
 export const useTrustedCerts = () => {
     const [certs, setCerts] = useState([]);
-    const [loading, setLoading] = useState(false);
+    const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
     const fetchCerts = useCallback(async () => {

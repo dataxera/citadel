@@ -1,43 +1,18 @@
-import React, { useState } from 'react';
-import { useOutletContext } from 'react-router-dom';
+import React from 'react';
 import { useSuperset } from '../../hooks/useResources';
+import PlatformResourcePage from '../../components/PlatformResourcePage';
 import ListingView from './ListingView';
 import ServiceView from './ServiceView';
 
-const SupersetPage = () => {
-    const { darkMode, selectedProject } = useOutletContext();
-    const superset = useSuperset();
-    const [selectedPlatformId, setSelectedPlatformId] = useState(null);
-    const [initialTab, setInitialTab] = useState('connect');
-
-    const handleSelectPlatform = (id, tab = 'connect') => {
-        setSelectedPlatformId(id);
-        setInitialTab(tab);
-    };
-
-    const selectedPlatform = superset.platforms.find(p => p.id === selectedPlatformId);
-
-    if (selectedPlatform) {
-        return (
-            <ServiceView
-                darkMode={darkMode}
-                selectedPlatformId={selectedPlatformId}
-                selectedPlatform={selectedPlatform}
-                onBack={() => setSelectedPlatformId(null)}
-                initialTab={initialTab}
-                superset={superset}
-            />
-        );
-    }
-
-    return (
-        <ListingView
-            darkMode={darkMode}
-            selectedProject={selectedProject}
-            superset={superset}
-            onSelectPlatform={handleSelectPlatform}
-        />
-    );
-};
+const SupersetPage = () => (
+    <PlatformResourcePage
+        useResourceHook={useSuperset}
+        resourcePropName="superset"
+        basePath="/platform/superset"
+        ListingView={ListingView}
+        ServiceView={ServiceView}
+        notFoundTitle="Superset Deployment Not Found"
+    />
+);
 
 export default SupersetPage;

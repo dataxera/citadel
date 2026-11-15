@@ -1,27 +1,46 @@
-import React, { useState } from 'react';
-import { useOutletContext } from 'react-router-dom';
+import React from 'react';
+import { useOutletContext, useParams, useNavigate } from 'react-router-dom';
 import { useProjects } from '../../hooks/useResources';
+import { ResourceLoading, ResourceNotFound } from '../../components/ResourceRouteState';
 import ListingView from './ListingView';
 import ServiceView from './ServiceView';
 
 const ProjectsPage = () => {
     const context = useOutletContext();
+    const { id } = useParams();
+    const navigate = useNavigate();
     const projectsHook = useProjects();
-    const [selectedProjectId, setSelectedProjectId] = useState(null);
 
-    const handleSelectProject = (id) => {
-        setSelectedProjectId(id);
+    const handleSelectProject = (projectId) => {
+        navigate(`/projects/${projectId}`);
     };
 
-    const selectedProject = projectsHook.projects.find(p => p.id === selectedProjectId);
+    const handleBack = () => {
+        navigate('/projects');
+    };
 
-    if (selectedProject) {
+    if (id) {
+        const selectedProject = projectsHook.projects.find(p => String(p.id) === String(id));
+
+        if (!selectedProject) {
+            if (projectsHook.loading) {
+                return <ResourceLoading message="Loading project..." />;
+            }
+            return (
+                <ResourceNotFound
+                    title="Project Not Found"
+                    description="The requested project could not be found or may have been deleted."
+                    onBack={handleBack}
+                />
+            );
+        }
+
         return (
             <ServiceView
                 context={context}
-                selectedProjectId={selectedProjectId}
+                selectedProjectId={selectedProject.id}
                 selectedProject={selectedProject}
-                onBack={() => setSelectedProjectId(null)}
+                onBack={handleBack}
                 projectsHook={projectsHook}
             />
         );

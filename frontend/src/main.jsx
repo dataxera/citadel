@@ -48,11 +48,19 @@ const router = createBrowserRouter([
         element: <ProjectsPage />,
       },
       {
+        path: 'projects/:id',
+        element: <ProjectsPage />,
+      },
+      {
         path: 'stacks',
         element: <StacksPage />,
       },
       {
         path: 'k8s_clusters',
+        element: <K8sClustersPage />,
+      },
+      {
+        path: 'k8s_clusters/:id',
         element: <K8sClustersPage />,
       },
 
@@ -62,6 +70,10 @@ const router = createBrowserRouter([
       },
       {
         path: 's3-storages',
+        element: <S3StoragePage />,
+      },
+      {
+        path: 's3-storages/:id',
         element: <S3StoragePage />,
       },
       {
@@ -85,6 +97,10 @@ const router = createBrowserRouter([
         element: <TrustedCertsPage />,
       },
       {
+        path: 'trusted-certs/:id',
+        element: <TrustedCertsPage />,
+      },
+      {
         path: 'users',
         element: <UsersPage />,
       },
@@ -94,7 +110,15 @@ const router = createBrowserRouter([
         element: <PgSqlPage />,
       },
       {
+        path: 'platform/pgsql/:id',
+        element: <PgSqlPage />,
+      },
+      {
         path: 'platform/hive-metastore',
+        element: <HiveMetastorePage />,
+      },
+      {
+        path: 'platform/hive-metastore/:id',
         element: <HiveMetastorePage />,
       },
       {
@@ -102,7 +126,15 @@ const router = createBrowserRouter([
         element: <TrinoPage />,
       },
       {
+        path: 'platform/trino/:id',
+        element: <TrinoPage />,
+      },
+      {
         path: 'platform/superset',
+        element: <SupersetPage />,
+      },
+      {
+        path: 'platform/superset/:id',
         element: <SupersetPage />,
       },
       {
@@ -110,7 +142,15 @@ const router = createBrowserRouter([
         element: <AirflowPage />,
       },
       {
+        path: 'platform/airflow/:id',
+        element: <AirflowPage />,
+      },
+      {
         path: 'platform/kafka',
+        element: <KafkaPage />,
+      },
+      {
+        path: 'platform/kafka/:id',
         element: <KafkaPage />,
       },
       {
@@ -118,7 +158,15 @@ const router = createBrowserRouter([
         element: <NifiPage />,
       },
       {
+        path: 'platform/nifi/:id',
+        element: <NifiPage />,
+      },
+      {
         path: 'platform/doris',
+        element: <DorisPage />,
+      },
+      {
+        path: 'platform/doris/:id',
         element: <DorisPage />,
       },
       {

@@ -1,27 +1,46 @@
-import React, { useState } from 'react';
-import { useOutletContext } from 'react-router-dom';
+import React from 'react';
+import { useOutletContext, useParams, useNavigate } from 'react-router-dom';
 import { useK8sClusters } from '../../hooks/useResources';
+import { ResourceLoading, ResourceNotFound } from '../../components/ResourceRouteState';
 import ListingView from './ListingView';
 import ServiceView from './ServiceView';
 
 const K8sClustersPage = () => {
     const context = useOutletContext();
+    const { id } = useParams();
+    const navigate = useNavigate();
     const clustersHook = useK8sClusters();
-    const [selectedClusterId, setSelectedClusterId] = useState(null);
 
-    const handleSelectCluster = (id) => {
-        setSelectedClusterId(id);
+    const handleSelectCluster = (clusterId) => {
+        navigate(`/k8s_clusters/${clusterId}`);
     };
 
-    const selectedCluster = clustersHook.clusters.find(p => p.id === selectedClusterId);
+    const handleBack = () => {
+        navigate('/k8s_clusters');
+    };
 
-    if (selectedCluster) {
+    if (id) {
+        const selectedCluster = clustersHook.clusters.find(p => String(p.id) === String(id));
+
+        if (!selectedCluster) {
+            if (clustersHook.loading) {
+                return <ResourceLoading message="Loading Kubernetes cluster..." />;
+            }
+            return (
+                <ResourceNotFound
+                    title="Kubernetes Cluster Not Found"
+                    description="The requested Kubernetes cluster could not be found or may have been deleted."
+                    onBack={handleBack}
+                />
+            );
+        }
+
         return (
             <ServiceView
                 context={context}
-                selectedClusterId={selectedClusterId}
+                selectedClusterId={selectedCluster.id}
                 selectedCluster={selectedCluster}
-                onBack={() => setSelectedClusterId(null)}
+                onBack={handleBack}
                 clustersHook={clustersHook}
             />
         );

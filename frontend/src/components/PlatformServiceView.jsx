@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Terminal, RefreshCcw, Zap, AlertCircle, Loader2, Activity, Clock, Copy, Check } from 'lucide-react';
 import { cn } from '../utils/cn';
 import DynamicForm from './DynamicForm';
@@ -54,7 +55,19 @@ const PlatformServiceView = ({
     notDeployedDescription = "Deploy the cluster to see connection details and access endpoints.",
     deployButtonText = "DEPLOY CLUSTER",
 }) => {
-    const [activeTab, setActiveTab] = useState(initialTab);
+    const [searchParams, setSearchParams] = useSearchParams();
+    const activeTab = searchParams.get('tab') || initialTab;
+    const setActiveTab = (tab) => {
+        setSearchParams(prev => {
+            const next = new URLSearchParams(prev);
+            if (!tab || tab === 'connect') {
+                next.delete('tab');
+            } else {
+                next.set('tab', tab);
+            }
+            return next;
+        }, { replace: true });
+    };
     const [isDecommissionModalOpen, setIsDecommissionModalOpen] = useState(false);
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);

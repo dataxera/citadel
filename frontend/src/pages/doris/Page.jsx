@@ -3,46 +3,21 @@ SPDX-FileCopyrightText: Copyright © 2026 Mohd Izhar Firdaus Bin Ismail
 SPDX-License-Identifier: AGPLv3+
 */
 
-import React, { useState } from 'react';
-import { useOutletContext } from 'react-router-dom';
+import React from 'react';
 import { useDoris } from '../../hooks/useResources';
+import PlatformResourcePage from '../../components/PlatformResourcePage';
 import ListingView from './ListingView';
 import ServiceView from './ServiceView';
 
-const DorisPage = () => {
-    const { darkMode, selectedProject } = useOutletContext();
-    const doris = useDoris();
-    const [selectedPlatformId, setSelectedPlatformId] = useState(null);
-    const [initialTab, setInitialTab] = useState('connect');
-
-    const handleSelectPlatform = (id, tab = 'connect') => {
-        setSelectedPlatformId(id);
-        setInitialTab(tab);
-    };
-
-    const selectedPlatform = doris.platforms.find(p => p.id === selectedPlatformId);
-
-    if (selectedPlatform) {
-        return (
-            <ServiceView
-                darkMode={darkMode}
-                selectedPlatformId={selectedPlatformId}
-                selectedPlatform={selectedPlatform}
-                onBack={() => setSelectedPlatformId(null)}
-                initialTab={initialTab}
-                doris={doris}
-            />
-        );
-    }
-
-    return (
-        <ListingView
-            darkMode={darkMode}
-            selectedProject={selectedProject}
-            doris={doris}
-            onSelectPlatform={handleSelectPlatform}
-        />
-    );
-};
+const DorisPage = () => (
+    <PlatformResourcePage
+        useResourceHook={useDoris}
+        resourcePropName="doris"
+        basePath="/platform/doris"
+        ListingView={ListingView}
+        ServiceView={ServiceView}
+        notFoundTitle="Apache Doris Cluster Not Found"
+    />
+);
 
 export default DorisPage;

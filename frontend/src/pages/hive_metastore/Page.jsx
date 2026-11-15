@@ -1,43 +1,18 @@
-import React, { useState } from 'react';
-import { useOutletContext } from 'react-router-dom';
+import React from 'react';
 import { useHiveMetastore } from '../../hooks/useResources';
+import PlatformResourcePage from '../../components/PlatformResourcePage';
 import ListingView from './ListingView';
 import ServiceView from './ServiceView';
 
-const HiveMetastorePage = () => {
-    const { darkMode, selectedProject } = useOutletContext();
-    const hms = useHiveMetastore();
-    const [selectedPlatformId, setSelectedPlatformId] = useState(null);
-    const [initialTab, setInitialTab] = useState('connect');
-
-    const handleSelectPlatform = (id, tab = 'connect') => {
-        setSelectedPlatformId(id);
-        setInitialTab(tab);
-    };
-
-    const selectedPlatform = hms.platforms.find(p => p.id === selectedPlatformId);
-
-    if (selectedPlatform) {
-        return (
-            <ServiceView
-                darkMode={darkMode}
-                selectedPlatformId={selectedPlatformId}
-                selectedPlatform={selectedPlatform}
-                onBack={() => setSelectedPlatformId(null)}
-                initialTab={initialTab}
-                hms={hms}
-            />
-        );
-    }
-
-    return (
-        <ListingView
-            darkMode={darkMode}
-            selectedProject={selectedProject}
-            hms={hms}
-            onSelectPlatform={handleSelectPlatform}
-        />
-    );
-};
+const HiveMetastorePage = () => (
+    <PlatformResourcePage
+        useResourceHook={useHiveMetastore}
+        resourcePropName="hms"
+        basePath="/platform/hive-metastore"
+        ListingView={ListingView}
+        ServiceView={ServiceView}
+        notFoundTitle="Hive Metastore Deployment Not Found"
+    />
+);
 
 export default HiveMetastorePage;
