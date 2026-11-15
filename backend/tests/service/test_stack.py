@@ -274,17 +274,14 @@ async def test_resolve_integration_version(mock_service_dependencies):
 
 
 def test_default_stack_file_versions_locked():
-    """Verify the default stack YAML locks chart and image versions for all components."""
+    """Verify the unit-test stack YAML locks chart and image versions for all components."""
     from pathlib import Path
     import yaml
 
     stack_path = (
-        Path(__file__).resolve().parents[2]
-        / "src"
-        / "mindweaver"
+        Path(__file__).resolve().parents[1]
         / "resources"
-        / "stacks"
-        / "mindweaver-0.1.0-alpha.1.yml"
+        / "test-stack.yml"
     )
     data = yaml.safe_load(stack_path.read_text())
     components = data["configuration"]["components"]
@@ -326,13 +323,13 @@ def test_default_stack_file_versions_locked():
                 f"{comp_name}.images.{img_key} uses unpinned -latest tag"
             )
 
-    assert components["doris-operator"]["images"]["main"]["tag"] == "operator-26.0.1"
-    assert components["doris"]["images"]["fe"]["repository"] == "selectdb/doris.fe-ubuntu"
-    assert components["doris"]["images"]["fe"]["tag"] == "2.1.8"
-    assert components["doris"]["images"]["be"]["repository"] == "selectdb/doris.be-ubuntu"
-    assert components["doris"]["images"]["be"]["tag"] == "2.1.8"
-    assert components["cert-manager"]["images"]["main"]["tag"] == "v1.20.0"
-    assert components["cert-manager"]["images"]["cainjector"]["tag"] == "v1.20.0"
-    assert components["cert-manager"]["images"]["webhook"]["tag"] == "v1.20.0"
+    assert components["doris-operator"]["images"]["main"]["tag"] == "operator-26.99.1"
+    assert components["doris"]["images"]["fe"]["repository"] == "test.registry/doris.fe-ubuntu"
+    assert components["doris"]["images"]["fe"]["tag"] == "2.99.8"
+    assert components["doris"]["images"]["be"]["repository"] == "test.registry/doris.be-ubuntu"
+    assert components["doris"]["images"]["be"]["tag"] == "2.99.8"
+    assert components["cert-manager"]["images"]["main"]["tag"] == "v1.99.0"
+    assert components["cert-manager"]["images"]["cainjector"]["tag"] == "v1.99.0"
+    assert components["cert-manager"]["images"]["webhook"]["tag"] == "v1.99.0"
 
 

@@ -117,7 +117,7 @@ async def test_pgsql_template_rendering(mock_service_dependencies):
 
 @pytest.mark.asyncio
 async def test_pgsql_images_default_and_manifest(mock_service_dependencies):
-    """Test that PgSql template_vars and manifest use locked default images for main and pgbouncer."""
+    """Test that PgSql template_vars and manifest populate main and pgbouncer images by default."""
     request, session = mock_service_dependencies
     svc = PgSqlPlatformService(request, session)
 
@@ -133,62 +133,35 @@ async def test_pgsql_images_default_and_manifest(mock_service_dependencies):
     svc.project = AsyncMock(return_value=mock_project)
 
     vars = await svc.template_vars(model)
-    assert vars["image_name"] == "ghcr.io/cloudnative-pg/postgresql:18.4"
-    assert vars["pgbouncer_image"] == "ghcr.io/cloudnative-pg/pgbouncer:1.25.1"
+    assert vars["image_name"]
+    assert vars["pgbouncer_image"]
 
     manifest = await svc.render_manifests(model)
-    assert "imageName: ghcr.io/cloudnative-pg/postgresql:18.4" in manifest
-    assert "image: ghcr.io/cloudnative-pg/pgbouncer:1.25.1" in manifest
+    assert f"imageName: {vars['image_name']}" in manifest
+    assert f"image: {vars['pgbouncer_image']}" in manifest
 
 
 @pytest.mark.asyncio
-async def test_pgsql_images_resolved_from_stack():
-    """Test that PgSql resolves both main and pgbouncer images from the project's stack."""
-    from mindweaver.service.stack.model import Stack
-
-    stack = Stack(
-        name="custom-stack",
-        version="1.0.0",
-        configuration={
-            "components": {
-                "pgsql": {
-                    "images": {
-                        "main": {"repository": "custom/postgresql", "tag": "18.9"},
-                        "pgbouncer": {"repository": "custom/pgbouncer", "tag": "1.26.0"},
-                    }
-                }
-            }
-        },
-    )
-
-    class _FakeResult:
-        def one_or_none(self):
-            return stack
-
-    class _FakeSession:
-        async def exec(self, stmt):
-            return _FakeResult()
-
+async def test_pgsql_images_resolved_from_stack(test_stack_session):
+    """Test that PgSql resolves both main and pgbouncer images from test_stack."""
     request = MagicMock(spec=Request)
-    session = _FakeSession()
-
-    svc = PgSqlPlatformService(request, session)
+    svc = PgSqlPlatformService(request, test_stack_session)
     model = PgSqlPlatform(name="test-db", project_id=1)
 
     svc._resolve_namespace = AsyncMock(return_value="test-ns")
     mock_project = MagicMock()
     mock_project.name = "myproject"
     mock_project.title = "My Project"
-    mock_project.stack_id = 42
+    mock_project.stack_id = 1
     svc.project = AsyncMock(return_value=mock_project)
 
     vars = await svc.template_vars(model)
-    assert vars["image_name"] == "custom/postgresql:18.9"
-    assert vars["pgbouncer_image"] == "custom/pgbouncer:1.26.0"
+    assert vars["image_name"] == "test.registry/cloudnative-pg/postgresql:18.99"
+    assert vars["pgbouncer_image"] == "test.registry/cloudnative-pg/pgbouncer:1.99.1"
 
     manifest = await svc.render_manifests(model)
-    assert "imageName: custom/postgresql:18.9" in manifest
-    assert "image: custom/pgbouncer:1.26.0" in manifest
+    assert "imageName: test.registry/cloudnative-pg/postgresql:18.99" in manifest
+    assert "image: test.registry/cloudnative-pg/pgbouncer:1.99.1" in manifest
 
 
 

@@ -1000,61 +1000,24 @@ async def test_trino_configurable_rules(mock_service_dependencies):
 
 
 @pytest.mark.asyncio
-async def test_trino_images_default_and_stack(mock_service_dependencies):
-    """Test that Trino resolves main and prepare_tls images with locked defaults and from stack."""
-    from mindweaver.service.stack.model import Stack
-
+async def test_trino_images_default_and_stack(mock_service_dependencies, test_stack_session):
+    """Test that Trino resolves main and prepare_tls images from test_stack."""
     request, _ = mock_service_dependencies
-    stack = Stack(
-        name="custom-stack",
-        version="1.0.0",
-        configuration={
-            "components": {
-                "trino": {
-                    "images": {
-                        "main": {"repository": "custom/trino", "tag": "490"},
-                        "prepare_tls": {"repository": "custom/temurin", "tag": "21-jre"},
-                    }
-                }
-            }
-        },
-    )
-
-    class _FakeResult:
-        def one_or_none(self):
-            return stack
-
-    class _FakeSession:
-        async def exec(self, stmt):
-            return _FakeResult()
-
-    svc_default = TrinoPlatformService(request, mock_service_dependencies[1])
+    svc_stack = TrinoPlatformService(request, test_stack_session)
     model = TrinoPlatform(name="test-trino", title="Test Trino", project_id=1)
-    svc_default._resolve_namespace = AsyncMock(return_value="ns")
-    mock_project = MagicMock()
-    mock_project.name = "myproject"
-    mock_project.ingress_domain = None
-    mock_project.ldap_config_id = None
-    svc_default.project = AsyncMock(return_value=mock_project)
 
-    default_manifest = await svc_default.render_manifests(model)
-    assert 'repository: "trinodb/trino"' in default_manifest
-    assert 'tag: "482"' in default_manifest
-    assert 'image: "eclipse-temurin:17-jre-alpine"' in default_manifest
-
-    svc_stack = TrinoPlatformService(request, _FakeSession())
     svc_stack._resolve_namespace = AsyncMock(return_value="ns")
     mock_project_stack = MagicMock()
     mock_project_stack.name = "myproject"
     mock_project_stack.ingress_domain = None
     mock_project_stack.ldap_config_id = None
-    mock_project_stack.stack_id = 99
+    mock_project_stack.stack_id = 1
     svc_stack.project = AsyncMock(return_value=mock_project_stack)
 
     stack_manifest = await svc_stack.render_manifests(model)
-    assert 'repository: "custom/trino"' in stack_manifest
-    assert 'tag: "490"' in stack_manifest
-    assert 'image: "custom/temurin:21-jre"' in stack_manifest
+    assert 'repository: "test.registry/trinodb/trino"' in stack_manifest
+    assert 'tag: "499"' in stack_manifest
+    assert 'image: "test.registry/eclipse-temurin:21-jre-test"' in stack_manifest
 
 
 

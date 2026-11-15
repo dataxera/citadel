@@ -478,18 +478,18 @@ async def test_airflow_redis_password_persistence_in_template_vars(test_project)
 
 
 @pytest.mark.asyncio
-async def test_airflow_images_resolved_and_rendered():
-    """Test that Airflow resolves and renders main, redis, statsd_exporter, and git_sync images."""
+async def test_airflow_images_resolved_and_rendered(test_stack_session):
+    """Test that Airflow resolves and renders main, redis, statsd_exporter, and git_sync images from test_stack."""
     from mindweaver.platform_service.pgsql.service import PgSqlPlatformService
 
     req = MagicMock()
-    session = MagicMock()
-    svc = AirflowPlatformService(req, session)
+    svc = AirflowPlatformService(req, test_stack_session)
     svc._resolve_namespace = AsyncMock(return_value="ns")
     mock_project = MagicMock()
     mock_project.name = "myproject"
     mock_project.ingress_domain = None
     mock_project.ldap_config_id = None
+    mock_project.stack_id = 1
     svc.project = AsyncMock(return_value=mock_project)
 
     mock_pgsql_svc = MagicMock()
@@ -520,14 +520,14 @@ async def test_airflow_images_resolved_and_rendered():
     with patch.object(PgSqlPlatformService, "get_service", new=get_service_mock):
         manifest = await svc.render_manifests(airflow_model)
 
-    assert "repository: \"ghcr.io/kagesenshi/mindweaver/airflow\"" in manifest
-    assert "tag: \"3.2.2-rev.5\"" in manifest
-    assert "repository: \"redis\"" in manifest
-    assert "tag: \"7.2-bookworm\"" in manifest
-    assert "repository: \"quay.io/prometheus/statsd-exporter\"" in manifest
-    assert "tag: \"v0.30.0\"" in manifest
-    assert "repository: \"registry.k8s.io/git-sync/git-sync\"" in manifest
-    assert "tag: \"v4.4.2\"" in manifest
+    assert 'repository: "test.registry/mindweaver/airflow"' in manifest
+    assert 'tag: "3.99.0"' in manifest
+    assert 'repository: "test.registry/redis"' in manifest
+    assert 'tag: "7.99-bookworm"' in manifest
+    assert 'repository: "test.registry/prometheus/statsd-exporter"' in manifest
+    assert 'tag: "v0.99.0"' in manifest
+    assert 'repository: "test.registry/git-sync/git-sync"' in manifest
+    assert 'tag: "v4.99.0"' in manifest
 
 
 

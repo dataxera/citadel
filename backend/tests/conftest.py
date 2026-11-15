@@ -140,3 +140,38 @@ def project_scoped_crud_client(
     SQLModel.metadata.create_all(engine)
     yield TestClient(app=app)
     SQLModel.metadata.drop_all(engine)
+
+
+@pytest.fixture(scope="function")
+def test_stack():
+    """Load the dedicated unit-test stack YAML into a Stack model."""
+    from pathlib import Path
+    import yaml
+    from mindweaver.service.stack.model import Stack
+
+    stack_path = Path(__file__).resolve().parent / "resources" / "test-stack.yml"
+    data = yaml.safe_load(stack_path.read_text())
+    return Stack(
+        id=1,
+        name=data["name"],
+        title=data.get("title", data["name"]),
+        version=data["version"],
+        configuration=data["configuration"],
+    )
+
+
+@pytest.fixture(scope="function")
+def test_stack_session(test_stack):
+    """Return a minimal async session stub that resolves queries to test_stack."""
+    class _FakeResult:
+        def one_or_none(self):
+            return test_stack
+
+        def first(self):
+            return test_stack
+
+    class _FakeSession:
+        async def exec(self, stmt):
+            return _FakeResult()
+
+    return _FakeSession()

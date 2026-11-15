@@ -850,10 +850,10 @@ async def test_superset_datasource_engine_driver_mapping(mock_service_dependenci
 
 
 @pytest.mark.asyncio
-async def test_superset_redis_image_version_locked(mock_service_dependencies):
-    """Test that Superset template_vars and manifest lock the Redis image and tag."""
-    request, session = mock_service_dependencies
-    svc = SupersetPlatformService(request, session)
+async def test_superset_redis_image_version_locked(test_stack_session):
+    """Test that Superset template_vars and manifest resolve main, redis, and init images from test_stack."""
+    request = MagicMock(spec=Request)
+    svc = SupersetPlatformService(request, test_stack_session)
 
     model = SupersetPlatform(
         name="superset-redis-test",
@@ -885,15 +885,18 @@ async def test_superset_redis_image_version_locked(mock_service_dependencies):
         mock_project.ldap_config_id = None
         mock_project.ingress_domain = None
         mock_project.name = "myproject"
+        mock_project.stack_id = 1
         svc.project = AsyncMock(return_value=mock_project)
 
         manifest = await svc.render_manifests(model)
 
-    assert "repository: bitnamilegacy/redis" in manifest
-    assert 'tag: "7.0.10-debian-11-r4"' in manifest
+    assert 'repository: "test.registry/mindweaver/superset"' in manifest
+    assert 'tag: "6.99.0"' in manifest
+    assert "repository: test.registry/bitnamilegacy/redis" in manifest
+    assert 'tag: "7.99.0"' in manifest
     assert "initImage:" in manifest
-    assert "repository: apache/superset" in manifest
-    assert 'tag: "dockerize"' in manifest
+    assert "repository: test.registry/apache/superset" in manifest
+    assert 'tag: "dockerize-test"' in manifest
 
 
 

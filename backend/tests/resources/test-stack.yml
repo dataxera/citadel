@@ -1,0 +1,212 @@
+# SPDX-FileCopyrightText: Copyright © 2026 Mohd Izhar Firdaus Bin Ismail
+# SPDX-License-Identifier: AGPLv3+
+
+name: mindweaver-test
+title: Mindweaver Test Stack
+version: 0.0.1-test
+configuration:
+  components:
+    pgsql:
+      package_type: helm
+      charts:
+        main:
+          repo: https://test.example.com/cnpg
+          chart: cluster
+          version: "0.99.0"
+      images:
+        main:
+          repository: test.registry/cloudnative-pg/postgresql
+          tag: "18.99"
+        pgbouncer:
+          repository: test.registry/cloudnative-pg/pgbouncer
+          tag: "1.99.1"
+    nifi:
+      package_type: helm
+      charts:
+        main:
+          repo: https://test.example.com/nifi
+          chart: nifi-cluster
+          version: "1.99.0"
+      images:
+        main:
+          repository: test.registry/apache/nifi
+          tag: "2.99.0"
+    airflow:
+      package_type: helm
+      charts:
+        main:
+          repo: https://test.example.com/airflow
+          chart: airflow
+          version: "1.99.0"
+      images:
+        main:
+          repository: test.registry/mindweaver/airflow
+          tag: "3.99.0"
+        redis:
+          repository: test.registry/redis
+          tag: "7.99-bookworm"
+        statsd_exporter:
+          repository: test.registry/prometheus/statsd-exporter
+          tag: "v0.99.0"
+        git_sync:
+          repository: test.registry/git-sync/git-sync
+          tag: "v4.99.0"
+    kafka:
+      package_type: helm
+      charts:
+        main:
+          repo: https://test.example.com/kafka
+          chart: kafka
+          version: "0.99.3"
+      images:
+        main:
+          repository: test.registry/mindweaver/kafka
+          tag: "4.99.0"
+    superset:
+      package_type: helm
+      charts:
+        main:
+          repo: https://test.example.com/superset
+          chart: superset
+          version: "0.99.0"
+      images:
+        main:
+          repository: test.registry/mindweaver/superset
+          tag: "6.99.0"
+        redis:
+          repository: test.registry/bitnamilegacy/redis
+          tag: "7.99.0"
+        init:
+          repository: test.registry/apache/superset
+          tag: "dockerize-test"
+    hive_metastore:
+      package_type: helm
+      charts:
+        main:
+          repo: https://test.example.com/hms
+          chart: hive-metastore
+          version: "0.99.11"
+      images:
+        main:
+          repository: test.registry/mindweaver/hive-metastore
+          tag: "4.99.0"
+    trino:
+      package_type: helm
+      charts:
+        main:
+          repo: https://test.example.com/trino
+          chart: trino
+          version: "1.99.0"
+      images:
+        main:
+          repository: test.registry/trinodb/trino
+          tag: "499"
+        prepare_tls:
+          repository: test.registry/eclipse-temurin
+          tag: "21-jre-test"
+    doris:
+      package_type: helm
+      charts:
+        main:
+          repo: https://test.example.com/doris
+          chart: doris
+          version: "25.99.0"
+      images:
+        fe:
+          repository: test.registry/doris.fe-ubuntu
+          tag: "2.99.8"
+        be:
+          repository: test.registry/doris.be-ubuntu
+          tag: "2.99.8"
+    argocd:
+      package_type: helm
+      charts:
+        main:
+          repo: https://test.example.com/argo
+          chart: argo/argo-cd
+          version: "9.99.4"
+      images:
+        main:
+          repository: test.registry/argoproj/argocd
+          tag: "v2.99.2"
+        dex:
+          repository: test.registry/dexidp/dex
+          tag: "v2.99.1"
+        redis:
+          repository: test.registry/library/redis
+          tag: "7.99.2-alpine"
+    cert-manager:
+      package_type: helm
+      charts:
+        main:
+          repo: https://test.example.com/cert-manager
+          chart: cert-manager
+          version: "v1.99.0"
+      images:
+        main:
+          repository: test.registry/jetstack/cert-manager-controller
+          tag: "v1.99.0"
+        cainjector:
+          repository: test.registry/jetstack/cert-manager-cainjector
+          tag: "v1.99.0"
+        webhook:
+          repository: test.registry/jetstack/cert-manager-webhook
+          tag: "v1.99.0"
+    cnpg:
+      package_type: helm
+      charts:
+        main:
+          repo: https://test.example.com/cnpg
+          chart: cloudnative-pg
+          version: "0.99.1"
+      images:
+        main:
+          repository: test.registry/cloudnative-pg/cloudnative-pg
+          tag: "1.99.1"
+    envoy-gateway:
+      package_type: helm
+      charts:
+        main:
+          repo: https://test.example.com/envoy-gateway
+          chart: gateway-helm
+          version: "1.99.1"
+      images:
+        main:
+          repository: test.registry/envoyproxy/gateway
+          tag: "v1.99.1"
+        envoy:
+          repository: test.registry/envoyproxy/envoy
+          tag: "distroless-v1.99.1"
+    kafka-operator:
+      package_type: helm
+      charts:
+        main:
+          repo: https://test.example.com/strimzi
+          chart: strimzi-kafka-operator
+          version: "0.99.1"
+      images:
+        main:
+          repository: test.registry/strimzi/operator
+          tag: "0.99.1"
+    nifikop-operator:
+      package_type: helm
+      charts:
+        main:
+          repo: https://test.example.com/nifikop
+          chart: nifikop
+          version: "1.99.0"
+      images:
+        main:
+          repository: test.registry/konpyutaika/nifikop
+          tag: "v1.99.0-test"
+    doris-operator:
+      package_type: helm
+      charts:
+        main:
+          repo: https://test.example.com/doris-operator
+          chart: doris-operator
+          version: "25.99.0"
+      images:
+        main:
+          repository: test.registry/apache/doris
+          tag: "operator-26.99.1"

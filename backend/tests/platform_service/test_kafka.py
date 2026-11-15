@@ -362,21 +362,22 @@ def test_register_poller_invalid_frequency():
 
 
 @pytest.mark.asyncio
-async def test_kafka_default_image_and_chart_locked(mock_service_dependencies):
-    """Test that Kafka defaults match the locked stack image and chart versions."""
-    request, session = mock_service_dependencies
-    svc = KafkaPlatformService(request, session)
+async def test_kafka_default_image_and_chart_locked(test_stack_session):
+    """Test that Kafka resolves image and chart versions from test_stack."""
+    request = MagicMock(spec=Request)
+    svc = KafkaPlatformService(request, test_stack_session)
     model = KafkaPlatform(name="my-kafka", project_id=1)
 
     svc._resolve_namespace = AsyncMock(return_value="ns")
     mock_project = MagicMock(ingress_domain=None)
     mock_project.name = "mock-project"
+    mock_project.stack_id = 1
     svc.project = AsyncMock(return_value=mock_project)
 
     vars = await svc.template_vars(model)
-    assert vars["image"] == "ghcr.io/kagesenshi/mindweaver/kafka"
-    assert vars["image_tag"] == "4.0.0-rev.1"
-    assert vars["chart_repo"] == "ghcr.io/kagesenshi/mindweaver/charts"
+    assert vars["image"] == "test.registry/mindweaver/kafka"
+    assert vars["image_tag"] == "4.99.0"
+    assert vars["chart_repo"] == "https://test.example.com/kafka"
     assert vars["chart_name"] == "kafka"
-    assert vars["chart_version"] == "0.1.3"
+    assert vars["chart_version"] == "0.99.3"
 
