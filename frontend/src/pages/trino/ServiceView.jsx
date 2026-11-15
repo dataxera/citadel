@@ -153,21 +153,6 @@ const ServiceView = ({
             isIngressUsed = true;
         }
 
-        const httpPort = platformState?.node_ports?.find(np => np.name?.endsWith('https-nodeport') || np.port === 8443);
-        if (httpPort) {
-            ports.push({
-                label: 'Trino UI / API (NodePort)',
-                node_port: httpPort.node_port,
-                scheme: trinoUriObj ? trinoUriObj.protocol.replace(':', '') : 'https'
-            });
-        } else if (!isIngressUsed && trinoUriObj) {
-            ports.push({
-                label: 'Trino UI / API (NodePort)',
-                node_port: trinoUriObj.port ? parseInt(trinoUriObj.port) : 8443,
-                scheme: trinoUriObj.protocol.replace(':', '')
-            });
-        }
-
         const externalUri = platformState?.trino_uri || (trinoUriObj ? trinoUriObj.toString() : null);
 
         return (
@@ -187,13 +172,8 @@ const ServiceView = ({
                         clusterNodes={platformState.cluster_nodes}
                         isIngressUsed={isIngressUsed}
                         cliInfo={{
-                            command: (node) => {
-                                const nodeScheme = trinoUriObj ? trinoUriObj.protocol.replace(':', '') : 'https';
-                                const nodePortVal = httpPort?.node_port || (trinoUriObj?.port ? parseInt(trinoUriObj.port) : 8443);
-                                const targetUri = isIngressUsed && externalUri
-                                    ? externalUri
-                                    : (node?.hostname ? `${nodeScheme}://${node.hostname}:${nodePortVal}` : (externalUri || 'https://[NODE_HOSTNAME]:[NODE_PORT]'));
-                                return `trino --server ${targetUri} --catalog ${platformState?.extra_data?.preferred_catalog || 'hive'} --schema default`;
+                            command: () => {
+                                return `trino --server ${externalUri || 'https://[INGRESS_HOSTNAME]'} --catalog ${platformState?.extra_data?.preferred_catalog || 'hive'} --schema default`;
                             },
                             languageButtons: []
                         }}
