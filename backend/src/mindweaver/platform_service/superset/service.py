@@ -228,7 +228,7 @@ class SupersetPlatformService(PlatformService[SupersetPlatform]):
                     {
                         "database_name": ds.name,
                         "sqlalchemy_uri": sqlalchemy_uri,
-                        "expose_in_sqllab": True,
+                        "expose_in_sqllab": model.sqllab_enabled,
                     }
                 )
 
@@ -264,7 +264,7 @@ class SupersetPlatformService(PlatformService[SupersetPlatform]):
                         {
                             "database_name": trino_model.name,
                             "sqlalchemy_uri": sqlalchemy_uri,
-                            "expose_in_sqllab": True,
+                            "expose_in_sqllab": model.sqllab_enabled,
                             "impersonate_user": True,
                             "extra": extra_dict,
                             "encrypted_extra": encrypted_extra_dict,
@@ -304,7 +304,7 @@ class SupersetPlatformService(PlatformService[SupersetPlatform]):
                         {
                             "database_name": doris_model.name,
                             "sqlalchemy_uri": sqlalchemy_uri,
-                            "expose_in_sqllab": True,
+                            "expose_in_sqllab": model.sqllab_enabled,
                         }
                     )
 

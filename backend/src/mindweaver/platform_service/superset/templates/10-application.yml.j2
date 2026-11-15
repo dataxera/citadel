@@ -115,6 +115,71 @@ spec:
             superset db upgrade
             echo "Initializing roles..."
             superset init
+            echo "Creating admin user..."
+            superset fab create-admin \
+                            --username admin \
+                            --firstname Superset \
+                            --lastname Admin \
+                            --email admin@superset.com \
+                            --password {{ admin_password }} \
+                            || true
+            {% if load_examples %}
+            echo "Configuring examples database URI..."
+            python3 -c "
+            from superset.app import create_app
+            app = create_app()
+            with app.app_context():
+                from superset import db
+                from superset.models.core import Database
+                d = db.session.query(Database).filter_by(database_name='examples').first()
+                target_uri = app.config.get('SQLALCHEMY_EXAMPLES_URI') or app.config['SQLALCHEMY_DATABASE_URI']
+                if d:
+                    if d.sqlalchemy_uri_decrypted != target_uri:
+                        print(f'Updating examples database URI to {target_uri}')
+                        d.set_sqlalchemy_uri(target_uri)
+                    d.expose_in_sqllab = True
+                    db.session.commit()
+            "
+            echo "Loading examples..."
+            superset load_examples --force
+            echo "Fixing example datasets schema and views..."
+            python3 -c "
+            from superset.app import create_app
+            app = create_app()
+            with app.app_context():
+                from superset import db
+                from superset.models.core import Database
+                from superset.connectors.sqla.models import SqlaTable
+                from sqlalchemy import text
+
+                examples_db = db.session.query(Database).filter_by(database_name='examples').first()
+                if examples_db:
+                    examples_db.expose_in_sqllab = True
+                    for tbl in db.session.query(SqlaTable).filter_by(database_id=examples_db.id).all():
+                        if tbl.schema == 'main':
+                            print(f'Updating schema for {tbl.table_name} from main to public')
+                            tbl.schema = 'public'
+                    db.session.commit()
+
+                    try:
+                        with examples_db.get_sqla_engine().begin() as conn:
+                            if examples_db.backend == 'postgresql':
+                                conn.execute(text('CREATE SCHEMA IF NOT EXISTS main;'))
+                                conn.execute(text('''
+                                    DO \$\$
+                                    DECLARE
+                                        r RECORD;
+                                    BEGIN
+                                        FOR r IN (SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_type = 'BASE TABLE') LOOP
+                                            EXECUTE 'CREATE OR REPLACE VIEW main.' || quote_ident(r.table_name) || ' AS SELECT * FROM public.' || quote_ident(r.table_name);
+                                        END LOOP;
+                                    END \$\$;
+                                '''))
+                                print('Created main schema views in PostgreSQL')
+                    except Exception as e:
+                        print(f'Warning: Failed to create main schema alias in examples db: {e}')
+            "
+            {% endif %}
             if [ -f /app/configs/import_datasources.yaml ]; then
               echo "Importing datasources..."
               superset import_datasources -p /app/configs/import_datasources.yaml
@@ -128,7 +193,10 @@ spec:
             with app.app_context():
                 from superset import db
                 from superset.models.core import Database
-                expected_names = ['main', 'examples']
+                expected_names = ['main']
+                {% if load_examples %}
+                expected_names.append('examples')
+                {% endif %}
                 config_path = '/app/configs/import_datasources.yaml'
                 if os.path.exists(config_path):
                     with open(config_path, 'r') as f:
@@ -146,6 +214,47 @@ spec:
             SECRET_KEY = '{{ superset_secret_key }}'
             RECAPTCHA_PUBLIC_KEY = ''
             RECAPTCHA_PRIVATE_KEY = ''
+            SQLALCHEMY_EXAMPLES_URI = SQLALCHEMY_DATABASE_URI
+          security_manager: |
+            from superset.security import SupersetSecurityManager
+
+            class CustomSecurityManager(SupersetSecurityManager):
+                def update_user_auth_stat(self, user, success=True):
+                    if success and user:
+                        try:
+                            {% if sqllab_enabled %}
+                            sql_lab_role = self.find_role("sql_lab")
+                            if sql_lab_role and sql_lab_role not in user.roles:
+                                user.roles.append(sql_lab_role)
+                                try:
+                                    self.session.commit()
+                                except AttributeError:
+                                    from superset import db
+                                    db.session.commit()
+                            {% else %}
+                            sql_lab_role = self.find_role("sql_lab")
+                            if sql_lab_role and sql_lab_role in user.roles:
+                                user.roles.remove(sql_lab_role)
+                                try:
+                                    self.session.commit()
+                                except AttributeError:
+                                    from superset import db
+                                    db.session.commit()
+                            {% endif %}
+                        except Exception as e:
+                            import logging
+                            logging.error(f"Failed to update sql_lab role: {e}")
+                    super().update_user_auth_stat(user, success)
+
+            CUSTOM_SECURITY_MANAGER = CustomSecurityManager
+
+            import trino.auth
+            ALLOWED_EXTRA_AUTHENTICATIONS = {
+                "trino": {
+                    "jwt": trino.auth.JWTAuthentication,
+                    "certificate": trino.auth.CertificateAuthentication
+                }
+            }
           {% if ldap %}
           ldap: |
             from flask_appbuilder.security.manager import AUTH_LDAP
@@ -200,7 +309,7 @@ spec:
             {% for ds in datasources %}
             - database_name: "{{ ds.database_name }}"
               sqlalchemy_uri: "{{ ds.sqlalchemy_uri }}"
-              expose_in_sqllab: true
+              expose_in_sqllab: {{ 'true' if ds.expose_in_sqllab else 'false' }}
               {% if ds.impersonate_user %}
               impersonate_user: true
               {% endif %}

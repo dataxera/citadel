@@ -271,6 +271,7 @@ async def test_superset_template_rendering(mock_service_dependencies):
         # Verify initscript database auto-cleanup exists in rendered helm values
         assert "initscript" in values["init"]
         assert "superset db upgrade" in values["init"]["initscript"]
+        assert "superset fab create-admin" in values["init"]["initscript"]
         assert "superset import_datasources" in values["init"]["initscript"]
         assert "Cleaning up removed datasources..." in values["init"]["initscript"]
         assert "create_app()" in values["init"]["initscript"]
@@ -280,6 +281,10 @@ async def test_superset_template_rendering(mock_service_dependencies):
         assert values["service"]["type"] == "NodePort"
         assert values["service"]["port"] == 8088
         assert "AUTH_LDAP" in values["configOverrides"]["ldap"]
+        assert "SQLALCHEMY_EXAMPLES_URI = SQLALCHEMY_DATABASE_URI" in values["configOverrides"]["secret_key"]
+        assert "CUSTOM_SECURITY_MANAGER = CustomSecurityManager" in values["configOverrides"]["security_manager"]
+        assert "sql_lab_role not in user.roles" in values["configOverrides"]["security_manager"]
+        assert "ALLOWED_EXTRA_AUTHENTICATIONS" in values["configOverrides"]["security_manager"]
         assert values["image"]["repository"] == "ghcr.io/kagesenshi/mindweaver/superset"
         assert values["redis"]["image"]["repository"] == "bitnamilegacy/redis"
         assert "AUTH_ROLES_MAPPING" in values["configOverrides"]["role_mapping"]
@@ -304,12 +309,23 @@ async def test_superset_template_rendering(mock_service_dependencies):
         model.sqllab_enabled = False
         vars_no_sqllab = await svc.template_vars(model)
         assert "sql_lab" not in vars_no_sqllab["auth_role_mapping"]["user@mindweaver.io"]
+        manifest_no_sqllab = await svc.render_manifests(model)
+        docs_no_sqllab = [d for d in yaml.safe_load_all(manifest_no_sqllab) if d is not None]
+        app_doc_no_sqllab = next(d for d in docs_no_sqllab if d["kind"] == "Application")
+        values_no_sqllab = yaml.safe_load(app_doc_no_sqllab["spec"]["source"]["helm"]["values"])
+        assert "user.roles.remove(sql_lab_role)" in values_no_sqllab["configOverrides"]["security_manager"]
+        datasources_yaml_no_sqllab = yaml.safe_load(values_no_sqllab["extraConfigs"]["import_datasources.yaml"])
+        ds_pg_no_sqllab = next(ds for ds in datasources_yaml_no_sqllab["databases"] if ds["database_name"] == "mypsql")
+        assert ds_pg_no_sqllab["expose_in_sqllab"] is False
 
         # Verify Trino datasource has extra connecting args
         assert "import_datasources.yaml" in values["extraConfigs"]
         datasources_yaml = yaml.safe_load(values["extraConfigs"]["import_datasources.yaml"])
+        ds_pg_rendered = next(ds for ds in datasources_yaml["databases"] if ds["database_name"] == "mypsql")
+        assert ds_pg_rendered["expose_in_sqllab"] is True
         trino_ds = next(ds for ds in datasources_yaml["databases"] if ds["database_name"] == "mytrino")
         assert trino_ds.get("impersonate_user") is True
+        assert trino_ds["expose_in_sqllab"] is True
         assert "extra" in trino_ds
         extra_data = yaml.safe_load(trino_ds["extra"])
         assert extra_data["engine_params"]["connect_args"]["http_scheme"] == "https"
@@ -494,6 +510,11 @@ async def test_superset_load_examples(mock_service_dependencies):
         app_doc = next(d for d in docs if d["kind"] == "Application")
         values = yaml.safe_load(app_doc["spec"]["source"]["helm"]["values"])
         assert values["init"]["loadExamples"] is True
+        assert "SQLALCHEMY_EXAMPLES_URI = SQLALCHEMY_DATABASE_URI" in values["configOverrides"]["secret_key"]
+        assert "superset load_examples --force" in values["init"]["initscript"]
+        assert "CREATE SCHEMA IF NOT EXISTS main" in values["init"]["initscript"]
+        assert "Updating schema for" in values["init"]["initscript"]
+        assert "expected_names.append('examples')" in values["init"]["initscript"]
 
     # 2. Test load_examples is False
     model_false = SupersetPlatform(
@@ -520,6 +541,8 @@ async def test_superset_load_examples(mock_service_dependencies):
         app_doc = next(d for d in docs if d["kind"] == "Application")
         values = yaml.safe_load(app_doc["spec"]["source"]["helm"]["values"])
         assert values["init"]["loadExamples"] is False
+        assert "superset load_examples" not in values["init"]["initscript"]
+        assert "expected_names.append('examples')" not in values["init"]["initscript"]
 
 
 @pytest.mark.asyncio
