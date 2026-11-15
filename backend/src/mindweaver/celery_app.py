@@ -23,16 +23,6 @@ app.conf.update(
     timezone=settings.timezone,
     enable_utc=True,
     beat_schedule={
-        "poll-all-platforms-15s": {
-            "task": "mindweaver.tasks.platform_status.poll_all_platforms",
-            "schedule": 15.0,
-            "options": {"expires": settings.status_polling_expiry},
-        },
-        "poll-all-k8s-clusters-15s": {
-            "task": "mindweaver.tasks.k8s_cluster_status.poll_all_k8s_clusters",
-            "schedule": 15.0,
-            "options": {"expires": settings.status_polling_expiry},
-        },
         "scan-and-clean-names-daily": {
             "task": "mindweaver.tasks.name_tracker.scan_and_clean_names_task",
             "schedule": 86400.0,

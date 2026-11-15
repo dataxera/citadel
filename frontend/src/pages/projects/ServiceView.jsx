@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
     Briefcase, Database, Server, Activity, ArrowLeft, Monitor, Users, UserPlus, Edit, Trash2, Shield, RefreshCw, Download, Search, Key, CheckCircle2, AlertCircle, Eye, RefreshCcw, Network, Copy, Check
 } from 'lucide-react';
@@ -9,6 +9,7 @@ import ResourceConfirmModal from '../../components/ResourceConfirmModal';
 import { useNotification } from '../../providers/NotificationProvider';
 import { ExternalNetworkAccessBlock } from '../../components/ServiceBlocks';
 import apiClient from '../../services/api';
+import { useVisibilityPolling } from '../../hooks/useStatePolling';
 
 const ServiceView = ({
     context,
@@ -197,30 +198,24 @@ const ServiceView = ({
         }
     };
 
-    useEffect(() => {
-        let timer;
-        if (selectedProjectId) {
-            getProjectState(selectedProjectId).then(setProjectState);
-            if (getProjectCertManager) {
-                getProjectCertManager(selectedProjectId).then(setCertData).catch(console.error);
-            }
+    const pollProjectState = useCallback(() => {
+        if (!selectedProjectId) return;
+        getProjectState(selectedProjectId).then(setProjectState).catch(console.error);
+        if (getProjectCertManager) {
+            getProjectCertManager(selectedProjectId).then(setCertData).catch(console.error);
+        }
+    }, [selectedProjectId, getProjectState, getProjectCertManager]);
 
-            timer = setInterval(() => {
-                getProjectState(selectedProjectId).then(setProjectState);
-                if (getProjectCertManager) {
-                    getProjectCertManager(selectedProjectId).then(setCertData).catch(console.error);
-                }
-            }, 10000);
-        } else {
+    useEffect(() => {
+        if (!selectedProjectId) {
             Promise.resolve().then(() => {
                 setProjectState(null);
                 setCertData(null);
             });
         }
-        return () => {
-            if (timer) clearInterval(timer);
-        };
-    }, [selectedProjectId, getProjectState, getProjectCertManager]);
+    }, [selectedProjectId]);
+
+    useVisibilityPolling(pollProjectState, Boolean(selectedProjectId));
 
     const projectUsers = localUsers.filter(u => u.project_id === selectedProjectId);
 

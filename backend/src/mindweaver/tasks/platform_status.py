@@ -16,6 +16,7 @@ from mindweaver.platform_service.doris import DorisPlatformService
 from mindweaver.config import logger, settings
 from typing import Type
 from .base import run_async
+from .poll_coordinator import acquire_poll_lock, release_poll_lock
 
 
 @app.task
@@ -90,32 +91,40 @@ async def _poll_platform_status(service_class_name: str, platform_id: int):
         logger.error(f"Service class {service_class_name} not found")
         return
 
+    resource_key = f"platform:{service_class_name}:{platform_id}"
+    if not await acquire_poll_lock(resource_key):
+        logger.debug(f"Skipping poll for {resource_key}; already in flight")
+        return
+
     engine = get_engine()
-    async with AsyncSession(engine) as session:
+    try:
+        async with AsyncSession(engine) as session:
 
-        class MockRequest:
-            headers = {}
+            class MockRequest:
+                headers = {}
 
-        svc = svc_cls(MockRequest(), session)
-        try:
-            model = await svc.get(platform_id)
-            await svc.poll_status(model)
-            await session.commit()
-            logger.info(
-                f"Successfully polled {service_class_name} instance {platform_id}"
-            )
-        except Exception as e:
-            logger.error(
-                f"Error polling {service_class_name} instance {platform_id}: {e}"
-            )
+            svc = svc_cls(MockRequest(), session)
             try:
-                state = await svc.platform_state(platform_id)
-                if state:
-                    state.status = "error"
-                    state.message = f"Cluster is unreachable: {str(e)}"
-                    state.last_heartbeat = ts_now()
-                    await session.commit()
-            except Exception as se:
-                logger.error(
-                    f"Failed to record error state for {service_class_name} {platform_id}: {se}"
+                model = await svc.get(platform_id)
+                await svc.poll_status(model)
+                await session.commit()
+                logger.info(
+                    f"Successfully polled {service_class_name} instance {platform_id}"
                 )
+            except Exception as e:
+                logger.error(
+                    f"Error polling {service_class_name} instance {platform_id}: {e}"
+                )
+                try:
+                    state = await svc.platform_state(platform_id)
+                    if state:
+                        state.status = "error"
+                        state.message = f"Cluster is unreachable: {str(e)}"
+                        state.last_heartbeat = ts_now()
+                        await session.commit()
+                except Exception as se:
+                    logger.error(
+                        f"Failed to record error state for {service_class_name} {platform_id}: {se}"
+                    )
+    finally:
+        await release_poll_lock(resource_key)

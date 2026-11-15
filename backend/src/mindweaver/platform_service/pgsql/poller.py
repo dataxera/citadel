@@ -83,16 +83,16 @@ class PgSQLPoller:
                         except Exception:
                             status = "error"
                             message = f"Cluster is unreachable: {str(e)}"
-                            return status, message, {}, [], [], None
+                            return status, message, {}, [], [], {}, None
                 else:
                     status = "error"
                     message = f"Cluster is unreachable: {str(e)}"
-                    return status, message, {}, [], [], None
+                    return status, message, {}, [], [], {}, None
                 status_data = {}
             except Exception as e:
                 status = "error"
                 message = f"Cluster is unreachable: {str(e)}"
-                return status, message, {}, [], [], None
+                return status, message, {}, [], [], {}, None
 
             # 2. Fetch NodePort status if any
             node_ports = []
@@ -212,6 +212,13 @@ class PgSQLPoller:
             await self.service.session.flush()
             return
 
+        if status == "error":
+            state.status = status
+            state.message = message
+            state.last_heartbeat = ts_now()
+            await self.service.session.flush()
+            return
+
         state.status = status
         state.message = message
         if extra_data is None:
@@ -224,9 +231,13 @@ class PgSQLPoller:
         state.cluster_nodes = cluster_nodes
 
         if db_credentials:
-            state.db_user = db_credentials.get("db_user")
-            state.db_pass = db_credentials.get("db_pass")
-            state.db_name = db_credentials.get("db_name")
-            state.db_ca_crt = db_credentials.get("db_ca_crt")
+            if db_credentials.get("db_user") is not None:
+                state.db_user = db_credentials.get("db_user")
+            if db_credentials.get("db_pass") is not None:
+                state.db_pass = db_credentials.get("db_pass")
+            if db_credentials.get("db_name") is not None:
+                state.db_name = db_credentials.get("db_name")
+            if db_credentials.get("db_ca_crt") is not None:
+                state.db_ca_crt = db_credentials.get("db_ca_crt")
 
         state.last_heartbeat = ts_now()

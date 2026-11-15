@@ -248,6 +248,8 @@ class ServiceViewMixin:
                 svc: Annotated[cls, Depends(cls.get_service)],  # type: ignore
                 model: Annotated[model_class, Depends(cls.get_model)],  # type: ignore
             ):
+                if hasattr(svc, "on_state_requested"):
+                    await svc.on_state_requested(model)
                 state_instance = state_class(model, svc)
                 if asyncio.iscoroutinefunction(state_instance.get):
                     return await state_instance.get()

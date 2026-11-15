@@ -5,6 +5,7 @@ import logging
 from typing import Any
 
 from mindweaver.service import Service, before_create, before_update
+from mindweaver.tasks.poll_coordinator import schedule_k8s_cluster_poll
 
 from .model import Project
 from . import permission
@@ -18,6 +19,11 @@ class ProjectService(Service[Project]):
     @classmethod
     def model_class(cls) -> type[Project]:
         return Project
+
+    async def on_state_requested(self, model: Project):
+        """Trigger a deduplicated background cluster poll when project state is viewed."""
+        if model.k8s_cluster_id:
+            await schedule_k8s_cluster_poll(model.k8s_cluster_id)
 
     @before_create
     async def _set_default_namespace(self, model: Project):

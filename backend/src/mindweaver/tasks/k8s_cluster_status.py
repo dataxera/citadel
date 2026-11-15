@@ -9,6 +9,7 @@ from mindweaver.service.k8s_cluster import K8sClusterService, K8sClusterStatus
 from mindweaver.platform_service.base import PlatformService
 from mindweaver.config import logger, settings
 from .base import run_async
+from .poll_coordinator import acquire_poll_lock, release_poll_lock
 
 
 @app.task
@@ -40,51 +41,47 @@ def poll_k8s_cluster_status(k8s_cluster_id: int):
 
 
 async def _poll_k8s_cluster_status(k8s_cluster_id: int):
+    resource_key = f"k8s_cluster:{k8s_cluster_id}"
+    if not await acquire_poll_lock(resource_key):
+        logger.debug(f"Skipping poll for {resource_key}; already in flight")
+        return
+
     engine = get_engine()
-    async with AsyncSession(engine) as session:
+    try:
+        async with AsyncSession(engine) as session:
 
-        class MockRequest:
-            headers = {}
+            class MockRequest:
+                headers = {}
 
-        svc = K8sClusterService(MockRequest(), session)
-        try:
-            model = await svc.get(k8s_cluster_id)
-            await svc.poll_status(model)
-            await session.commit()
-            logger.info(f"Successfully polled cluster {k8s_cluster_id}")
-        except Exception as e:
-            logger.error(f"Error polling cluster {k8s_cluster_id}: {e}")
+            svc = K8sClusterService(MockRequest(), session)
             try:
-                stmt = select(K8sClusterStatus).where(
-                    K8sClusterStatus.k8s_cluster_id == k8s_cluster_id
-                )
-                res = await session.exec(stmt)
-                status_model = res.one_or_none()
-                if not status_model:
-                    status_model = K8sClusterStatus(k8s_cluster_id=k8s_cluster_id)
-                    session.add(status_model)
-                status_model.status = "error"
-                status_model.message = f"Cluster is unreachable: {str(e)}"
-                status_model.last_update = ts_now()
-                status_model.node_count = 0
-                status_model.nodes_status = {}
-                status_model.node_ips = []
-                status_model.cpu_total = 0.0
-                status_model.ram_total = 0.0
-                status_model.argocd_installed = False
-                status_model.cert_manager_installed = False
-                status_model.cnpg_installed = False
-                status_model.envoy_gateway_installed = False
-                status_model.kafka_operator_installed = False
-                status_model.nifikop_installed = False
-                status_model.doris_operator_installed = False
-                cluster_name = getattr(model, "name", str(k8s_cluster_id)) if "model" in locals() and model else str(k8s_cluster_id)
-                await PlatformService.mark_cluster_services_unreachable(
-                    session, k8s_cluster_id, cluster_name, str(e)
-                )
+                model = await svc.get(k8s_cluster_id)
+                await svc.poll_status(model)
                 await session.commit()
-            except Exception as se:
-                logger.error(f"Failed to record cluster error state for {k8s_cluster_id}: {se}")
+                logger.info(f"Successfully polled cluster {k8s_cluster_id}")
+            except Exception as e:
+                logger.error(f"Error polling cluster {k8s_cluster_id}: {e}")
+                try:
+                    stmt = select(K8sClusterStatus).where(
+                        K8sClusterStatus.k8s_cluster_id == k8s_cluster_id
+                    )
+                    res = await session.exec(stmt)
+                    status_model = res.one_or_none()
+                    if not status_model:
+                        status_model = K8sClusterStatus(k8s_cluster_id=k8s_cluster_id)
+                        session.add(status_model)
+                    status_model.status = "error"
+                    status_model.message = f"Cluster is unreachable: {str(e)}"
+                    status_model.last_update = ts_now()
+                    cluster_name = getattr(model, "name", str(k8s_cluster_id)) if "model" in locals() and model else str(k8s_cluster_id)
+                    await PlatformService.mark_cluster_services_unreachable(
+                        session, k8s_cluster_id, cluster_name, str(e)
+                    )
+                    await session.commit()
+                except Exception as se:
+                    logger.error(f"Failed to record cluster error state for {k8s_cluster_id}: {se}")
+    finally:
+        await release_poll_lock(resource_key)
 
 
 @app.task

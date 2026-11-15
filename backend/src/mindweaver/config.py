@@ -33,6 +33,7 @@ class Settings(BaseSettings):
     celery_result_backend: str = "redis://localhost:6379/0"
     embedded_worker: bool = True
     status_polling_expiry: int = 60
+    status_polling_interval: int = 3
 
     oidc_issuer: str | None = None
     oidc_client_id: str | None = None

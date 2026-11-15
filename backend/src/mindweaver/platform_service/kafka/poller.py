@@ -180,6 +180,13 @@ class KafkaPoller:
             await self.service.session.flush()
             return
 
+        if status == "error":
+            state.status = status
+            state.message = message
+            state.last_heartbeat = ts_now()
+            await self.service.session.flush()
+            return
+
         state.status = status
         state.message = message
         project = await self.service.project(self.model)
@@ -204,10 +211,6 @@ class KafkaPoller:
                 state.kafka_external_url = f"{lb_ips[0]}:9094"
             else:
                 state.kafka_external_url = None
-        else:
-            state.kafka_url = None
-            state.kafka_url_ipv6 = None
-            state.kafka_external_url = None
 
         state.last_heartbeat = ts_now()
         await self.service.session.flush()

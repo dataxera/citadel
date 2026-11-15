@@ -28,6 +28,10 @@ import pydantic
 from mindweaver.service.trusted_certs.model import TrustedCert
 from mindweaver.service.name_tracker.model import NameTracker
 from mindweaver.service.dependency_tracker import DependencyTracker, DependencyTrackerService
+from mindweaver.tasks.poll_coordinator import (
+    schedule_platform_poll,
+    schedule_k8s_cluster_poll,
+)
 from sqlalchemy import Column, DateTime, String
 from sqlalchemy_utils import JSONType
 from sqlmodel import Field, select, delete
@@ -421,27 +425,25 @@ class PlatformService(ProjectScopedService[T], abc.ABC):
                 state.status = "error"
                 state.message = f"Cluster '{cluster_name}' is unreachable: {error_message}"
                 state.last_heartbeat = ts_now()
-                state.node_ports = []
-                state.cluster_nodes = []
-                for url_attr in [
-                    "kafka_url",
-                    "kafka_url_ipv6",
-                    "airflow_url",
-                    "airflow_url_ipv6",
-                    "trino_uri",
-                    "trino_uri_ipv6",
-                    "nifi_url",
-                    "nifi_url_ipv6",
-                    "superset_url",
-                    "superset_url_ipv6",
-                    "fe_url",
-                    "fe_url_ipv6",
-                    "hms_uri",
-                    "hms_uri_ipv6",
-                ]:
-                    if hasattr(state, url_attr):
-                        setattr(state, url_attr, None)
         await session.flush()
+
+    async def on_state_requested(self, model: T):
+        """Trigger a deduplicated background poll when platform state is viewed."""
+        state = await self.platform_state(model)
+        if state and not state.active:
+            return
+        await schedule_platform_poll(self.__class__.__name__, model.id)
+        try:
+            project = await self.project(model)
+            if project and getattr(project, "k8s_cluster_id", None):
+                stmt_c = select(K8sClusterStatus).where(
+                    K8sClusterStatus.k8s_cluster_id == project.k8s_cluster_id
+                )
+                cluster_status = (await self.session.exec(stmt_c)).one_or_none()
+                if cluster_status and cluster_status.status == "error":
+                    await schedule_k8s_cluster_poll(project.k8s_cluster_id)
+        except Exception as e:
+            logger.debug(f"Failed to check cluster status during on_state_requested: {e}")
 
     async def poll_status(self, model: T):
         """

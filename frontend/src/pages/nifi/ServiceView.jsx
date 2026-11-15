@@ -1,11 +1,12 @@
 // SPDX-FileCopyrightText: Copyright © 2026 Mohd Izhar Firdaus Bin Ismail
 // SPDX-License-Identifier: AGPLv3+
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Network } from 'lucide-react';
 import { useNotification } from '../../providers/NotificationProvider';
 import PlatformServiceView from '../../components/PlatformServiceView';
 import { InternalNetworkAccessBlock, ExternalNetworkAccessBlock } from '../../components/ServiceBlocks';
+import { useVisibilityPolling } from '../../hooks/useStatePolling';
 
 /**
  * ServiceView displays detail, status, and connection options for a single Apache NiFi platform instance.
@@ -24,20 +25,18 @@ const ServiceView = ({
 
     const { showSuccess, showError } = useNotification();
 
+    const pollPlatformState = useCallback(() => {
+        if (!selectedPlatformId) return;
+        getPlatformState(selectedPlatformId).then(setPlatformState).catch(console.error);
+    }, [selectedPlatformId, getPlatformState]);
+
     useEffect(() => {
-        let timer;
-        if (selectedPlatformId) {
-            getPlatformState(selectedPlatformId).then(setPlatformState);
-            timer = setInterval(() => {
-                getPlatformState(selectedPlatformId).then(setPlatformState);
-            }, 15000);
-        } else {
+        if (!selectedPlatformId) {
             setPlatformState(null);
         }
-        return () => {
-            if (timer) clearInterval(timer);
-        };
-    }, [selectedPlatformId, getPlatformState]);
+    }, [selectedPlatformId]);
+
+    useVisibilityPolling(pollPlatformState, Boolean(selectedPlatformId));
 
     const handleRefresh = async () => {
         if (!selectedPlatformId) return;

@@ -154,6 +154,13 @@ class NifiPoller:
             await self.service.session.flush()
             return
 
+        if status == "error":
+            state.status = status
+            state.message = message
+            state.last_heartbeat = ts_now()
+            await self.service.session.flush()
+            return
+
         state.status = status
         state.message = message
         project = await self.service.project(self.model)
@@ -183,8 +190,6 @@ class NifiPoller:
                     state.nifi_uri = f"https://{self.model.name}.{namespace}.svc.cluster.local:8443"
             else:
                 state.nifi_uri = f"https://{self.model.name}.{namespace}.svc.cluster.local:8443"
-        else:
-            state.nifi_uri = None
 
         state.last_heartbeat = ts_now()
         await self.service.session.flush()

@@ -2,11 +2,12 @@
 SPDX-FileCopyrightText: Copyright © 2026 Mohd Izhar Firdaus Bin Ismail
 SPDX-License-Identifier: AGPLv3+
 */
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Search, ChevronRight, Trash2, Edit2 } from 'lucide-react';
 import PageLayout from './PageLayout';
 import ListingItem from './ListingItem';
 import ResourceConfirmModal from './ResourceConfirmModal';
+import { DEFAULT_POLL_INTERVAL_MS, useVisibilityPolling } from '../hooks/useStatePolling';
 
 const GenericListingView = ({
     title,
@@ -32,7 +33,7 @@ const GenericListingView = ({
     selectedProject,
     rowKey = "id",
     searchFields = ["name", "title", "id"],
-    pollInterval = 5000
+    pollInterval = DEFAULT_POLL_INTERVAL_MS
 }) => {
     const [searchTerm, setSearchTerm] = useState('');
     const [itemStates, setItemStates] = useState({});
@@ -47,31 +48,21 @@ const GenericListingView = ({
         return matchesProject && matchesSearch;
     });
 
-    useEffect(() => {
-        let timer;
-        const fetchStates = async () => {
-            if (!getItemState || items.length === 0) return;
-            const states = {};
-            await Promise.all(items.map(async (item) => {
-                try {
-                    const state = await getItemState(item[rowKey]);
-                    states[item[rowKey]] = state;
-                } catch (e) {
-                    console.error(`Failed to fetch state for item ${item[rowKey]}`, e);
-                }
-            }));
-            setItemStates(states);
-        };
+    const fetchStates = async () => {
+        if (!getItemState || items.length === 0) return;
+        const states = {};
+        await Promise.all(items.map(async (item) => {
+            try {
+                const state = await getItemState(item[rowKey]);
+                states[item[rowKey]] = state;
+            } catch (e) {
+                console.error(`Failed to fetch state for item ${item[rowKey]}`, e);
+            }
+        }));
+        setItemStates(prev => ({ ...prev, ...states }));
+    };
 
-        if (getItemState && items.length > 0) {
-            fetchStates();
-            timer = setInterval(fetchStates, pollInterval);
-        }
-
-        return () => {
-            if (timer) clearInterval(timer);
-        };
-    }, [items, getItemState, rowKey, pollInterval]);
+    useVisibilityPolling(fetchStates, Boolean(getItemState && items.length > 0), pollInterval);
 
     const handleDeleteClick = (e, item) => {
         e.stopPropagation();

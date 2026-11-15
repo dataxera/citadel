@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
     Activity, Monitor, RefreshCw, Shield, Key, CheckCircle2, AlertCircle, Eye, Download
 } from 'lucide-react';
 import { useNotification } from '../../providers/NotificationProvider';
 import Modal from '../../components/Modal';
+import { useVisibilityPolling } from '../../hooks/useStatePolling';
 
 const ServiceView = ({
     selectedClusterId,
@@ -18,23 +19,20 @@ const ServiceView = ({
     const { showSuccess, showError } = useNotification();
 
 
-    useEffect(() => {
-        let timer;
-        if (selectedClusterId && getClusterState) {
-            getClusterState(selectedClusterId).then(setClusterState);
+    const pollClusterState = useCallback(() => {
+        if (!selectedClusterId || !getClusterState) return;
+        getClusterState(selectedClusterId).then(setClusterState).catch(console.error);
+    }, [selectedClusterId, getClusterState]);
 
-            timer = setInterval(() => {
-                getClusterState(selectedClusterId).then(setClusterState);
-            }, 10000);
-        } else {
+    useEffect(() => {
+        if (!selectedClusterId) {
             Promise.resolve().then(() => {
                 setClusterState(null);
             });
         }
-        return () => {
-            if (timer) clearInterval(timer);
-        };
-    }, [selectedClusterId, getClusterState]);
+    }, [selectedClusterId]);
+
+    useVisibilityPolling(pollClusterState, Boolean(selectedClusterId && getClusterState));
 
     const handleRefresh = async () => {
         if (!refreshClusterState) return;

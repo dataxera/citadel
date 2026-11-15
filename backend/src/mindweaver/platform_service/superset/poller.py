@@ -153,6 +153,13 @@ class SupersetPoller:
             await self.service.session.flush()
             return
 
+        if status == "error":
+            state.status = status
+            state.message = message
+            state.last_heartbeat = ts_now()
+            await self.service.session.flush()
+            return
+
         state.status = status
         state.message = message
         project = await self.service.project(self.model)
@@ -205,9 +212,6 @@ class SupersetPoller:
                     f"http://{self.model.name}.{namespace}.svc.cluster.local:8088"
                 )
                 state.superset_uri_ipv6 = None
-        else:
-            state.superset_uri = None
-            state.superset_uri_ipv6 = None
 
         state.last_heartbeat = ts_now()
         await self.service.session.flush()

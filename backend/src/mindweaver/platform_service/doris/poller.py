@@ -163,6 +163,13 @@ class DorisPoller:
             await self.service.session.flush()
             return
 
+        if status == "error":
+            state.status = status
+            state.message = message
+            state.last_heartbeat = ts_now()
+            await self.service.session.flush()
+            return
+
         state.status = status
         state.message = message
         project = await self.service.project(self.model)
@@ -201,9 +208,6 @@ class DorisPoller:
                 state.fe_http_uri = f"http://{node_v4['ipv4']}:{http_np['node_port']}"
             else:
                 state.fe_http_uri = f"http://{self.model.name}-fe-service.{namespace}.svc.cluster.local:8030"
-        else:
-            state.query_uri = None
-            state.fe_http_uri = None
 
         state.admin_user = "root"
         state.admin_password = admin_pass

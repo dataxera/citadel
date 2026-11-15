@@ -153,6 +153,13 @@ class AirflowPoller:
             await self.service.session.flush()
             return
 
+        if status == "error":
+            state.status = status
+            state.message = message
+            state.last_heartbeat = ts_now()
+            await self.service.session.flush()
+            return
+
         state.status = status
         state.message = message
         project = await self.service.project(self.model)
@@ -203,9 +210,6 @@ class AirflowPoller:
                     f"http://{self.model.name}.{namespace}.svc.cluster.local:8080"
                 )
                 state.airflow_uri_ipv6 = None
-        else:
-            state.airflow_uri = None
-            state.airflow_uri_ipv6 = None
 
         state.last_heartbeat = ts_now()
         await self.service.session.flush()

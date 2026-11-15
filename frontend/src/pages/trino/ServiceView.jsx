@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Server } from 'lucide-react';
 import { useNotification } from '../../providers/NotificationProvider';
 import PlatformServiceView from '../../components/PlatformServiceView';
 import { InternalNetworkAccessBlock, ExternalNetworkAccessBlock, CredentialBlock } from '../../components/ServiceBlocks';
+import { useVisibilityPolling } from '../../hooks/useStatePolling';
 
 const ServiceView = ({
     darkMode,
@@ -18,20 +19,18 @@ const ServiceView = ({
 
     const { showSuccess, showError } = useNotification();
 
+    const pollPlatformState = useCallback(() => {
+        if (!selectedPlatformId) return;
+        getPlatformState(selectedPlatformId).then(setPlatformState).catch(console.error);
+    }, [selectedPlatformId, getPlatformState]);
+
     useEffect(() => {
-        let timer;
-        if (selectedPlatformId) {
-            getPlatformState(selectedPlatformId).then(setPlatformState);
-            timer = setInterval(() => {
-                getPlatformState(selectedPlatformId).then(setPlatformState);
-            }, 15000);
-        } else {
+        if (!selectedPlatformId) {
             setPlatformState(null);
         }
-        return () => {
-            if (timer) clearInterval(timer);
-        };
-    }, [selectedPlatformId, getPlatformState]);
+    }, [selectedPlatformId]);
+
+    useVisibilityPolling(pollPlatformState, Boolean(selectedPlatformId));
 
     const handleRefresh = async () => {
         if (!selectedPlatformId) return;

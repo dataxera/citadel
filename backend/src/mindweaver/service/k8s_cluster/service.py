@@ -11,6 +11,7 @@ from sqlmodel import select
 
 from mindweaver.service import Service
 from mindweaver.fw.model import ts_now
+from mindweaver.tasks.poll_coordinator import schedule_k8s_cluster_poll
 from .model import K8sCluster, K8sClusterStatus, K8sClusterType
 from . import permission
 
@@ -23,6 +24,10 @@ class K8sClusterService(Service[K8sCluster]):
     @classmethod
     def model_class(cls) -> type[K8sCluster]:
         return K8sCluster
+
+    async def on_state_requested(self, model: K8sCluster):
+        """Trigger a deduplicated background poll when cluster state is viewed."""
+        await schedule_k8s_cluster_poll(model.id)
 
     async def delete(self, model_id: int):
         """Delete cluster and its associated status record."""
@@ -410,18 +415,6 @@ class K8sClusterService(Service[K8sCluster]):
             status_model.status = "error"
             status_model.message = f"Cluster is unreachable: {str(e)}"
             status_model.last_update = ts_now()
-            status_model.node_count = 0
-            status_model.nodes_status = {}
-            status_model.node_ips = []
-            status_model.cpu_total = 0.0
-            status_model.ram_total = 0.0
-            status_model.argocd_installed = False
-            status_model.cert_manager_installed = False
-            status_model.cnpg_installed = False
-            status_model.envoy_gateway_installed = False
-            status_model.kafka_operator_installed = False
-            status_model.nifikop_installed = False
-            status_model.doris_operator_installed = False
 
             # Workaround circular import: PlatformService imports k8s_cluster
             from mindweaver.platform_service.base import PlatformService
