@@ -218,10 +218,9 @@ async def test_trino_template_rendering(mock_service_dependencies):
     assert rules["impersonation"][0]["new_user"] == ".*"
     assert rules["impersonation"][0]["allow"] is True
 
-    # Verify the additional HTTPS NodePort service is present in the docs
-    https_svc = next(d for d in docs if d["kind"] == "Service" and d["metadata"]["name"] == "trino-test-https-nodeport")
-    assert https_svc["spec"]["type"] == "NodePort"
-    assert https_svc["spec"]["ports"][0]["port"] == 8443
+    # Verify no NodePort Service is rendered (Trino uses Envoy Gateway)
+    nodeport_svcs = [d for d in docs if d and d.get("kind") == "Service" and d.get("spec", {}).get("type") == "NodePort"]
+    assert nodeport_svcs == []
 
 
 @pytest.mark.asyncio
@@ -572,7 +571,7 @@ async def test_trino_https_rendering(mock_service_dependencies):
         manifest = await svc.render_manifests(model)
 
     docs = list(yaml.safe_load_all(manifest))
-    assert len(docs) >= 3  # Application + Certificate + NodePort Service
+    assert len(docs) >= 3  # Secret + Certificate + Application
 
     # Ensure no local Issuer is created (it's cluster-wide now - wait, project-wide)
     issuer_kinds = [d["kind"] for d in docs]
@@ -586,11 +585,9 @@ async def test_trino_https_rendering(mock_service_dependencies):
     assert "keystores" in cert["spec"]
     assert cert["spec"]["keystores"]["jks"]["create"] is True
 
-    # Check additional NodePort service
-    service = next(d for d in docs if d["kind"] == "Service" and d["metadata"]["name"] == "trino-https-test-https-nodeport")
-    assert service["spec"]["type"] == "NodePort"
-    assert service["spec"]["ports"][0]["port"] == 8443
-    assert service["spec"]["selector"]["app.kubernetes.io/component"] == "coordinator"
+    # Ensure no NodePort service is rendered
+    nodeport_svcs = [d for d in docs if d and d.get("kind") == "Service" and d.get("spec", {}).get("type") == "NodePort"]
+    assert nodeport_svcs == []
 
     # Check Application Helm values
     app = next(d for d in docs if d["kind"] == "Application")
