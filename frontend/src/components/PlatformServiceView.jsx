@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
-import { Terminal, RefreshCcw, Zap, AlertCircle, Loader2, Activity, Clock, Copy, Check } from 'lucide-react';
+import { Terminal, RefreshCcw, Zap, Loader2, Activity, Clock, Copy, Check } from 'lucide-react';
 import { cn } from '../utils/cn';
-import DynamicForm from './DynamicForm';
-import ResourceConfirmModal from './ResourceConfirmModal';
-import PageLayout from './PageLayout';
 import Drawer from './Drawer';
 import Modal from './Modal';
+import {
+    ServiceViewTabs,
+    ConnectionTab,
+    ConfigurationTab,
+    AdministrativeTab,
+} from './service_tabs';
 
 const StatusBadge = ({ status }) => {
     const styles = {
@@ -54,22 +56,8 @@ const PlatformServiceView = ({
     notDeployedTitle = "Cluster Not Deployed",
     notDeployedDescription = "Deploy the cluster to see connection details and access endpoints.",
     deployButtonText = "DEPLOY CLUSTER",
+    extraTabs = [],
 }) => {
-    const [searchParams, setSearchParams] = useSearchParams();
-    const activeTab = searchParams.get('tab') || initialTab;
-    const setActiveTab = (tab) => {
-        setSearchParams(prev => {
-            const next = new URLSearchParams(prev);
-            if (!tab || tab === 'connect') {
-                next.delete('tab');
-            } else {
-                next.set('tab', tab);
-            }
-            return next;
-        }, { replace: true });
-    };
-    const [isDecommissionModalOpen, setIsDecommissionModalOpen] = useState(false);
-    const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
     const [copied, setCopied] = useState(false);
 
@@ -173,73 +161,34 @@ const PlatformServiceView = ({
                 </div>
             </div>
 
-            <div className="space-y-6">
-                <div className={cn("flex items-center gap-4 border-b p-1", darkMode ? 'border-slate-800' : 'border-slate-200')}>
-                    <button
-                        onClick={() => setActiveTab('connect')}
-                        className={cn(
-                            "px-4 py-2 text-sm font-bold uppercase tracking-widest transition-all border-b-2",
-                            activeTab === 'connect' ? 'border-blue-500 text-blue-500' : 'border-transparent text-slate-500 hover:text-slate-900 dark:hover:text-slate-100'
-                        )}
-                    >
-                        Connection & Access
-                    </button>
-                    <button
-                        onClick={() => setActiveTab('configure')}
-                        className={cn(
-                            "px-4 py-2 text-sm font-bold uppercase tracking-widest transition-all border-b-2",
-                            activeTab === 'configure' ? 'border-blue-500 text-blue-500' : 'border-transparent text-slate-500 hover:text-slate-900 dark:hover:text-slate-100'
-                        )}
-                    >
-                        Configuration
-                    </button>
-                    <button
-                        onClick={() => setActiveTab('admin')}
-                        className={cn(
-                            "px-4 py-2 text-sm font-bold uppercase tracking-widest transition-all border-b-2",
-                            activeTab === 'admin' ? 'border-blue-500 text-blue-500' : 'border-transparent text-slate-500 hover:text-slate-900 dark:hover:text-slate-100'
-                        )}
-                    >
-                        Administrative
-                    </button>
-                </div>
-
-                {activeTab === 'connect' ? (
-                    <div className="space-y-6 animate-in fade-in duration-500">
-                        {!platformState?.active ? (
-                            <PageLayout.EmptyState
-                                icon={<Zap size={40} />}
-                                title={notDeployedTitle}
-                                description={notDeployedDescription}
-                                className="p-12 bg-slate-50/50 dark:bg-slate-950/20"
-                            >
-                                <div className="flex justify-center w-full">
-                                    <button
-                                        onClick={onToggleActive}
-                                        className="mw-btn-primary px-8 py-3 flex items-center justify-center gap-2 text-base mt-6"
-                                    >
-                                        <Zap size={18} /> {deployButtonText}
-                                    </button>
-                                </div>
-                            </PageLayout.EmptyState>
-                        ) : (
-                            renderConnectTab()
-                        )}
-                    </div>
-                ) : activeTab === 'configure' ? (
-                    <div className="mw-panel animate-in fade-in slide-in-from-top-4 duration-500">
-                        <div className={cn("p-4 border-b flex items-center justify-between", darkMode ? 'border-slate-800 bg-slate-950/30' : 'border-slate-200 bg-slate-50')}>
-                            <div className="flex items-center gap-3">
-                                <div className="p-2 bg-indigo-500/10 text-indigo-400 rounded-lg"><Zap size={18} /></div>
-                                <h4 className="text-base font-bold tracking-wider leading-none text-slate-900 dark:text-white">Configuration</h4>
-                            </div>
-                        </div>
-                        <div className="p-8">
-                            <DynamicForm
-                                entityPath={entityPath}
-                                mode="edit"
-                                initialData={selectedPlatform}
+            <ServiceViewTabs
+                darkMode={darkMode}
+                initialTab={initialTab}
+                defaultTab="connect"
+                tabs={[
+                    {
+                        id: 'connect',
+                        label: 'Connection & Access',
+                        render: () => (
+                            <ConnectionTab
+                                isActive={platformState?.active}
+                                onDeploy={onToggleActive}
+                                notDeployedTitle={notDeployedTitle}
+                                notDeployedDescription={notDeployedDescription}
+                                deployButtonText={deployButtonText}
+                                renderContent={renderConnectTab}
+                            />
+                        ),
+                    },
+                    ...extraTabs,
+                    {
+                        id: 'configure',
+                        label: 'Configuration',
+                        render: ({ setActiveTab }) => (
+                            <ConfigurationTab
                                 darkMode={darkMode}
+                                entityPath={entityPath}
+                                initialData={selectedPlatform}
                                 onCancel={() => setActiveTab('connect')}
                                 onSuccess={async () => {
                                     await new Promise(resolve => setTimeout(resolve, 500));
@@ -247,93 +196,29 @@ const PlatformServiceView = ({
                                     setActiveTab('connect');
                                 }}
                             />
-                        </div>
-                    </div>
-                ) : (
-                    <div className="space-y-6 animate-in fade-in slide-in-from-top-4 duration-500">
-                        <div className="mw-panel overflow-hidden border-rose-500/20">
-                            <div className="p-4 border-b bg-rose-500/5 border-rose-500/10 flex items-center gap-3">
-                                <AlertCircle className="text-rose-500" size={20} />
-                                <h4 className="text-base font-bold tracking-wider text-rose-500 uppercase">Danger Zone</h4>
-                            </div>
-                            <div className="p-8 space-y-6">
-                                <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-                                    <div className="space-y-1">
-                                        <h5 className="text-lg font-bold text-slate-900 dark:text-white">Decommission Cluster</h5>
-                                        <p className="text-sm text-slate-500 dark:text-slate-400 max-w-xl">
-                                            {decommissionWarningText}
-                                        </p>
-                                    </div>
-                                    <button
-                                        onClick={() => setIsDecommissionModalOpen(true)}
-                                        disabled={!platformState?.active}
-                                        className={cn(
-                                            "px-8 py-3 rounded-xl font-bold text-sm transition-all border shrink-0",
-                                            platformState?.active
-                                                ? "bg-rose-500 text-white hover:bg-rose-600 border-rose-600 shadow-lg shadow-rose-500/20"
-                                                : "bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed"
-                                        )}
-                                    >
-                                        DECOMMISSION CLUSTER
-                                    </button>
-                                </div>
-
-                                {onDelete && (
-                                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 pt-6 border-t border-rose-500/10">
-                                        <div className="space-y-1">
-                                            <h5 className="text-lg font-bold text-slate-900 dark:text-white">{deleteTitle}</h5>
-                                            <p className="text-sm text-slate-500 dark:text-slate-400 max-w-xl">
-                                                {deleteWarningText}
-                                            </p>
-                                        </div>
-                                        <button
-                                            onClick={() => setIsDeleteModalOpen(true)}
-                                            disabled={platformState?.active}
-                                            className={cn(
-                                                "px-8 py-3 rounded-xl font-bold text-sm transition-all border shrink-0",
-                                                !platformState?.active
-                                                    ? "bg-rose-500 text-white hover:bg-rose-600 border-rose-600 shadow-lg shadow-rose-500/20"
-                                                    : "bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed"
-                                            )}
-                                        >
-                                            {deleteButtonText}
-                                        </button>
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                    </div>
-                )}
-            </div>
-            {isDecommissionModalOpen && (
-                <ResourceConfirmModal
-                    isOpen={isDecommissionModalOpen}
-                    onClose={() => setIsDecommissionModalOpen(false)}
-                    onConfirm={(name, options) => onDecommission(name || selectedPlatform?.name, options)}
-                    resourceName={selectedPlatform?.name}
-                    darkMode={darkMode}
-                    title="Confirm Decommissioning"
-                    message={decommissionWarningText}
-                    confirmText="DECOMMISSION"
-                    icon={Icon}
-                    variant="danger"
-                    showForceOption={true}
-                />
-            )}
-            {isDeleteModalOpen && (
-                <ResourceConfirmModal
-                    isOpen={isDeleteModalOpen}
-                    onClose={() => setIsDeleteModalOpen(false)}
-                    onConfirm={(name) => onDelete(name || selectedPlatform?.name)}
-                    resourceName={selectedPlatform?.name}
-                    darkMode={darkMode}
-                    title={deleteModalTitle}
-                    message={deleteWarningText}
-                    confirmText="DELETE"
-                    icon={Icon}
-                    variant="danger"
-                />
-            )}
+                        ),
+                    },
+                    {
+                        id: 'admin',
+                        label: 'Administrative',
+                        render: () => (
+                            <AdministrativeTab
+                                darkMode={darkMode}
+                                resourceName={selectedPlatform?.name}
+                                isActive={platformState?.active}
+                                icon={Icon}
+                                onDecommission={onDecommission}
+                                decommissionWarningText={decommissionWarningText}
+                                onDelete={onDelete}
+                                deleteTitle={deleteTitle}
+                                deleteWarningText={deleteWarningText}
+                                deleteModalTitle={deleteModalTitle}
+                                deleteButtonText={deleteButtonText}
+                            />
+                        ),
+                    },
+                ]}
+            />
             {isStatusModalOpen && (
                 <Modal
                     isOpen={isStatusModalOpen}
