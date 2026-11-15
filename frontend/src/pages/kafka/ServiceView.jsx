@@ -170,8 +170,6 @@ const ServiceView = ({
             });
         }
 
-        const externalTarget = platformState?.kafka_external_url || (lbIps.length > 0 ? `${lbIps[0]}:9094` : (externalPort ? `${platformState?.cluster_nodes?.[0]?.ipv4 || '[NODE_IP]'}:${externalPort.node_port}` : ''));
-
         return (
             <div className="space-y-6">
                 {endpoints.length > 0 && (
@@ -188,7 +186,12 @@ const ServiceView = ({
                         ports={externalPorts}
                         clusterNodes={platformState?.cluster_nodes}
                         cliInfo={{
-                            command: `kcat -b ${externalTarget || '[LOADBALANCER_OR_NODE_IP]:9094'} -L -X security.protocol=SSL`,
+                            command: (node) => {
+                                const target = lbIps.length > 0
+                                    ? `${lbIps[0]}:9094`
+                                    : (externalPort ? `${node?.hostname || platformState?.cluster_nodes?.[0]?.hostname || '[NODE_HOSTNAME]'}:${externalPort.node_port}` : (platformState?.kafka_external_url || '[LOADBALANCER_OR_NODE_HOSTNAME]:9094'));
+                                return `kcat -b ${target} -L -X security.protocol=SSL`;
+                            },
                             languageButtons: []
                         }}
                     />

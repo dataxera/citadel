@@ -169,9 +169,8 @@ const ServiceView = ({
         }
 
         const mysqlNodePort = platformState?.node_ports?.find(np => np.port === 9030);
-        const nodeIp = platformState?.cluster_nodes?.[0]?.ipv4 || '[NODE_IP]';
         const cliInfo = mysqlNodePort ? {
-            command: `mysql -h ${nodeIp} -P ${mysqlNodePort.node_port} -u root -p`,
+            command: (node) => `mysql -h ${node?.hostname || platformState?.cluster_nodes?.[0]?.hostname || '[NODE_HOSTNAME]'} -P ${mysqlNodePort.node_port} -u root -p`,
             languageButtons: []
         } : null;
 

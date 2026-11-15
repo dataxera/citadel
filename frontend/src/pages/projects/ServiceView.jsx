@@ -411,10 +411,12 @@ const ServiceView = ({
                                 load_balancer_ips: projectState.envoy_gateway_service_type === 'LoadBalancer' ? (port.load_balancer_ips || []) : undefined,
                                 scheme: 'https'
                             }))}
-                            clusterNodes={projectState.cluster_node_ips?.map((ip, idx) => ({
-                                ipv4: ip,
-                                hostname: `Node ${idx + 1}`
-                            })) || []}
+                            clusterNodes={projectState.cluster?.nodes_status
+                                ? Object.keys(projectState.cluster.nodes_status).map(hostname => ({ hostname }))
+                                : (projectState.cluster_node_ips?.map((ip, idx) => ({
+                                    ipv4: ip,
+                                    hostname: `Node ${idx + 1}`
+                                })) || [])}
                             guideTitle={projectState.envoy_gateway_service_type === 'LoadBalancer' ? "DNS Ingress Domain Setup" : "HAProxy Ingress Gateway Configuration"}
                             guideText={projectState.envoy_gateway_service_type === 'LoadBalancer' 
                                 ? `To route external traffic to your project, configure a CNAME or A record for your domain <strong>${selectedProject.ingress_domain}</strong> to point to the LoadBalancer IP/hostname.`

@@ -185,8 +185,16 @@ const ServiceView = ({
                         darkMode={darkMode}
                         ports={ports}
                         clusterNodes={platformState.cluster_nodes}
+                        isIngressUsed={isIngressUsed}
                         cliInfo={{
-                            command: `trino --server ${externalUri || 'https://[NODE_IP]:[NODE_PORT]'} --catalog ${platformState?.extra_data?.preferred_catalog || 'hive'} --schema default`,
+                            command: (node) => {
+                                const nodeScheme = trinoUriObj ? trinoUriObj.protocol.replace(':', '') : 'https';
+                                const nodePortVal = httpPort?.node_port || (trinoUriObj?.port ? parseInt(trinoUriObj.port) : 8443);
+                                const targetUri = isIngressUsed && externalUri
+                                    ? externalUri
+                                    : (node?.hostname ? `${nodeScheme}://${node.hostname}:${nodePortVal}` : (externalUri || 'https://[NODE_HOSTNAME]:[NODE_PORT]'));
+                                return `trino --server ${targetUri} --catalog ${platformState?.extra_data?.preferred_catalog || 'hive'} --schema default`;
+                            },
                             languageButtons: []
                         }}
                     />

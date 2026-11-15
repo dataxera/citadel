@@ -193,6 +193,7 @@ const ServiceView = ({
                         darkMode={darkMode}
                         ports={ports}
                         clusterNodes={platformState?.cluster_nodes}
+                        isIngressUsed={isIngressUsed}
                         icon={Network}
                         iconColorClass="text-orange-400"
                     />
