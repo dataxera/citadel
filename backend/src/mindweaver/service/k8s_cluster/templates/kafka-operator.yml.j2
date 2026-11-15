@@ -25,6 +25,11 @@ spec:
     helm:
       values: |
         watchAnyNamespace: true
+        image:
+          registry: {{ image_registry }}
+          repository: {{ image_repository }}
+          name: {{ image_name }}
+          tag: "{{ image_tag }}"
   destination:
     server: https://kubernetes.default.svc
     namespace: kafka

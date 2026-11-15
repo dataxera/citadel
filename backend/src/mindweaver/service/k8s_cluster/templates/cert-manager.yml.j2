@@ -26,12 +26,15 @@ spec:
       values: |
         installCRDs: true
         image:
+          repository: {{ controller_image }}
           tag: "{{ controller_tag }}"
         cainjector:
           image:
+            repository: {{ cainjector_image }}
             tag: "{{ cainjector_tag }}"
         webhook:
           image:
+            repository: {{ webhook_image }}
             tag: "{{ webhook_tag }}"
   destination:
     server: https://kubernetes.default.svc

@@ -927,8 +927,105 @@ async def test_install_cert_manager_locks_images():
     assert len(applied_manifests) == 1
     manifest = applied_manifests[0]
     assert 'tag: "v1.20.0"' in manifest
+    assert "repository: quay.io/jetstack/cert-manager-controller" in manifest
     assert "cainjector:" in manifest
+    assert "repository: quay.io/jetstack/cert-manager-cainjector" in manifest
     assert "webhook:" in manifest
+    assert "repository: quay.io/jetstack/cert-manager-webhook" in manifest
+
+
+@pytest.mark.asyncio
+async def test_install_argocd_locks_images_and_chart():
+    """Verify InstallArgoCDAction passes stack chart version and image overrides to helm."""
+    from unittest.mock import AsyncMock
+    from mindweaver.service.k8s_cluster.model import K8sCluster, K8sClusterType
+    from mindweaver.service.k8s_cluster.actions import InstallArgoCDAction
+
+    cluster = K8sCluster(
+        name="test-cluster-argo",
+        title="Test Cluster Argo",
+        type=K8sClusterType.REMOTE,
+        kubeconfig="fake-kubeconfig",
+    )
+    mock_svc = MagicMock()
+    action = InstallArgoCDAction(cluster, mock_svc)
+    action._install_helm_chart = AsyncMock()
+
+    await action.run()
+
+    action._install_helm_chart.assert_awaited_once()
+    kwargs = action._install_helm_chart.call_args.kwargs
+    assert kwargs["version"] == "9.4.4"
+    set_vals = kwargs["set_vals"]
+    assert set_vals["global.image.repository"] == "quay.io/argoproj/argocd"
+    assert set_vals["global.image.tag"] == "v2.14.2"
+    assert set_vals["dex.image.repository"] == "ghcr.io/dexidp/dex"
+    assert set_vals["dex.image.tag"] == "v2.41.1"
+    assert set_vals["redis.image.repository"] == "public.ecr.aws/docker/library/redis"
+    assert set_vals["redis.image.tag"] == "7.4.2-alpine"
+
+
+@pytest.mark.asyncio
+async def test_install_other_integrations_lock_images():
+    """Verify CNPG, Envoy Gateway, Kafka Operator, and NiFiKop render stack images."""
+    from unittest.mock import AsyncMock
+    from mindweaver.service.k8s_cluster.model import K8sCluster, K8sClusterType
+    from mindweaver.service.k8s_cluster.actions import (
+        InstallCNPGAction,
+        InstallEnvoyGatewayAction,
+        InstallKafkaOperatorAction,
+        InstallNifikopAction,
+    )
+    import os
+
+    cluster = K8sCluster(
+        name="test-cluster-integrations",
+        title="Test Cluster Integrations",
+        type=K8sClusterType.REMOTE,
+        kubeconfig="fake-kubeconfig",
+    )
+    mock_svc = MagicMock()
+    mock_svc.kubeconfig = AsyncMock(return_value="fake-kubeconfig")
+
+    applied_manifests = []
+
+    def mock_subprocess(*args, **kwargs):
+        cmd = args
+        if len(cmd) > 0 and "kubectl" in cmd:
+            path = cmd[-1]
+            if os.path.exists(path):
+                with open(path, "r") as f:
+                    applied_manifests.append(f.read())
+        mock_proc = MagicMock()
+        mock_proc.returncode = 0
+        mock_proc.communicate = AsyncMock(return_value=(b"success", b""))
+        return mock_proc
+
+    with patch("asyncio.create_subprocess_exec", side_effect=mock_subprocess):
+        await InstallCNPGAction(cluster, mock_svc).run()
+        envoy_action = InstallEnvoyGatewayAction(cluster, mock_svc)
+        envoy_action._wait_for_crd_and_namespace = AsyncMock()
+        await envoy_action.run()
+        await InstallKafkaOperatorAction(cluster, mock_svc).run()
+        await InstallNifikopAction(cluster, mock_svc).run()
+
+    assert len(applied_manifests) == 5
+    cnpg_manifest, eg_manifest, eg_cfg_manifest, kafka_manifest, nifikop_manifest = applied_manifests
+
+    assert "repository: ghcr.io/cloudnative-pg/cloudnative-pg" in cnpg_manifest
+    assert 'tag: "1.28.1"' in cnpg_manifest
+
+    assert "repository: docker.io/envoyproxy/gateway" in eg_manifest
+    assert 'tag: "v1.8.1"' in eg_manifest
+    assert "image: docker.io/envoyproxy/envoy:distroless-v1.38.1" in eg_cfg_manifest
+
+    assert "registry: quay.io" in kafka_manifest
+    assert "repository: strimzi" in kafka_manifest
+    assert "name: operator" in kafka_manifest
+    assert 'tag: "0.50.1"' in kafka_manifest
+
+    assert "repository: ghcr.io/konpyutaika/docker-images/nifikop" in nifikop_manifest
+    assert 'tag: "v1.17.0-release"' in nifikop_manifest
 
 
 

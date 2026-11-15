@@ -22,6 +22,11 @@ spec:
     repoURL: {{ chart_repo }}
     chart: {{ chart_name }}
     targetRevision: {{ chart_version }}
+    helm:
+      values: |
+        image:
+          repository: {{ image }}
+          tag: "{{ image_tag }}"
   destination:
     server: https://kubernetes.default.svc
     namespace: cnpg-system

@@ -26,6 +26,9 @@ spec:
       values: |
         namespaces:
           - ""
+        image:
+          repository: {{ image }}
+          tag: "{{ image_tag }}"
   destination:
     server: https://kubernetes.default.svc
     namespace: nifikop

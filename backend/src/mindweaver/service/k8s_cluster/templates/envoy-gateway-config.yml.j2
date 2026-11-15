@@ -22,5 +22,8 @@ spec:
   provider:
     type: Kubernetes
     kubernetes:
+      envoyDeployment:
+        container:
+          image: {{ envoy_image }}
       envoyService:
         type: {{ service_type }}

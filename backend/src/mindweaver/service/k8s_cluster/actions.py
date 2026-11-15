@@ -123,7 +123,16 @@ class InstallArgoCDAction(BaseAction):
         logger.info(f"Installing ArgoCD for cluster {self.model.name}")
 
         repo_url, chart_name, version = await self.resolve_integration_chart(
-            "argocd", "main", "https://argoproj.github.io/argo-helm", "argo/argo-cd", "7.8.2"
+            "argocd", "main", "https://argoproj.github.io/argo-helm", "argo/argo-cd", "9.4.4"
+        )
+        main_img, main_tag = await self.resolve_integration_image(
+            "argocd", "main", "quay.io/argoproj/argocd", "v2.14.2"
+        )
+        dex_img, dex_tag = await self.resolve_integration_image(
+            "argocd", "dex", "ghcr.io/dexidp/dex", "v2.41.1"
+        )
+        redis_img, redis_tag = await self.resolve_integration_image(
+            "argocd", "redis", "public.ecr.aws/docker/library/redis", "7.4.2-alpine"
         )
         release_name = "argocd"
         namespace = "argocd"
@@ -134,6 +143,14 @@ class InstallArgoCDAction(BaseAction):
             release_name=release_name,
             chart_name=chart_name,
             namespace=namespace,
+            set_vals={
+                "global.image.repository": main_img,
+                "global.image.tag": main_tag,
+                "dex.image.repository": dex_img,
+                "dex.image.tag": dex_tag,
+                "redis.image.repository": redis_img,
+                "redis.image.tag": redis_tag,
+            },
             version=version,
         )
 
@@ -359,13 +376,13 @@ class InstallCertManagerAction(InstallArgoCDAction):
         chart_repo, chart_name, chart_version = await self.resolve_integration_chart(
             "cert-manager", "main", "https://charts.jetstack.io", "cert-manager", "v1.20.0"
         )
-        _, controller_tag = await self.resolve_integration_image(
+        controller_image, controller_tag = await self.resolve_integration_image(
             "cert-manager", "main", "quay.io/jetstack/cert-manager-controller", "v1.20.0"
         )
-        _, cainjector_tag = await self.resolve_integration_image(
+        cainjector_image, cainjector_tag = await self.resolve_integration_image(
             "cert-manager", "cainjector", "quay.io/jetstack/cert-manager-cainjector", "v1.20.0"
         )
-        _, webhook_tag = await self.resolve_integration_image(
+        webhook_image, webhook_tag = await self.resolve_integration_image(
             "cert-manager", "webhook", "quay.io/jetstack/cert-manager-webhook", "v1.20.0"
         )
         await self._apply_template(
@@ -373,8 +390,11 @@ class InstallCertManagerAction(InstallArgoCDAction):
             chart_repo=chart_repo,
             chart_name=chart_name,
             chart_version=chart_version,
+            controller_image=controller_image,
             controller_tag=controller_tag,
+            cainjector_image=cainjector_image,
             cainjector_tag=cainjector_tag,
+            webhook_image=webhook_image,
             webhook_tag=webhook_tag,
         )
 
@@ -418,11 +438,16 @@ class InstallCNPGAction(InstallArgoCDAction):
         chart_repo, chart_name, chart_version = await self.resolve_integration_chart(
             "cnpg", "main", "https://cloudnative-pg.github.io/charts", "cloudnative-pg", "0.27.1"
         )
+        image, image_tag = await self.resolve_integration_image(
+            "cnpg", "main", "ghcr.io/cloudnative-pg/cloudnative-pg", "1.28.1"
+        )
         await self._apply_template(
             "cnpg.yml.j2",
             chart_repo=chart_repo,
             chart_name=chart_name,
             chart_version=chart_version,
+            image=image,
+            image_tag=image_tag,
         )
 
 
@@ -465,11 +490,19 @@ class InstallEnvoyGatewayAction(InstallArgoCDAction):
         chart_repo, chart_name, chart_version = await self.resolve_integration_chart(
             "envoy-gateway", "main", "docker.io/envoyproxy", "gateway-helm", "1.8.1"
         )
+        gw_image, gw_tag = await self.resolve_integration_image(
+            "envoy-gateway", "main", "docker.io/envoyproxy/gateway", "v1.8.1"
+        )
+        envoy_image, envoy_tag = await self.resolve_integration_image(
+            "envoy-gateway", "envoy", "docker.io/envoyproxy/envoy", "distroless-v1.38.1"
+        )
         await self._apply_template(
             "envoy-gateway.yml.j2",
             chart_repo=chart_repo,
             chart_name=chart_name,
             chart_version=chart_version,
+            image=gw_image,
+            image_tag=gw_tag,
         )
 
         await self._wait_for_crd_and_namespace(
@@ -479,7 +512,11 @@ class InstallEnvoyGatewayAction(InstallArgoCDAction):
 
         # Deploy global GatewayClass and EnvoyProxy resources
         logger.info("Applying global Envoy GatewayClass and EnvoyProxy configuration")
-        await self._apply_template("envoy-gateway-config.yml.j2", service_type="LoadBalancer")
+        await self._apply_template(
+            "envoy-gateway-config.yml.j2",
+            service_type="LoadBalancer",
+            envoy_image=f"{envoy_image}:{envoy_tag}",
+        )
 
 
 @K8sClusterService.register_action("sync_core_integrations")
@@ -633,11 +670,31 @@ class InstallKafkaOperatorAction(InstallArgoCDAction):
         chart_repo, chart_name, chart_version = await self.resolve_integration_chart(
             "kafka-operator", "main", "https://strimzi.io/charts/", "strimzi-kafka-operator", "0.50.1"
         )
+        image, image_tag = await self.resolve_integration_image(
+            "kafka-operator", "main", "quay.io/strimzi/operator", "0.50.1"
+        )
+        parts = image.split("/")
+        if len(parts) >= 3:
+            image_registry = parts[0]
+            image_repository = "/".join(parts[1:-1])
+            image_name = parts[-1]
+        elif len(parts) == 2:
+            image_registry = ""
+            image_repository = parts[0]
+            image_name = parts[1]
+        else:
+            image_registry = ""
+            image_repository = ""
+            image_name = image
         await self._apply_template(
             "kafka-operator.yml.j2",
             chart_repo=chart_repo,
             chart_name=chart_name,
             chart_version=chart_version,
+            image_registry=image_registry,
+            image_repository=image_repository,
+            image_name=image_name,
+            image_tag=image_tag,
         )
 
 
@@ -680,11 +737,16 @@ class InstallNifikopAction(InstallArgoCDAction):
         chart_repo, chart_name, chart_version = await self.resolve_integration_chart(
             "nifikop-operator", "main", "ghcr.io/konpyutaika/helm-charts", "nifikop", "1.17.0"
         )
+        image, image_tag = await self.resolve_integration_image(
+            "nifikop-operator", "main", "ghcr.io/konpyutaika/docker-images/nifikop", "v1.17.0-release"
+        )
         await self._apply_template(
             "nifikop-operator.yml.j2",
             chart_repo=chart_repo,
             chart_name=chart_name,
             chart_version=chart_version,
+            image=image,
+            image_tag=image_tag,
         )
 
 

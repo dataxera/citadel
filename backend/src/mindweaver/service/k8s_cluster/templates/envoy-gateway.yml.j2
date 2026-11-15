@@ -22,6 +22,13 @@ spec:
     repoURL: {{ chart_repo }}
     chart: {{ chart_name }}
     targetRevision: {{ chart_version }}
+    helm:
+      values: |
+        deployment:
+          envoyGateway:
+            image:
+              repository: {{ image }}
+              tag: "{{ image_tag }}"
   destination:
     server: https://kubernetes.default.svc
     namespace: envoy-gateway-system
