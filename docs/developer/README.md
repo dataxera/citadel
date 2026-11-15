@@ -8,6 +8,7 @@ Welcome to the Mindweaver developer guide. This documentation is intended for co
 2. **[Backend Development](backend.md)**: Guide on the `fw` layer, services, and platform services.
 3. **[Frontend Development](frontend.md)**: Working with React, Dynamic Forms, and providers.
 4. **[Testing](testing.md)**: How to write and run backend and frontend tests.
+5. **[Human Tester Manual](../tester-manual.md)**: Step-by-step QA checklist for validating all core functionalities in the app.
 
 ## Technical Stack
 
