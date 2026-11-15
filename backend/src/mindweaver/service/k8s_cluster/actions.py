@@ -10,11 +10,54 @@ import jinja2 as j2
 from kubernetes import client, config
 
 from sqlmodel import select
+from sqlalchemy.orm.attributes import flag_modified
 from mindweaver.fw.action import BaseAction
+from mindweaver.fw.model import ts_now
 from .service import K8sClusterService
 from .model import K8sCluster, K8sClusterStatus, K8sClusterType
 
 logger = logging.getLogger(__name__)
+
+CORE_INTEGRATIONS = [
+    ("argocd", "ArgoCD", "argocd_installed"),
+    ("cert_manager", "Cert Manager", "cert_manager_installed"),
+    ("cnpg", "CNPG Operator", "cnpg_installed"),
+    ("envoy_gateway", "Envoy Gateway", "envoy_gateway_installed"),
+    ("kafka_operator", "Kafka Operator", "kafka_operator_installed"),
+    ("nifikop", "NiFi Operator", "nifikop_installed"),
+    ("doris_operator", "Doris Operator", "doris_operator_installed"),
+]
+
+
+def build_initial_sync_state() -> dict:
+    """Build the initial persistent sync_state payload for core integrations sync."""
+    return {
+        "status": "in_progress",
+        "started_at": ts_now().isoformat(),
+        "completed_at": None,
+        "total": len(CORE_INTEGRATIONS),
+        "completed": 0,
+        "tasks": {
+            key: {"label": label, "status": "pending", "message": None, "logs": None}
+            for key, label, _ in CORE_INTEGRATIONS
+        },
+    }
+
+
+def get_integration_action_class(key: str):
+    """Return the Install*Action class corresponding to a core integration key."""
+    mapping = {
+        "argocd": InstallArgoCDAction,
+        "cert_manager": InstallCertManagerAction,
+        "cnpg": InstallCNPGAction,
+        "envoy_gateway": InstallEnvoyGatewayAction,
+        "kafka_operator": InstallKafkaOperatorAction,
+        "nifikop": InstallNifikopAction,
+        "doris_operator": InstallDorisOperatorAction,
+    }
+    if key not in mapping:
+        raise ValueError(f"Unknown core integration key: {key}")
+    return mapping[key]
 
 
 @K8sClusterService.register_action("install_argocd")
@@ -537,7 +580,6 @@ class SyncCoreIntegrationsAction(InstallArgoCDAction):
         """Invoke the action asynchronously via Celery task"""
         from mindweaver.tasks.k8s_cluster_status import sync_core_integrations_task
 
-        # Set status flags to True immediately so UI shows sync in progress or active states
         stmt = select(K8sClusterStatus).where(
             K8sClusterStatus.k8s_cluster_id == self.model.id
         )
@@ -546,6 +588,8 @@ class SyncCoreIntegrationsAction(InstallArgoCDAction):
         if not status_model:
             status_model = K8sClusterStatus(k8s_cluster_id=self.model.id)
             self.session.add(status_model)
+        status_model.sync_state = build_initial_sync_state()
+        flag_modified(status_model, "sync_state")
         await self.session.flush()
 
         sync_core_integrations_task.delay(self.model.id)
@@ -557,7 +601,7 @@ class SyncCoreIntegrationsAction(InstallArgoCDAction):
     async def run(self):
         """Execute the sync workflow sequentially to install or update all integrations"""
         logger.info(f"Syncing core integrations for cluster {self.model.name}")
-        
+
         stmt = select(K8sClusterStatus).where(
             K8sClusterStatus.k8s_cluster_id == self.model.id
         )
@@ -566,69 +610,16 @@ class SyncCoreIntegrationsAction(InstallArgoCDAction):
         if not status:
             return
 
-        # 1. Install ArgoCD if missing
-        if not status.argocd_installed:
-            logger.info("Sync: Installing ArgoCD...")
-            from .actions import InstallArgoCDAction
-            action = InstallArgoCDAction(self.model, self.svc)
+        for key, label, installed_attr in CORE_INTEGRATIONS:
+            if key == "argocd" and getattr(status, installed_attr, False):
+                continue
+            logger.info(f"Sync: Deploying/updating {label}...")
+            action_cls = get_integration_action_class(key)
+            action = action_cls(self.model, self.svc)
             action.session = self.session
             await action.run()
-            status.argocd_installed = True
+            setattr(status, installed_attr, True)
             await self.session.flush()
-
-        # 2. Deploy/update Cert Manager Application manifest
-        logger.info("Sync: Deploying/updating Cert Manager...")
-        from .actions import InstallCertManagerAction
-        action = InstallCertManagerAction(self.model, self.svc)
-        action.session = self.session
-        await action.run()
-        status.cert_manager_installed = True
-        await self.session.flush()
-
-        # 3. Deploy/update CNPG Operator Application manifest
-        logger.info("Sync: Deploying/updating CNPG Operator...")
-        from .actions import InstallCNPGAction
-        action = InstallCNPGAction(self.model, self.svc)
-        action.session = self.session
-        await action.run()
-        status.cnpg_installed = True
-        await self.session.flush()
-
-        # 4. Deploy/update Envoy Gateway or update config if envoy gateway is already installed
-        logger.info("Sync: Deploying/updating Envoy Gateway config...")
-        from .actions import InstallEnvoyGatewayAction
-        action = InstallEnvoyGatewayAction(self.model, self.svc)
-        action.session = self.session
-        await action.run()
-        status.envoy_gateway_installed = True
-        await self.session.flush()
-
-        # 7. Deploy/update Kafka Operator Application manifest
-        logger.info("Sync: Deploying/updating Kafka Operator...")
-        from .actions import InstallKafkaOperatorAction
-        action_kafka = InstallKafkaOperatorAction(self.model, self.svc)
-        action_kafka.session = self.session
-        await action_kafka.run()
-        status.kafka_operator_installed = True
-        await self.session.flush()
-
-        # 8. Deploy/update NiFiKop Operator Application manifest
-        logger.info("Sync: Deploying/updating NiFiKop Operator...")
-        from .actions import InstallNifikopAction
-        action_nifikop = InstallNifikopAction(self.model, self.svc)
-        action_nifikop.session = self.session
-        await action_nifikop.run()
-        status.nifikop_installed = True
-        await self.session.flush()
-
-        # 9. Deploy/update Doris Operator Application manifest
-        logger.info("Sync: Deploying/updating Doris Operator...")
-        from .actions import InstallDorisOperatorAction
-        action_doris = InstallDorisOperatorAction(self.model, self.svc)
-        action_doris.session = self.session
-        await action_doris.run()
-        status.doris_operator_installed = True
-        await self.session.flush()
 
 
 @K8sClusterService.register_action("install_kafka_operator")

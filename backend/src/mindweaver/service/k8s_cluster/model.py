@@ -77,6 +77,9 @@ class K8sClusterStatus(Base, table=True):
     doris_operator_installed: bool = Field(default=False)
     doris_operator_version: Optional[str] = Field(default=None)
 
+    integrations_status: dict[str, Any] = Field(default_factory=dict, sa_type=JSONType())
+    sync_state: dict[str, Any] = Field(default_factory=dict, sa_type=JSONType())
+
     last_update: datetime = Field(
         default_factory=ts_now, sa_type=DateTime(timezone=True)
     )

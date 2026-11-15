@@ -115,9 +115,115 @@ class K8sClusterService(Service[K8sCluster]):
                     # Convert memory to GiB
                     ram_total += _parse_res(node.status.capacity.get("memory", "0"))
 
+                def _pod_readiness(pods_items) -> tuple[str, str]:
+                    if not pods_items:
+                        return "pending", "Waiting for pods"
+                    ready_count = 0
+                    has_error = False
+                    for pod in pods_items:
+                        phase = getattr(getattr(pod, "status", None), "phase", None)
+                        statuses = (
+                            getattr(getattr(pod, "status", None), "container_statuses", None)
+                            or []
+                        )
+                        if phase == "Running" and any(
+                            getattr(c, "ready", False) for c in statuses
+                        ):
+                            ready_count += 1
+                        elif phase in ("Failed", "Unknown"):
+                            has_error = True
+                        else:
+                            for c in statuses:
+                                waiting = getattr(
+                                    getattr(c, "state", None), "waiting", None
+                                )
+                                reason = getattr(waiting, "reason", None) if waiting else None
+                                if reason in (
+                                    "CrashLoopBackOff",
+                                    "ErrImagePull",
+                                    "ImagePullBackOff",
+                                    "CreateContainerConfigError",
+                                ):
+                                    has_error = True
+                                    break
+                    total = len(pods_items)
+                    if ready_count == total and total > 0:
+                        return "online", f"Pods: {ready_count}/{total} ready"
+                    if has_error:
+                        return "error", f"Pods: {ready_count}/{total} ready (error)"
+                    return "pending", f"Pods: {ready_count}/{total} ready"
+
+                argo_apps: dict[str, dict] = {}
+                try:
+                    custom_api = client.CustomObjectsApi(k8s_client)
+                    apps_resp = custom_api.list_namespaced_custom_object(
+                        group="argoproj.io",
+                        version="v1alpha1",
+                        namespace="argocd",
+                        plural="applications",
+                    )
+                    for app_obj in (apps_resp or {}).get("items", []):
+                        app_name = app_obj.get("metadata", {}).get("name")
+                        if app_name:
+                            argo_apps[app_name] = app_obj
+                except Exception as e:
+                    logger.debug(f"Could not list ArgoCD applications: {e}")
+
+                def _integration_status(
+                    installed: bool,
+                    version: str | None,
+                    pods_items: list,
+                    argo_app_name: str | None = None,
+                ) -> tuple[dict[str, Any], bool]:
+                    if argo_app_name and argo_app_name in argo_apps:
+                        app_obj = argo_apps[argo_app_name]
+                        sync_st = (
+                            app_obj.get("status", {})
+                            .get("sync", {})
+                            .get("status", "Unknown")
+                        )
+                        health_st = (
+                            app_obj.get("status", {})
+                            .get("health", {})
+                            .get("status", "Unknown")
+                        )
+                        if health_st == "Healthy":
+                            st = "online"
+                        elif health_st in (
+                            "Progressing",
+                            "Suspended",
+                            "Missing",
+                        ) or sync_st in ("Unknown", "OutOfSync"):
+                            st = "pending"
+                        else:
+                            st = "error"
+                        return (
+                            {
+                                "status": st,
+                                "version": version,
+                                "message": f"Sync: {sync_st}, Health: {health_st}",
+                            },
+                            True,
+                        )
+                    if installed:
+                        st, msg = _pod_readiness(pods_items)
+                        return (
+                            {"status": st, "version": version, "message": msg},
+                            True,
+                        )
+                    return (
+                        {
+                            "status": "offline",
+                            "version": None,
+                            "message": "Not installed",
+                        },
+                        False,
+                    )
+
                 # Check ArgoCD
                 argocd_installed = False
                 argocd_version = None
+                argocd_pods = []
                 secrets = None
                 try:
                     secrets = core_v1.list_secret_for_all_namespaces(
@@ -144,14 +250,16 @@ class K8sClusterService(Service[K8sCluster]):
                         pods = core_v1.list_pod_for_all_namespaces(
                             label_selector="app.kubernetes.io/name=argocd-server"
                         )
-                        if pods.items:
-                            argocd_version = _get_version(pods.items[0])
+                        argocd_pods = pods.items or []
+                        if argocd_pods:
+                            argocd_version = _get_version(argocd_pods[0])
                 except Exception as e:
                     logger.warning(f"Failed to check ArgoCD presence: {e}")
 
                 # Check Cert Manager
                 cert_manager_installed = False
                 cert_manager_version = None
+                cert_manager_pods = []
                 try:
                     if secrets:
                         for secret in secrets.items:
@@ -167,18 +275,20 @@ class K8sClusterService(Service[K8sCluster]):
                         if svcs.items:
                             cert_manager_installed = True
 
-                    if cert_manager_installed:
+                    if cert_manager_installed or "cert-manager" in argo_apps:
                         pods = core_v1.list_pod_for_all_namespaces(
                             label_selector="app.kubernetes.io/name=cert-manager"
                         )
-                        if pods.items:
-                            cert_manager_version = _get_version(pods.items[0])
+                        cert_manager_pods = pods.items or []
+                        if cert_manager_pods:
+                            cert_manager_version = _get_version(cert_manager_pods[0])
                 except Exception as e:
                     logger.warning(f"Failed to check Cert Manager presence: {e}")
 
                 # Check CNPG
                 cnpg_installed = False
                 cnpg_version = None
+                cnpg_pods = []
                 try:
                     if secrets:
                         for secret in secrets.items:
@@ -192,12 +302,13 @@ class K8sClusterService(Service[K8sCluster]):
                         if svcs.items:
                             cnpg_installed = True
 
-                    if cnpg_installed:
+                    if cnpg_installed or "cnpg-operator" in argo_apps:
                         pods = core_v1.list_pod_for_all_namespaces(
                             label_selector="app.kubernetes.io/name=cloudnative-pg"
                         )
-                        if pods.items:
-                            cnpg_version = _get_version(pods.items[0])
+                        cnpg_pods = pods.items or []
+                        if cnpg_pods:
+                            cnpg_version = _get_version(cnpg_pods[0])
                 except Exception as e:
                     logger.warning(f"Failed to check CNPG presence: {e}")
 
@@ -205,6 +316,7 @@ class K8sClusterService(Service[K8sCluster]):
                 # Check Envoy Gateway
                 envoy_gateway_installed = False
                 envoy_gateway_version = None
+                envoy_gateway_pods = []
                 try:
                     if secrets:
                         for secret in secrets.items:
@@ -226,7 +338,7 @@ class K8sClusterService(Service[K8sCluster]):
                         if svcs.items:
                             envoy_gateway_installed = True
 
-                    if envoy_gateway_installed:
+                    if envoy_gateway_installed or "envoy-gateway" in argo_apps:
                         pods = core_v1.list_pod_for_all_namespaces(
                             label_selector="control-plane=envoy-gateway"
                         )
@@ -238,107 +350,125 @@ class K8sClusterService(Service[K8sCluster]):
                             pods = core_v1.list_pod_for_all_namespaces(
                                 label_selector="app.kubernetes.io/name=envoy-gateway"
                             )
-                        if pods.items:
-                            envoy_gateway_version = _get_version(pods.items[0])
+                        envoy_gateway_pods = pods.items or []
+                        if envoy_gateway_pods:
+                            envoy_gateway_version = _get_version(envoy_gateway_pods[0])
                 except Exception as e:
                     logger.warning(f"Failed to check Envoy Gateway presence: {e}")
 
                 # Check Kafka Operator
                 kafka_operator_installed = False
                 kafka_operator_version = None
+                kafka_operator_pods = []
                 try:
                     if secrets:
                         for secret in secrets.items:
                             if secret.metadata.name.startswith("sh.helm.release.v1.strimzi-kafka-operator") or secret.metadata.name.startswith("sh.helm.release.v1.kafka-operator"):
                                 kafka_operator_installed = True
                                 break
-                    if not kafka_operator_installed:
+                    pods = core_v1.list_pod_for_all_namespaces(
+                        label_selector="app.kubernetes.io/name=strimzi-kafka-operator"
+                    )
+                    if not pods.items:
                         pods = core_v1.list_pod_for_all_namespaces(
-                            label_selector="app.kubernetes.io/name=strimzi-kafka-operator"
+                            label_selector="app.kubernetes.io/name=kafka-operator"
                         )
-                        if not pods.items:
-                            pods = core_v1.list_pod_for_all_namespaces(
-                                label_selector="app.kubernetes.io/name=kafka-operator"
-                            )
-                        if not pods.items:
-                            pods = core_v1.list_pod_for_all_namespaces(
-                                label_selector="name=strimzi-cluster-operator"
-                            )
-                        if not pods.items:
-                            pods = core_v1.list_pod_for_all_namespaces(
-                                label_selector="strimzi.io/kind=cluster-operator"
-                            )
-                        if pods.items:
-                            kafka_operator_installed = True
-                            kafka_operator_version = _get_version(pods.items[0])
+                    if not pods.items:
+                        pods = core_v1.list_pod_for_all_namespaces(
+                            label_selector="name=strimzi-cluster-operator"
+                        )
+                    if not pods.items:
+                        pods = core_v1.list_pod_for_all_namespaces(
+                            label_selector="strimzi.io/kind=cluster-operator"
+                        )
+                    kafka_operator_pods = pods.items or []
+                    if kafka_operator_pods:
+                        kafka_operator_installed = True
+                        kafka_operator_version = _get_version(kafka_operator_pods[0])
                 except Exception as e:
                     logger.warning(f"Failed to check Kafka Operator presence: {e}")
 
                 # Check NiFiKop Operator
                 nifikop_installed = False
                 nifikop_version = None
+                nifikop_pods = []
                 try:
                     if secrets:
                         for secret in secrets.items:
                             if secret.metadata.name.startswith("sh.helm.release.v1.nifikop"):
                                 nifikop_installed = True
                                 break
-                    if not nifikop_installed:
+                    pods = core_v1.list_pod_for_all_namespaces(
+                        label_selector="app.kubernetes.io/name=nifikop"
+                    )
+                    if not pods.items:
                         pods = core_v1.list_pod_for_all_namespaces(
-                            label_selector="app.kubernetes.io/name=nifikop"
+                            label_selector="control-plane=nifikop"
                         )
-                        if not pods.items:
-                            pods = core_v1.list_pod_for_all_namespaces(
-                                label_selector="control-plane=nifikop"
-                            )
-                        if pods.items:
+                    nifikop_pods = pods.items or []
+                    if nifikop_pods:
+                        if not nifikop_installed:
                             nifikop_installed = True
-                            nifikop_version = _get_version(pods.items[0])
-                    else:
-                        pods = core_v1.list_pod_for_all_namespaces(
-                            label_selector="app.kubernetes.io/name=nifikop"
-                        )
-                        if not pods.items:
-                            pods = core_v1.list_pod_for_all_namespaces(
-                                label_selector="control-plane=nifikop"
-                            )
-                        if pods.items:
-                            nifikop_version = _get_version(pods.items[0])
+                        nifikop_version = _get_version(nifikop_pods[0])
                 except Exception as e:
                     logger.warning(f"Failed to check NiFiKop Operator presence: {e}")
 
                 # Check Doris Operator
                 doris_operator_installed = False
                 doris_operator_version = None
+                doris_operator_pods = []
                 try:
                     if secrets:
                         for secret in secrets.items:
                             if secret.metadata.name.startswith("sh.helm.release.v1.doris-operator") or secret.metadata.name.startswith("sh.helm.release.v1.selectdb-doris-operator"):
                                 doris_operator_installed = True
                                 break
-                    if not doris_operator_installed:
+                    pods = core_v1.list_pod_for_all_namespaces(
+                        label_selector="app.kubernetes.io/name=doris-operator"
+                    )
+                    if not pods.items:
                         pods = core_v1.list_pod_for_all_namespaces(
-                            label_selector="app.kubernetes.io/name=doris-operator"
+                            label_selector="control-plane=doris-operator"
                         )
-                        if not pods.items:
-                            pods = core_v1.list_pod_for_all_namespaces(
-                                label_selector="control-plane=doris-operator"
-                            )
-                        if pods.items:
+                    doris_operator_pods = pods.items or []
+                    if doris_operator_pods:
+                        if not doris_operator_installed:
                             doris_operator_installed = True
-                            doris_operator_version = _get_version(pods.items[0])
-                    else:
-                        pods = core_v1.list_pod_for_all_namespaces(
-                            label_selector="app.kubernetes.io/name=doris-operator"
-                        )
-                        if not pods.items:
-                            pods = core_v1.list_pod_for_all_namespaces(
-                                label_selector="control-plane=doris-operator"
-                            )
-                        if pods.items:
-                            doris_operator_version = _get_version(pods.items[0])
+                        doris_operator_version = _get_version(doris_operator_pods[0])
                 except Exception as e:
                     logger.warning(f"Failed to check Doris Operator presence: {e}")
+
+                argocd_st, argocd_installed = _integration_status(
+                    argocd_installed, argocd_version, argocd_pods
+                )
+                cert_manager_st, cert_manager_installed = _integration_status(
+                    cert_manager_installed, cert_manager_version, cert_manager_pods, "cert-manager"
+                )
+                cnpg_st, cnpg_installed = _integration_status(
+                    cnpg_installed, cnpg_version, cnpg_pods, "cnpg-operator"
+                )
+                envoy_gateway_st, envoy_gateway_installed = _integration_status(
+                    envoy_gateway_installed, envoy_gateway_version, envoy_gateway_pods, "envoy-gateway"
+                )
+                kafka_operator_st, kafka_operator_installed = _integration_status(
+                    kafka_operator_installed, kafka_operator_version, kafka_operator_pods, "kafka-operator"
+                )
+                nifikop_st, nifikop_installed = _integration_status(
+                    nifikop_installed, nifikop_version, nifikop_pods, "nifikop-operator"
+                )
+                doris_operator_st, doris_operator_installed = _integration_status(
+                    doris_operator_installed, doris_operator_version, doris_operator_pods, "doris-operator"
+                )
+
+                integrations_status = {
+                    "argocd": argocd_st,
+                    "cert_manager": cert_manager_st,
+                    "cnpg": cnpg_st,
+                    "envoy_gateway": envoy_gateway_st,
+                    "kafka_operator": kafka_operator_st,
+                    "nifikop": nifikop_st,
+                    "doris_operator": doris_operator_st,
+                }
 
                 return {
                     "k8s_version": k8s_version,
@@ -361,6 +491,7 @@ class K8sClusterService(Service[K8sCluster]):
                     "nifikop_version": nifikop_version,
                     "doris_operator_installed": doris_operator_installed,
                     "doris_operator_version": doris_operator_version,
+                    "integrations_status": integrations_status,
                     "node_ips": node_ips,
                 }
 
@@ -398,6 +529,7 @@ class K8sClusterService(Service[K8sCluster]):
             status_model.nifikop_version = info["nifikop_version"]
             status_model.doris_operator_installed = info["doris_operator_installed"]
             status_model.doris_operator_version = info["doris_operator_version"]
+            status_model.integrations_status = info["integrations_status"]
             status_model.node_ips = info["node_ips"]
             status_model.last_update = ts_now()
             status_model.message = None

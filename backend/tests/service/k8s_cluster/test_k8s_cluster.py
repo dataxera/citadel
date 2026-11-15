@@ -1035,6 +1035,325 @@ async def test_install_other_integrations_lock_images(test_stack):
     assert 'tag: "v1.99.0-test"' in nifikop_manifest
 
 
+def test_sync_core_integrations_initializes_sync_state(client: TestClient):
+    """Triggering sync_core_integrations should persist initial sync_state in DB so progress survives refresh."""
+    p1 = client.post(
+        "/api/v1/k8s_clusters",
+        json={
+            "name": "sync-state-init",
+            "title": "Sync State Init",
+            "type": "in-cluster",
+        },
+    ).json()["data"]
+
+    with patch(
+        "mindweaver.tasks.k8s_cluster_status.sync_core_integrations_task.delay"
+    ) as mock_delay:
+        resp = client.post(
+            f"/api/v1/k8s_clusters/{p1['id']}/_actions",
+            json={"action": "sync_core_integrations"},
+        )
+        assert resp.status_code == 200
+        mock_delay.assert_called_once_with(p1["id"])
+
+    resp_state = client.get(f"/api/v1/k8s_clusters/{p1['id']}/_state")
+    assert resp_state.status_code == 200
+    sync_state = resp_state.json().get("sync_state")
+    assert sync_state is not None
+    assert sync_state["status"] == "in_progress"
+    assert sync_state["total"] == 7
+    assert sync_state["completed"] == 0
+    for key in [
+        "argocd",
+        "cert_manager",
+        "cnpg",
+        "envoy_gateway",
+        "kafka_operator",
+        "nifikop",
+        "doris_operator",
+    ]:
+        assert key in sync_state["tasks"]
+        assert sync_state["tasks"][key]["status"] == "pending"
+
+
+@pytest.mark.asyncio
+async def test_sync_core_integrations_orchestration_dispatches_tasks(client: TestClient):
+    """_sync_core_integrations_task runs ArgoCD first then dispatches individual integration tasks."""
+    from unittest.mock import AsyncMock
+    from mindweaver.tasks.k8s_cluster_status import _sync_core_integrations_task
+
+    p1 = client.post(
+        "/api/v1/k8s_clusters",
+        json={
+            "name": "sync-orch-test",
+            "title": "Sync Orch Test",
+            "type": "in-cluster",
+        },
+    ).json()["data"]
+
+    with patch(
+        "mindweaver.tasks.k8s_cluster_status.sync_core_integrations_task.delay"
+    ):
+        client.post(
+            f"/api/v1/k8s_clusters/{p1['id']}/_actions",
+            json={"action": "sync_core_integrations"},
+        )
+
+    with patch(
+        "mindweaver.service.k8s_cluster.actions.InstallArgoCDAction.run",
+        new_callable=AsyncMock,
+    ) as mock_argo_run, patch(
+        "mindweaver.tasks.k8s_cluster_status.sync_core_integration_task.delay"
+    ) as mock_sub_delay:
+        await _sync_core_integrations_task(p1["id"])
+
+        mock_argo_run.assert_awaited_once()
+        expected_keys = [
+            "cert_manager",
+            "cnpg",
+            "envoy_gateway",
+            "kafka_operator",
+            "nifikop",
+            "doris_operator",
+        ]
+        assert mock_sub_delay.call_count == len(expected_keys)
+        called_keys = [c.args[1] for c in mock_sub_delay.call_args_list]
+        assert called_keys == expected_keys
+
+    resp_state = client.get(f"/api/v1/k8s_clusters/{p1['id']}/_state")
+    sync_state = resp_state.json()["sync_state"]
+    assert sync_state["tasks"]["argocd"]["status"] == "completed"
+    assert sync_state["completed"] == 1
+    assert sync_state["status"] == "in_progress"
+
+
+@pytest.mark.asyncio
+async def test_sync_core_integrations_argocd_failure_marks_error(client: TestClient):
+    """If ArgoCD installation fails during sync, remaining tasks are skipped and sync_state is error."""
+    from unittest.mock import AsyncMock
+    from mindweaver.tasks.k8s_cluster_status import _sync_core_integrations_task
+
+    p1 = client.post(
+        "/api/v1/k8s_clusters",
+        json={
+            "name": "sync-argo-fail",
+            "title": "Sync Argo Fail",
+            "type": "in-cluster",
+        },
+    ).json()["data"]
+
+    with patch(
+        "mindweaver.tasks.k8s_cluster_status.sync_core_integrations_task.delay"
+    ):
+        client.post(
+            f"/api/v1/k8s_clusters/{p1['id']}/_actions",
+            json={"action": "sync_core_integrations"},
+        )
+
+    with patch(
+        "mindweaver.service.k8s_cluster.actions.InstallArgoCDAction.run",
+        new_callable=AsyncMock,
+        side_effect=RuntimeError("Helm failed"),
+    ), patch(
+        "mindweaver.tasks.k8s_cluster_status.sync_core_integration_task.delay"
+    ) as mock_sub_delay:
+        await _sync_core_integrations_task(p1["id"])
+        mock_sub_delay.assert_not_called()
+
+    resp_state = client.get(f"/api/v1/k8s_clusters/{p1['id']}/_state")
+    sync_state = resp_state.json()["sync_state"]
+    assert sync_state["status"] == "error"
+    assert sync_state["tasks"]["argocd"]["status"] == "failed"
+    assert "Helm failed" in sync_state["tasks"]["argocd"]["message"]
+    assert sync_state["tasks"]["cert_manager"]["status"] == "failed"
+
+
+@pytest.mark.asyncio
+async def test_sync_core_integration_task_updates_progress_and_completes(client: TestClient):
+    """Each individual integration task updates sync_state and the final one marks sync completed."""
+    from unittest.mock import AsyncMock
+    from mindweaver.tasks.k8s_cluster_status import (
+        _sync_core_integrations_task,
+        _sync_core_integration_task,
+    )
+
+    p1 = client.post(
+        "/api/v1/k8s_clusters",
+        json={
+            "name": "sync-single-task",
+            "title": "Sync Single Task",
+            "type": "in-cluster",
+        },
+    ).json()["data"]
+
+    with patch(
+        "mindweaver.tasks.k8s_cluster_status.sync_core_integrations_task.delay"
+    ):
+        client.post(
+            f"/api/v1/k8s_clusters/{p1['id']}/_actions",
+            json={"action": "sync_core_integrations"},
+        )
+
+    with patch(
+        "mindweaver.service.k8s_cluster.actions.InstallArgoCDAction.run",
+        new_callable=AsyncMock,
+    ), patch(
+        "mindweaver.tasks.k8s_cluster_status.sync_core_integration_task.delay"
+    ):
+        await _sync_core_integrations_task(p1["id"])
+
+    with patch(
+        "mindweaver.service.k8s_cluster.actions.InstallCertManagerAction.run",
+        new_callable=AsyncMock,
+    ), patch(
+        "mindweaver.service.k8s_cluster.actions.InstallCNPGAction.run",
+        new_callable=AsyncMock,
+    ), patch(
+        "mindweaver.service.k8s_cluster.actions.InstallEnvoyGatewayAction.run",
+        new_callable=AsyncMock,
+    ), patch(
+        "mindweaver.service.k8s_cluster.actions.InstallKafkaOperatorAction.run",
+        new_callable=AsyncMock,
+    ), patch(
+        "mindweaver.service.k8s_cluster.actions.InstallNifikopAction.run",
+        new_callable=AsyncMock,
+    ), patch(
+        "mindweaver.service.k8s_cluster.actions.InstallDorisOperatorAction.run",
+        new_callable=AsyncMock,
+        side_effect=RuntimeError("Doris apply error"),
+    ), patch(
+        "mindweaver.tasks.k8s_cluster_status.poll_k8s_cluster_status.delay"
+    ) as mock_poll_delay:
+        await _sync_core_integration_task(p1["id"], "cert_manager")
+        state_mid = client.get(f"/api/v1/k8s_clusters/{p1['id']}/_state").json()["sync_state"]
+        assert state_mid["completed"] == 2
+        assert state_mid["status"] == "in_progress"
+        assert state_mid["tasks"]["cert_manager"]["status"] == "completed"
+
+        for key in ["cnpg", "envoy_gateway", "kafka_operator", "nifikop", "doris_operator"]:
+            await _sync_core_integration_task(p1["id"], key)
+
+        mock_poll_delay.assert_called_once_with(p1["id"])
+
+    state_end = client.get(f"/api/v1/k8s_clusters/{p1['id']}/_state").json()["sync_state"]
+    assert state_end["completed"] == 7
+    assert state_end["status"] == "error"
+    assert state_end["completed_at"] is not None
+    assert state_end["tasks"]["doris_operator"]["status"] == "failed"
+    assert "Doris apply error" in state_end["tasks"]["doris_operator"]["message"]
+    assert "RuntimeError: Doris apply error" in state_end["tasks"]["doris_operator"]["logs"]
+
+
+@pytest.mark.asyncio
+async def test_sync_core_integration_task_model_not_expired_after_commit(client: TestClient):
+    """Regression test: accessing self.model attributes in action.run() after _update_sync_task_state commit must not raise MissingGreenlet."""
+    from mindweaver.tasks.k8s_cluster_status import _sync_core_integration_task
+    from mindweaver.service.k8s_cluster.actions import InstallCertManagerAction
+
+    p1 = client.post(
+        "/api/v1/k8s_clusters",
+        json={
+            "name": "sync-no-expire",
+            "title": "Sync No Expire",
+            "type": "in-cluster",
+        },
+    ).json()["data"]
+
+    with patch(
+        "mindweaver.tasks.k8s_cluster_status.sync_core_integrations_task.delay"
+    ):
+        client.post(
+            f"/api/v1/k8s_clusters/{p1['id']}/_actions",
+            json={"action": "sync_core_integrations"},
+        )
+
+    observed_names = []
+
+    async def _run_accessing_model(self):
+        observed_names.append(self.model.name)
+        observed_names.append(self.model.type)
+
+    with patch.object(InstallCertManagerAction, "run", _run_accessing_model), patch(
+        "mindweaver.tasks.k8s_cluster_status.poll_k8s_cluster_status.delay"
+    ):
+        await _sync_core_integration_task(p1["id"], "cert_manager")
+
+    assert observed_names == ["sync-no-expire", K8sClusterType.IN_CLUSTER]
+    state = client.get(f"/api/v1/k8s_clusters/{p1['id']}/_state").json()["sync_state"]
+    assert state["tasks"]["cert_manager"]["status"] == "completed"
+
+
+def test_poll_k8s_cluster_integrations_status(client: TestClient, mock_k8s):
+    """poll_status should populate integrations_status with status, version, and message."""
+    p1 = client.post(
+        "/api/v1/k8s_clusters",
+        json={
+            "name": "poll-int-status",
+            "title": "Poll Int Status",
+            "type": "in-cluster",
+        },
+    ).json()["data"]
+
+    # Ensure pods in mock_k8s have Running phase and ready container_statuses
+    for pod_attr in mock_k8s["core"].return_value.list_pod_for_all_namespaces.side_effect("argocd-server").items:
+        pod_attr.status.phase = "Running"
+        pod_attr.status.container_statuses = [MagicMock(ready=True)]
+
+    def _mock_list_pods(label_selector=None):
+        res = MagicMock()
+        pod = MagicMock()
+        pod.metadata.labels = {"app.kubernetes.io/version": "v1.0.0"}
+        pod.spec.containers = [MagicMock(image="test:v1.0.0")]
+        pod.status.phase = "Running"
+        pod.status.container_statuses = [MagicMock(ready=True)]
+        res.items = [pod]
+        return res
+
+    mock_k8s["core"].return_value.list_pod_for_all_namespaces.side_effect = _mock_list_pods
+
+    with patch("mindweaver.service.k8s_cluster.service.client.CustomObjectsApi") as mock_custom:
+        mock_custom.return_value.list_namespaced_custom_object.return_value = {
+            "items": [
+                {
+                    "metadata": {"name": "cert-manager"},
+                    "status": {
+                        "sync": {"status": "Synced"},
+                        "health": {"status": "Healthy"},
+                    },
+                },
+                {
+                    "metadata": {"name": "cnpg-operator"},
+                    "status": {
+                        "sync": {"status": "OutOfSync"},
+                        "health": {"status": "Progressing"},
+                    },
+                },
+                {
+                    "metadata": {"name": "doris-operator"},
+                    "status": {
+                        "sync": {"status": "Synced"},
+                        "health": {"status": "Degraded"},
+                    },
+                },
+            ]
+        }
+
+        resp = client.post(f"/api/v1/k8s_clusters/{p1['id']}/_refresh")
+        assert resp.status_code == 200
+
+    data = client.get(f"/api/v1/k8s_clusters/{p1['id']}/_state").json()
+    int_status = data.get("integrations_status")
+    assert int_status is not None
+    assert int_status["argocd"]["status"] == "online"
+    assert int_status["cert_manager"]["status"] == "online"
+    assert "Healthy" in int_status["cert_manager"]["message"]
+    assert int_status["cnpg"]["status"] == "pending"
+    assert "Progressing" in int_status["cnpg"]["message"]
+    assert int_status["doris_operator"]["status"] == "error"
+    assert "Degraded" in int_status["doris_operator"]["message"]
+
+
+
 
 
 
