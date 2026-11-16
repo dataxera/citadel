@@ -398,6 +398,14 @@ async def _sync_core_integrations_task(k8s_cluster_id: int):
                         )
                         return
                 elif argocd_task_status != "completed":
+                    try:
+                        action = InstallArgoCDAction(model, svc)
+                        action.session = session
+                        await action.ensure_load_balancer()
+                    except Exception as e:
+                        logger.warning(
+                            f"Failed to ensure ArgoCD LoadBalancer service during sync for cluster {k8s_cluster_id}: {e}"
+                        )
                     await _update_sync_task_state(
                         session,
                         k8s_cluster_id,

@@ -947,8 +947,10 @@ async def test_install_argocd_locks_images_and_chart(test_stack):
     action = InstallArgoCDAction(cluster, mock_svc)
     action._resolve_stack = AsyncMock(return_value=test_stack)
     action._install_helm_chart = AsyncMock()
+    action._apply_template = AsyncMock()
 
     await action.run()
+    action._apply_template.assert_called_once_with("argocd-lb.yml.j2", namespace="argocd")
 
     action._install_helm_chart.assert_awaited_once()
     kwargs = action._install_helm_chart.call_args.kwargs
@@ -1651,6 +1653,241 @@ def test_resume_sync_core_integrations_action(client: TestClient):
         )
         assert resp_resume.status_code == 200
         mock_recover.assert_called_once_with(stale_seconds=0, k8s_cluster_id=p1["id"])
+
+
+@pytest.mark.asyncio
+async def test_install_argocd_deploys_load_balancer_service():
+    """InstallArgoCDAction.run deploys a LoadBalancer Service for ArgoCD after Helm install."""
+    from unittest.mock import AsyncMock
+    import yaml
+    from citadel.service.k8s_cluster.actions import InstallArgoCDAction
+
+    cluster = K8sCluster(
+        name="test-cluster-argo-lb",
+        title="Test Cluster Argo LB",
+        type=K8sClusterType.REMOTE,
+        kubeconfig="fake-kubeconfig",
+    )
+
+    mock_svc = MagicMock()
+    mock_svc.kubeconfig = AsyncMock(return_value="fake-kubeconfig")
+
+    applied_manifests = []
+
+    async def capture_apply_yaml(self, manifest: str):
+        applied_manifests.append(manifest)
+        return "service/argocd-server-lb created"
+
+    with patch("asyncio.create_subprocess_exec") as mock_exec, patch.object(
+        InstallArgoCDAction, "_apply_yaml", new=capture_apply_yaml
+    ):
+        mock_proc = MagicMock()
+        mock_proc.returncode = 0
+        mock_proc.communicate = AsyncMock(return_value=(b"success", b""))
+        mock_exec.return_value = mock_proc
+
+        action = InstallArgoCDAction(cluster, mock_svc)
+        await action.run()
+
+    assert len(applied_manifests) == 1
+    manifest = yaml.safe_load(applied_manifests[0])
+    assert manifest["kind"] == "Service"
+    assert manifest["metadata"]["name"] == "argocd-server-lb"
+    assert manifest["metadata"]["namespace"] == "argocd"
+    assert manifest["spec"]["type"] == "LoadBalancer"
+    assert manifest["spec"]["selector"]["app.kubernetes.io/name"] == "argocd-server"
+
+
+def test_poll_k8s_cluster_argocd_access_details(client: TestClient):
+    """Polling fetches ArgoCD LoadBalancer URL, login, and decrypted initial admin password."""
+    import base64
+    from datetime import datetime, timezone
+
+    with patch(
+        "citadel.service.k8s_cluster.service.config.load_incluster_config"
+    ), patch(
+        "citadel.service.k8s_cluster.service.client.CoreV1Api"
+    ) as mock_core_cls, patch(
+        "citadel.service.k8s_cluster.service.client.VersionApi"
+    ) as mock_ver_cls, patch(
+        "citadel.service.k8s_cluster.service.client.CustomObjectsApi"
+    ) as mock_custom_cls:
+        mock_ver_cls.return_value.get_code.return_value = MagicMock(git_version="v1.30.0")
+        mock_custom_cls.return_value.list_namespaced_custom_object.return_value = {"items": []}
+
+        mock_node = MagicMock()
+        mock_node.metadata.name = "node-1"
+        mock_node.metadata.labels = {}
+        mock_node.metadata.creation_timestamp = datetime(2026, 1, 1, tzinfo=timezone.utc)
+        mock_node.status.conditions = [MagicMock(type="Ready", status="True")]
+        mock_node.status.capacity = {"cpu": "2", "memory": "4Gi", "ephemeral-storage": "20Gi"}
+        mock_node.status.allocatable = {"cpu": "2", "memory": "4Gi", "ephemeral-storage": "20Gi"}
+        mock_node.status.addresses = [MagicMock(type="InternalIP", address="10.0.0.10")]
+        mock_node.status.node_info.kubelet_version = "v1.30.0"
+
+        mock_argo_pod = MagicMock()
+        mock_argo_pod.metadata.labels = {}
+        mock_argo_pod.spec.containers = [MagicMock(image="quay.io/argoproj/argocd:v2.14.2")]
+        mock_argo_pod.status.phase = "Running"
+        mock_argo_pod.status.conditions = [MagicMock(type="Ready", status="True")]
+
+        mock_core = mock_core_cls.return_value
+        mock_core.list_node.return_value = MagicMock(items=[mock_node])
+        mock_core.list_pod_for_all_namespaces.side_effect = lambda label_selector="": MagicMock(
+            items=[mock_argo_pod]
+            if "argocd-server" in label_selector
+            else []
+        )
+
+        mock_helm_secret = MagicMock()
+        mock_helm_secret.metadata.name = "sh.helm.release.v1.argocd.v1"
+        mock_core.list_secret_for_all_namespaces.return_value = MagicMock(items=[mock_helm_secret])
+
+        mock_lb_svc = MagicMock()
+        mock_lb_svc.metadata.name = "argocd-server-lb"
+        mock_lb_svc.spec.type = "LoadBalancer"
+        mock_lb_svc.spec.ports = [MagicMock(port=443), MagicMock(port=80)]
+        mock_lb_svc.status.load_balancer.ingress = [MagicMock(ip="192.168.1.50", hostname=None)]
+
+        mock_core.list_namespaced_service.return_value = MagicMock(items=[mock_lb_svc])
+        mock_core.list_service_for_all_namespaces.return_value = MagicMock(items=[])
+
+        encoded_pw = base64.b64encode(b"argo-init-secret-123").decode("utf-8")
+        mock_core.read_namespaced_secret.return_value = MagicMock(data={"password": encoded_pw})
+
+        p1 = client.post(
+            "/api/v1/k8s_clusters",
+            json={
+                "name": "poll-argo-details",
+                "title": "Poll Argo Details",
+                "type": "in-cluster",
+            },
+        ).json()["data"]
+
+        resp = client.post(f"/api/v1/k8s_clusters/{p1['id']}/_refresh")
+        assert resp.status_code == 200
+
+        state = client.get(f"/api/v1/k8s_clusters/{p1['id']}/_state").json()
+        argo_info = state["integrations_status"]["argocd"]
+        assert argo_info["url"] == "https://192.168.1.50"
+        assert argo_info["username"] == "admin"
+        assert argo_info["initial_admin_password"] == "argo-init-secret-123"
+
+
+def test_poll_k8s_cluster_argocd_access_details_missing(client: TestClient):
+    """Polling handles missing LoadBalancer IP and missing argocd-initial-admin-secret gracefully."""
+    from datetime import datetime, timezone
+    from kubernetes.client.rest import ApiException
+
+    with patch(
+        "citadel.service.k8s_cluster.service.config.load_incluster_config"
+    ), patch(
+        "citadel.service.k8s_cluster.service.client.CoreV1Api"
+    ) as mock_core_cls, patch(
+        "citadel.service.k8s_cluster.service.client.VersionApi"
+    ) as mock_ver_cls, patch(
+        "citadel.service.k8s_cluster.service.client.CustomObjectsApi"
+    ) as mock_custom_cls:
+        mock_ver_cls.return_value.get_code.return_value = MagicMock(git_version="v1.30.0")
+        mock_custom_cls.return_value.list_namespaced_custom_object.return_value = {"items": []}
+
+        mock_node = MagicMock()
+        mock_node.metadata.name = "node-1"
+        mock_node.metadata.labels = {}
+        mock_node.metadata.creation_timestamp = datetime(2026, 1, 1, tzinfo=timezone.utc)
+        mock_node.status.conditions = [MagicMock(type="Ready", status="True")]
+        mock_node.status.capacity = {"cpu": "2", "memory": "4Gi", "ephemeral-storage": "20Gi"}
+        mock_node.status.allocatable = {"cpu": "2", "memory": "4Gi", "ephemeral-storage": "20Gi"}
+        mock_node.status.addresses = [MagicMock(type="InternalIP", address="10.0.0.10")]
+        mock_node.status.node_info.kubelet_version = "v1.30.0"
+
+        mock_core = mock_core_cls.return_value
+        mock_core.list_node.return_value = MagicMock(items=[mock_node])
+        mock_core.list_pod_for_all_namespaces.side_effect = lambda label_selector="": MagicMock(
+            items=[]
+        )
+
+        mock_helm_secret = MagicMock()
+        mock_helm_secret.metadata.name = "sh.helm.release.v1.argocd.v1"
+        mock_core.list_secret_for_all_namespaces.return_value = MagicMock(items=[mock_helm_secret])
+
+        mock_core.list_namespaced_service.return_value = MagicMock(items=[])
+        mock_core.list_service_for_all_namespaces.return_value = MagicMock(items=[])
+        mock_core.read_namespaced_secret.side_effect = ApiException(status=404, reason="Not Found")
+
+        p1 = client.post(
+            "/api/v1/k8s_clusters",
+            json={
+                "name": "poll-argo-missing",
+                "title": "Poll Argo Missing",
+                "type": "in-cluster",
+            },
+        ).json()["data"]
+
+        resp = client.post(f"/api/v1/k8s_clusters/{p1['id']}/_refresh")
+        assert resp.status_code == 200
+
+        state = client.get(f"/api/v1/k8s_clusters/{p1['id']}/_state").json()
+        argo_info = state["integrations_status"]["argocd"]
+        assert argo_info["url"] is None
+        assert argo_info["username"] == "admin"
+        assert argo_info["initial_admin_password"] is None
+
+
+@pytest.mark.asyncio
+async def test_sync_core_integrations_ensures_argocd_load_balancer_when_already_installed(
+    client: TestClient,
+):
+    """Syncing core integrations ensures ArgoCD LoadBalancer service even if ArgoCD is already installed."""
+    from unittest.mock import AsyncMock
+    from citadel.service.k8s_cluster.actions import build_initial_sync_state
+    from citadel.tasks.k8s_cluster_status import _sync_core_integrations_task
+    from citadel.fw.model import get_engine
+
+    p1 = client.post(
+        "/api/v1/k8s_clusters",
+        json={
+            "name": "sync-argo-lb-existing",
+            "title": "Sync Argo LB Existing",
+            "type": "in-cluster",
+        },
+    ).json()["data"]
+
+    engine = get_engine()
+    async with AsyncSession(engine) as session:
+        st = K8sClusterStatus(
+            k8s_cluster_id=p1["id"],
+            status="online",
+            argocd_installed=True,
+            sync_state=build_initial_sync_state(),
+        )
+        session.add(st)
+        await session.commit()
+
+    with patch(
+        "citadel.tasks.k8s_cluster_status.acquire_task_lock",
+        new=AsyncMock(return_value=True),
+    ), patch(
+        "citadel.tasks.k8s_cluster_status.release_task_lock",
+        new=AsyncMock(),
+    ), patch(
+        "citadel.tasks.k8s_cluster_status.is_task_locked",
+        new=AsyncMock(return_value=False),
+    ), patch(
+        "citadel.tasks.k8s_cluster_status.sync_core_integration_task.delay",
+    ), patch(
+        "citadel.service.k8s_cluster.actions.InstallArgoCDAction.run",
+        new=AsyncMock(),
+    ) as mock_run, patch(
+        "citadel.service.k8s_cluster.actions.InstallArgoCDAction.ensure_load_balancer",
+        new=AsyncMock(),
+    ) as mock_ensure_lb:
+        await _sync_core_integrations_task(p1["id"])
+
+    mock_run.assert_not_called()
+    mock_ensure_lb.assert_awaited_once()
+
+
 
 
 

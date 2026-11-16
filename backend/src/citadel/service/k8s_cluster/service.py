@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: AGPLv3+
 
 import asyncio
+import base64
 import logging
 import re
 import tempfile
@@ -11,6 +12,7 @@ from kubernetes import client, config
 from sqlalchemy.orm.attributes import flag_modified
 from sqlmodel import select
 
+from citadel.crypto import encrypt_password
 from citadel.service import Service
 from citadel.fw.model import ts_now
 from citadel.tasks.poll_coordinator import schedule_k8s_cluster_poll
@@ -579,10 +581,82 @@ class K8sClusterService(Service[K8sCluster]):
                         False,
                     )
 
+                def _get_argocd_lb_url() -> str | None:
+                    """Extract the external URL from the ArgoCD LoadBalancer Service."""
+                    try:
+                        lb_svcs = core_v1.list_namespaced_service(
+                            namespace="argocd",
+                            label_selector="app.kubernetes.io/name=argocd-server",
+                        )
+                        candidates = [
+                            s
+                            for s in (lb_svcs.items or [])
+                            if getattr(getattr(s, "spec", None), "type", None)
+                            == "LoadBalancer"
+                        ]
+                        candidates.sort(
+                            key=lambda s: 0
+                            if getattr(getattr(s, "metadata", None), "name", "")
+                            == "argocd-server-lb"
+                            else 1
+                        )
+                        for svc_obj in candidates:
+                            lb_status = getattr(
+                                getattr(svc_obj, "status", None), "load_balancer", None
+                            )
+                            ingress_list = (
+                                getattr(lb_status, "ingress", None) if lb_status else None
+                            )
+                            if not ingress_list:
+                                continue
+                            ing = ingress_list[0]
+                            host = getattr(ing, "ip", None) or getattr(
+                                ing, "hostname", None
+                            )
+                            if not host:
+                                continue
+                            ports = [
+                                getattr(p, "port", None)
+                                for p in (getattr(svc_obj.spec, "ports", None) or [])
+                                if getattr(p, "port", None) is not None
+                            ]
+                            if 443 in ports:
+                                return f"https://{host}"
+                            if 80 in ports:
+                                return f"http://{host}"
+                            if ports:
+                                return f"https://{host}:{ports[0]}"
+                            return f"https://{host}"
+                    except Exception as e:
+                        logger.debug(
+                            f"Could not fetch ArgoCD LoadBalancer URL: {e}"
+                        )
+                    return None
+
+                def _get_argocd_initial_admin_password() -> str | None:
+                    """Fetch and encrypt the ArgoCD initial admin password from Kubernetes."""
+                    try:
+                        secret_obj = core_v1.read_namespaced_secret(
+                            name="argocd-initial-admin-secret",
+                            namespace="argocd",
+                        )
+                        data = getattr(secret_obj, "data", None)
+                        if isinstance(data, dict) and data.get("password"):
+                            raw_pw = base64.b64decode(data["password"]).decode("utf-8")
+                            return encrypt_password(raw_pw)
+                    except Exception as e:
+                        logger.debug(
+                            f"Could not fetch ArgoCD initial admin secret: {e}"
+                        )
+                    return None
+
                 # Check ArgoCD
                 argocd_installed = False
                 argocd_version = None
                 argocd_pods = []
+                argocd_url = None
+                argocd_username = None
+                argocd_initial_password = None
                 secrets = None
                 try:
                     secrets = core_v1.list_secret_for_all_namespaces(
@@ -612,6 +686,9 @@ class K8sClusterService(Service[K8sCluster]):
                         argocd_pods = pods.items or []
                         if argocd_pods:
                             argocd_version = _get_version(argocd_pods[0])
+                        argocd_username = "admin"
+                        argocd_url = _get_argocd_lb_url()
+                        argocd_initial_password = _get_argocd_initial_admin_password()
                 except Exception as e:
                     logger.warning(f"Failed to check ArgoCD presence: {e}")
 
@@ -800,6 +877,10 @@ class K8sClusterService(Service[K8sCluster]):
                 argocd_st, argocd_installed = _integration_status(
                     argocd_installed, argocd_version, argocd_pods
                 )
+                if argocd_installed:
+                    argocd_st["url"] = argocd_url
+                    argocd_st["username"] = argocd_username
+                    argocd_st["initial_admin_password"] = argocd_initial_password
                 cert_manager_st, cert_manager_installed = _integration_status(
                     cert_manager_installed, cert_manager_version, cert_manager_pods, "cert-manager"
                 )

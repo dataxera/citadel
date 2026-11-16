@@ -54,7 +54,7 @@ configuration:
         main:
           repo: ghcr.io/dataxera/citadel/charts
           chart: kafka
-          version: "0.1.3"
+          version: "0.1.4"
       images:
         main:
           repository: ghcr.io/dataxera/citadel/kafka

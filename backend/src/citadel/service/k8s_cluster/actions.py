@@ -206,6 +206,16 @@ class InstallArgoCDAction(BaseAction):
             version=version,
         )
 
+        await self.ensure_load_balancer()
+
+    async def ensure_load_balancer(self):
+        """Ensure the LoadBalancer service for ArgoCD is deployed."""
+        logger.info("Deploying LoadBalancer service for ArgoCD")
+        await self._apply_template(
+            "argocd-lb.yml.j2",
+            namespace="argocd",
+        )
+
     def _get_kubernetes_clients(self):
         """Helper to load kubernetes config and return clients"""
         if self.model.type == K8sClusterType.IN_CLUSTER:

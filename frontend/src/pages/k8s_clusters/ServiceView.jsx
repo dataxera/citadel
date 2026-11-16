@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
     Activity, Monitor, RefreshCw, CheckCircle2, AlertCircle, Loader2, Clock, Copy, Check,
-    Network, SlidersHorizontal, Cpu, Layers, Table2, GitBranch
+    Network, SlidersHorizontal, Cpu, Layers, Table2, GitBranch, ExternalLink, Eye, EyeOff
 } from 'lucide-react';
 import { useNotification } from '../../providers/NotificationProvider';
 import Modal from '../../components/Modal';
@@ -91,6 +91,8 @@ const ServiceView = ({
     const [installingActions, setInstallingActions] = useState({});
     const [selectedSyncTask, setSelectedSyncTask] = useState(null);
     const [copiedLogs, setCopiedLogs] = useState(false);
+    const [showArgoPassword, setShowArgoPassword] = useState(false);
+    const [copiedArgoField, setCopiedArgoField] = useState(null);
     const [selectedNodeForConfig, setSelectedNodeForConfig] = useState(null);
     const [isRackTopologyOpen, setIsRackTopologyOpen] = useState(false);
     const [isTopologyPresetsOpen, setIsTopologyPresetsOpen] = useState(false);
@@ -119,7 +121,13 @@ const ServiceView = ({
         setIsRefreshing(true);
         try {
             const newState = await refreshClusterState(selectedClusterId);
-            setClusterState(newState);
+            if (newState && typeof newState === 'object' && 'status' in newState && !('k8s_version' in newState) && Object.keys(newState).length === 1) {
+                // Defensive guard: never overwrite state with bare action ack
+                const fetched = getClusterState ? await getClusterState(selectedClusterId) : null;
+                if (fetched) setClusterState(fetched);
+            } else if (newState) {
+                setClusterState(newState);
+            }
             showSuccess("Cluster state refreshed");
         } catch (e) {
             console.error(e);
@@ -191,6 +199,13 @@ const ServiceView = ({
             showError(detail);
             throw e;
         }
+    };
+
+    const handleCopyArgoValue = (field, value) => {
+        if (!value) return;
+        navigator.clipboard?.writeText(value);
+        setCopiedArgoField(field);
+        setTimeout(() => setCopiedArgoField(null), 2000);
     };
 
     if (!clusterState) {
@@ -707,11 +722,19 @@ const ServiceView = ({
                                     const taskStatus = syncTasks[item.key]?.status;
                                     const isActiveIcon = status === 'online' || status === 'pending' || taskStatus === 'running';
 
+                                    const isArgoCard = item.key === 'argocd';
+                                    const argoUrl = info?.url;
+                                    const argoLogin = info?.username || (isInstalled ? 'admin' : null);
+                                    const argoPassword = info?.initial_admin_password;
+
                                     return (
                                         <div
                                             key={item.key}
                                             id={`core-integration-${item.key}`}
-                                            className="flex flex-col justify-between gap-3 p-4 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700"
+                                            className={cn(
+                                                "flex flex-col justify-between gap-3 p-4 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700",
+                                                isArgoCard && "col-span-full"
+                                            )}
                                         >
                                             <div className="flex items-start justify-between gap-2">
                                                 <div className="flex items-center gap-3 min-w-0">
@@ -737,6 +760,124 @@ const ServiceView = ({
                                             <p className="text-xs text-slate-500 dark:text-slate-400 truncate" title={message}>
                                                 {message}
                                             </p>
+
+                                            {isArgoCard && isInstalled && (
+                                                <div
+                                                    id="argocd-access-details"
+                                                    className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-3 mt-1 border-t border-slate-200/70 dark:border-slate-700/70"
+                                                >
+                                                    <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-900/60 border border-slate-200/70 dark:border-slate-700/60 space-y-1">
+                                                        <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                                                            LoadBalancer URL
+                                                        </p>
+                                                        <div className="flex items-center justify-between gap-2 min-w-0">
+                                                            {argoUrl ? (
+                                                                <a
+                                                                    id="argocd-lb-url"
+                                                                    href={argoUrl}
+                                                                    target="_blank"
+                                                                    rel="noopener noreferrer"
+                                                                    className="text-xs font-mono font-semibold text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1.5 truncate"
+                                                                    title={argoUrl}
+                                                                >
+                                                                    <span className="truncate">{argoUrl}</span>
+                                                                    <ExternalLink size={12} className="shrink-0" />
+                                                                </a>
+                                                            ) : (
+                                                                <span id="argocd-lb-url" className="text-xs font-mono text-slate-400">
+                                                                    Pending LoadBalancer IP...
+                                                                </span>
+                                                            )}
+                                                            {argoUrl && (
+                                                                <button
+                                                                    id="argocd-copy-url-btn"
+                                                                    type="button"
+                                                                    onClick={() => handleCopyArgoValue('url', argoUrl)}
+                                                                    className="p-1 rounded text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors shrink-0"
+                                                                    title="Copy URL"
+                                                                >
+                                                                    {copiedArgoField === 'url' ? (
+                                                                        <Check size={13} className="text-green-500" />
+                                                                    ) : (
+                                                                        <Copy size={13} />
+                                                                    )}
+                                                                </button>
+                                                            )}
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-900/60 border border-slate-200/70 dark:border-slate-700/60 space-y-1">
+                                                        <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                                                            Login
+                                                        </p>
+                                                        <div className="flex items-center justify-between gap-2 min-w-0">
+                                                            <span
+                                                                id="argocd-login"
+                                                                className="text-xs font-mono font-semibold text-slate-700 dark:text-slate-200 truncate"
+                                                            >
+                                                                {argoLogin || '—'}
+                                                            </span>
+                                                            {argoLogin && (
+                                                                <button
+                                                                    id="argocd-copy-login-btn"
+                                                                    type="button"
+                                                                    onClick={() => handleCopyArgoValue('username', argoLogin)}
+                                                                    className="p-1 rounded text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors shrink-0"
+                                                                    title="Copy Login"
+                                                                >
+                                                                    {copiedArgoField === 'username' ? (
+                                                                        <Check size={13} className="text-green-500" />
+                                                                    ) : (
+                                                                        <Copy size={13} />
+                                                                    )}
+                                                                </button>
+                                                            )}
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-900/60 border border-slate-200/70 dark:border-slate-700/60 space-y-1">
+                                                        <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                                                            Initial Admin Password
+                                                        </p>
+                                                        <div className="flex items-center justify-between gap-2 min-w-0">
+                                                            <span
+                                                                id="argocd-initial-password"
+                                                                className="text-xs font-mono font-semibold text-slate-700 dark:text-slate-200 truncate"
+                                                            >
+                                                                {argoPassword
+                                                                    ? (showArgoPassword ? argoPassword : '••••••••••••')
+                                                                    : 'Unavailable'}
+                                                            </span>
+                                                            {argoPassword && (
+                                                                <div className="flex items-center gap-1 shrink-0">
+                                                                    <button
+                                                                        id="argocd-toggle-password-btn"
+                                                                        type="button"
+                                                                        onClick={() => setShowArgoPassword((prev) => !prev)}
+                                                                        className="p-1 rounded text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
+                                                                        title={showArgoPassword ? 'Hide Password' : 'Show Password'}
+                                                                    >
+                                                                        {showArgoPassword ? <EyeOff size={13} /> : <Eye size={13} />}
+                                                                    </button>
+                                                                    <button
+                                                                        id="argocd-copy-password-btn"
+                                                                        type="button"
+                                                                        onClick={() => handleCopyArgoValue('password', argoPassword)}
+                                                                        className="p-1 rounded text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
+                                                                        title="Copy Password"
+                                                                    >
+                                                                        {copiedArgoField === 'password' ? (
+                                                                            <Check size={13} className="text-green-500" />
+                                                                        ) : (
+                                                                            <Copy size={13} />
+                                                                        )}
+                                                                    </button>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            )}
                                         </div>
                                     );
                                 })}

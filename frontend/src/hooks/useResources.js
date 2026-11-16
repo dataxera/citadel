@@ -270,8 +270,9 @@ export const useK8sClusters = () => {
     }, []);
 
     const refreshClusterState = useCallback(async (id) => {
-        const response = await apiClient.post(`/k8s_clusters/${id}/_refresh`);
-        return response.data;
+        await apiClient.post(`/k8s_clusters/${id}/_refresh`);
+        const stateResponse = await apiClient.get(`/k8s_clusters/${id}/_state`);
+        return stateResponse.data;
     }, []);
 
     const fetchActions = useCallback(async (id) => {

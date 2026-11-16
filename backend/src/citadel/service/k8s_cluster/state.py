@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: AGPLv3+
 
 from sqlmodel import select
+from citadel.crypto import decrypt_password
 from citadel.fw.state import BaseState
 from .model import K8sClusterStatus
 
@@ -25,5 +26,20 @@ class K8sClusterState(BaseState):
                 exclude={"id", "k8s_cluster_id", "last_update"}
             )
             status_data["last_update"] = status_model.last_update.isoformat()
+            integrations = status_data.get("integrations_status")
+            if isinstance(integrations, dict):
+                argocd_info = integrations.get("argocd")
+                if isinstance(argocd_info, dict) and argocd_info.get("initial_admin_password"):
+                    argocd_copy = dict(argocd_info)
+                    try:
+                        argocd_copy["initial_admin_password"] = decrypt_password(
+                            argocd_copy["initial_admin_password"]
+                        )
+                    except Exception:
+                        pass
+                    status_data["integrations_status"] = {
+                        **integrations,
+                        "argocd": argocd_copy,
+                    }
 
         return status_data
