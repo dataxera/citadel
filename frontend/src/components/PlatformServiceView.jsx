@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { Terminal, RefreshCcw, Zap, Loader2, Activity, Clock, Copy, Check, Briefcase, Server } from 'lucide-react';
 import { cn } from '../utils/cn';
+import { getStatusStyle } from '../utils/statusStyles';
 import { useNotification } from '../providers/NotificationProvider';
 import { useResourcePermissions } from '../hooks/usePermissions';
 import Drawer from './Drawer';
@@ -14,19 +15,9 @@ import {
 } from './service_tabs';
 
 const StatusBadge = ({ status }) => {
-    const styles = {
-        running: 'dxc-badge-success',
-        online: 'dxc-badge-success',
-        connected: 'dxc-badge-success',
-        warning: 'dxc-badge-warning',
-        pending: 'dxc-badge-warning',
-        stopped: 'dxc-badge-neutral',
-        offline: 'dxc-badge-neutral',
-        error: 'dxc-badge-danger',
-        active: 'dxc-badge-info',
-    };
+    const { badge } = getStatusStyle(status);
     return (
-        <span className={cn(styles[status] || 'dxc-badge-neutral')}>
+        <span className={cn(badge)}>
             {(status || 'unknown').toUpperCase()}
         </span>
     );

@@ -6,6 +6,7 @@ SPDX-License-Identifier: AGPLv3+
 import React from 'react';
 import { Briefcase, Activity } from 'lucide-react';
 import { cn } from '../utils/cn';
+import { getStatusStyle } from '../utils/statusStyles';
 
 /**
  * Shared subtitle row for platform service listings, displaying the project pill,
@@ -14,6 +15,8 @@ import { cn } from '../utils/cn';
 const PlatformListingSubtitle = ({ platform, state = {}, projects = [] }) => {
     const project = projects.find((p) => String(p.id) === String(platform.project_id));
     const projectLabel = project ? (project.title || project.name) : `Project #${platform.project_id}`;
+    const status = state.status || (state.active ? 'active' : 'unknown');
+    const statusStyle = getStatusStyle(status);
 
     return (
         <div className="flex items-center gap-4 flex-wrap">
@@ -24,19 +27,9 @@ const PlatformListingSubtitle = ({ platform, state = {}, projects = [] }) => {
                 <Briefcase size={12} />
                 <span>{projectLabel}</span>
             </div>
-            <div className={cn(
-                "flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px] font-bold uppercase border",
-                state.status === 'online' ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20" :
-                    state.status === 'error' ? "bg-rose-500/10 text-rose-500 border-rose-500/20" :
-                        "bg-slate-500/10 text-slate-400 border-slate-500/20"
-            )}>
-                <div className={cn(
-                    "w-1.5 h-1.5 rounded-full",
-                    state.status === 'online' ? "bg-emerald-500" :
-                        state.status === 'error' ? "bg-rose-500" :
-                            "bg-slate-400"
-                )} />
-                {state.status || 'unknown'}
+            <div className={cn(statusStyle.badge, "gap-1.5")}>
+                <div className={cn("w-1.5 h-1.5 rounded-full", statusStyle.dot)} />
+                {status}
             </div>
             {state.active && (
                 <div className="flex items-center gap-1 bg-blue-500/10 text-blue-500 border border-blue-500/20 px-2 py-0.5 rounded-md text-[10px] font-bold uppercase">
