@@ -1,6 +1,6 @@
-# Citadel
+# Dataxera Citadel
 
-Citadel is a 100% open-source data & AI orchestration platform, providing an all-in-one solution for data warehousing, data lakes, and AI platforms.
+Dataxera Citadel is a 100% open-source data & AI orchestration platform, providing an all-in-one solution for data warehousing, data lakes, and AI platforms.
 
 - **Orchestration**: Currently provides orchestration capabilities to deploy key data platform components such as PostgreSQL, Trino, Airflow, Superset, Kafka, and others.
 - **Future Roadmap**:
@@ -77,6 +77,42 @@ kubectl wait --for=condition=ready pod --selector app=metallb -n metallb-system 
 
 **Make sure to check MetalLB status using `kubectl get pods -n metallb-system` and ensure it's running successfully.**
 
+#### Configure MetalLB IP Address Pool
+
+Once MetalLB is running, create an `IPAddressPool` and an advertisement resource (such as `L2Advertisement` for Layer 2 mode) so MetalLB can assign external IPs to `LoadBalancer` services:
+
+```bash
+kubectl apply -f - <<EOF
+apiVersion: metallb.io/v1beta1
+kind: IPAddressPool
+metadata:
+  name: default-pool
+  namespace: metallb-system
+spec:
+  addresses:
+    # Replace with an unused IP range or CIDR on your network (outside your DHCP range)
+    - 192.168.1.240-192.168.1.250
+---
+apiVersion: metallb.io/v1beta1
+kind: L2Advertisement
+metadata:
+  name: default-l2
+  namespace: metallb-system
+spec:
+  ipAddressPools:
+    - default-pool
+EOF
+```
+
+*   **`addresses`**: Specify one or more IP ranges (e.g., `192.168.1.240-192.168.1.250`) or CIDRs (e.g., `192.168.1.240/28`) reachable on your network and not used by your DHCP server or other hosts.
+*   **Layer 3 (BGP) mode**: If using BGP instead of Layer 2, configure `BGPPeer` and `BGPAdvertisement` resources referencing `default-pool` in place of `L2Advertisement`.
+
+Verify the IP pool configuration:
+
+```bash
+kubectl get ipaddresspools,l2advertisements -n metallb-system
+```
+
 ## Development Environment Setup
 
 ### 1. Start Development Containers
@@ -84,7 +120,7 @@ kubectl wait --for=condition=ready pod --selector app=metallb -n metallb-system 
 Start PostgreSQL and Redis (the backing services) using Docker Compose:
 
 ```bash
-docker compose up --profile=app up -d
+docker compose --profile=app up -d --build
 ```
 
 This will start:
