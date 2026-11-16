@@ -100,14 +100,20 @@ class AirflowPoller:
                     ("Scheduler", f"{self.model.name}-scheduler"),
                     ("Worker", f"{self.model.name}-worker"),
                 ]
-                stats = [
-                    f"{label} {ready}/{total}"
+                counts = [
+                    (label, *_count_ready_pods(pods.items, prefix))
                     for label, prefix in pod_types
-                    for ready, total in [_count_ready_pods(pods.items, prefix)]
                 ]
+                if status == "online" and any(
+                    ready < 1 or ready < total for _, ready, total in counts
+                ):
+                    status = "pending"
+                stats = [f"{label} {ready}/{total}" for label, ready, total in counts]
                 message += f" | Pods: {', '.join(stats)}"
             except Exception as e:
                 logger.error(f"Failed to fetch pods for {self.model.name}: {e}")
+                if status == "online":
+                    status = "pending"
 
             # 3. Fetch NodePorts (for Airflow web UI)
             node_ports = []

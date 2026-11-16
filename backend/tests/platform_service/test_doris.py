@@ -292,3 +292,108 @@ async def test_doris_poller(mock_service_dependencies):
         )
         await poller.poll()
         assert state.query_uri == "mysql://root:supersecret123@doris-test-fe-service.default.svc.cluster.local:9030"
+
+
+def _make_mock_pod(name: str, phase: str = "Running", ready: bool = True) -> MagicMock:
+    """Create a mock Kubernetes pod object for Doris poller tests."""
+    pod = MagicMock()
+    pod.metadata.name = name
+    pod.status.phase = phase
+    container_status = MagicMock()
+    container_status.ready = ready
+    pod.status.container_statuses = [container_status]
+    return pod
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "argo_health,fe_replicas,be_replicas,fe_ready_count,be_ready_count,expected_status",
+    [
+        # ArgoCD says Healthy, but 0/3 pods are up -> must be pending
+        ("Healthy", 3, 3, 0, 0, "pending"),
+        # ArgoCD says Healthy, FE is 3/3 but BE is 2/3 -> must be pending
+        ("Healthy", 3, 3, 3, 2, "pending"),
+        # ArgoCD says Healthy, FE is 2/3 and BE is 3/3 -> must be pending
+        ("Healthy", 3, 3, 2, 3, "pending"),
+        # ArgoCD says Healthy, FE is 3/3 and BE is 3/3 -> online
+        ("Healthy", 3, 3, 3, 3, "online"),
+        # Custom replica configuration (1 FE, 2 BE) all ready -> online
+        ("Healthy", 1, 2, 1, 2, "online"),
+        # ArgoCD says Degraded even when pods are ready -> error
+        ("Degraded", 3, 3, 3, 3, "error"),
+    ],
+)
+async def test_doris_poller_instance_counts(
+    mock_service_dependencies,
+    argo_health,
+    fe_replicas,
+    be_replicas,
+    fe_ready_count,
+    be_ready_count,
+    expected_status,
+):
+    """Test DorisPoller compares running FE/BE pods against configured replicas."""
+    request, session = mock_service_dependencies
+    svc = DorisPlatformService(request, session)
+
+    model = DorisPlatform(
+        id=11,
+        name="doris-test",
+        title="Doris Test",
+        project_id=1,
+        fe_replicas=fe_replicas,
+        be_replicas=be_replicas,
+        admin_password=encrypt_password("supersecret123"),
+    )
+
+    state = DorisPlatformState(platform_id=11, active=True)
+    svc.platform_state = AsyncMock(return_value=state)
+    svc.kubeconfig = AsyncMock(return_value=None)
+    svc._resolve_namespace = AsyncMock(return_value="default")
+    svc.project = AsyncMock(return_value=MagicMock(ingress_domain="example.com"))
+
+    fe_pods = [
+        _make_mock_pod(f"doris-test-fe-{i}", phase="Running", ready=(i < fe_ready_count))
+        for i in range(fe_replicas)
+    ]
+    be_pods = [
+        _make_mock_pod(f"doris-test-be-{i}", phase="Running", ready=(i < be_ready_count))
+        for i in range(be_replicas)
+    ]
+
+    mock_custom_api = MagicMock()
+    mock_custom_api.get_namespaced_custom_object.return_value = {
+        "status": {
+            "sync": {"status": "Synced"},
+            "health": {"status": argo_health},
+        }
+    }
+
+    mock_core_v1 = MagicMock()
+    mock_pod_list = MagicMock()
+    mock_pod_list.items = fe_pods + be_pods
+    mock_core_v1.list_namespaced_pod.return_value = mock_pod_list
+    mock_core_v1.read_namespaced_service.side_effect = Exception("not found")
+    mock_node_list = MagicMock()
+    mock_node_list.items = []
+    mock_core_v1.list_node.return_value = mock_node_list
+
+    with (
+        patch("citadel.platform_service.doris.poller.config.load_incluster_config"),
+        patch("citadel.platform_service.doris.poller.client.ApiClient"),
+        patch(
+            "citadel.platform_service.doris.poller.client.CustomObjectsApi",
+            return_value=mock_custom_api,
+        ),
+        patch(
+            "citadel.platform_service.doris.poller.client.CoreV1Api",
+            return_value=mock_core_v1,
+        ),
+    ):
+        poller = DorisPoller(svc, model)
+        await poller.poll()
+
+    assert state.status == expected_status
+    if expected_status != "error":
+        assert f"FE {fe_ready_count}/{fe_replicas}" in state.message
+        assert f"BE {be_ready_count}/{be_replicas}" in state.message

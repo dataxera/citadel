@@ -66,6 +66,8 @@ class PgSQLPoller:
                 ready_instances = status_data.get("readyInstances", 0)
 
                 status = "online" if phase == "Cluster in healthy state" else "pending"
+                if status == "online" and ready_instances < self.model.instances:
+                    status = "pending"
                 if phase == "Degraded":
                     status = "error"
 

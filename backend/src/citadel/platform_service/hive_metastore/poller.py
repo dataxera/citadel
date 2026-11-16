@@ -89,10 +89,13 @@ class HiveMetastorePoller:
                     if p.status.phase == "Running"
                     and any(c.ready for c in (p.status.container_statuses or []))
                 )
-                total_pods = len(pods.items)
-                message += f" | Pods: {ready_pods}/{total_pods}"
+                if status == "online" and ready_pods < self.model.replica_count:
+                    status = "pending"
+                message += f" | Pods: {ready_pods}/{self.model.replica_count}"
             except Exception as e:
                 logger.error(f"Failed to fetch pods for {self.model.name}: {e}")
+                if status == "online":
+                    status = "pending"
 
             # 3. Fetch NodePorts
             node_ports = []

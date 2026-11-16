@@ -7,6 +7,8 @@ from unittest.mock import MagicMock, AsyncMock, patch
 from fastapi import Request
 from pydantic import ValidationError
 
+from citadel.config import settings
+from citadel.crypto import encrypt_password
 from citadel.platform_service.superset.model import SupersetPlatform, SupersetPlatformState, SupersetRoleMapping
 from citadel.platform_service.superset.service import SupersetPlatformService
 from citadel.platform_service.pgsql import PgSqlPlatformState
@@ -897,6 +899,86 @@ async def test_superset_redis_image_version_locked(test_stack_session):
     assert "initImage:" in manifest
     assert "repository: test.registry/apache/superset" in manifest
     assert 'tag: "dockerize-test"' in manifest
+
+
+def _make_superset_mock_pod(name: str, phase: str = "Running", ready: bool = True) -> MagicMock:
+    """Create a mock Kubernetes pod object for Superset poller tests."""
+    pod = MagicMock()
+    pod.metadata.name = name
+    pod.status.phase = phase
+    cs = MagicMock()
+    cs.ready = ready
+    pod.status.container_statuses = [cs]
+    return pod
+
+
+@pytest.mark.asyncio
+async def test_superset_poller_instance_counts(mock_service_dependencies):
+    """Test SupersetPoller marks pending when active pods are not all ready or missing."""
+    from citadel.platform_service.superset.model import SupersetPlatformState
+    from citadel.platform_service.superset.poller import SupersetPoller
+
+    settings.fernet_key = "EFw4cCjDgHhGuZAGlwXmQhXg134ZdHjb9SeqcszWeSU="
+    request, session = mock_service_dependencies
+    session.flush = AsyncMock()
+    svc = SupersetPlatformService(request, session)
+    model = SupersetPlatform(
+        id=24,
+        name="my-superset",
+        title="My Superset",
+        project_id=1,
+        database_id=10,
+        redis_password=encrypt_password("redis"),
+        secret_key=encrypt_password("secret"),
+        admin_password=encrypt_password("admin"),
+    )
+    state = SupersetPlatformState(platform_id=24, active=True)
+    svc.platform_state = AsyncMock(return_value=state)
+    svc.kubeconfig = AsyncMock(return_value=None)
+    svc._resolve_namespace = AsyncMock(return_value="ns")
+    svc.project = AsyncMock(return_value=MagicMock(ingress_domain="example.com"))
+
+    mock_custom_api = MagicMock()
+    mock_custom_api.get_namespaced_custom_object.return_value = {
+        "status": {"sync": {"status": "Synced"}, "health": {"status": "Healthy"}}
+    }
+    mock_core_v1 = MagicMock()
+    mock_core_v1.list_namespaced_service.return_value = MagicMock(items=[])
+    mock_core_v1.list_node.return_value = MagicMock(items=[])
+
+    with (
+        patch("citadel.platform_service.superset.poller.config.load_incluster_config"),
+        patch("citadel.platform_service.superset.poller.client.ApiClient"),
+        patch("citadel.platform_service.superset.poller.client.CustomObjectsApi", return_value=mock_custom_api),
+        patch("citadel.platform_service.superset.poller.client.CoreV1Api", return_value=mock_core_v1),
+    ):
+        poller = SupersetPoller(svc, model)
+
+        # 0 pods -> pending
+        mock_core_v1.list_namespaced_pod.return_value = MagicMock(items=[])
+        await poller.poll()
+        assert state.status == "pending"
+
+        # 1/2 active pods ready -> pending
+        mock_core_v1.list_namespaced_pod.return_value = MagicMock(
+            items=[
+                _make_superset_mock_pod("my-superset-0", "Running", True),
+                _make_superset_mock_pod("my-superset-worker-0", "Pending", False),
+            ]
+        )
+        await poller.poll()
+        assert state.status == "pending"
+
+        # 2/2 active pods ready + 1 Succeeded init job -> online
+        mock_core_v1.list_namespaced_pod.return_value = MagicMock(
+            items=[
+                _make_superset_mock_pod("my-superset-0", "Running", True),
+                _make_superset_mock_pod("my-superset-worker-0", "Running", True),
+                _make_superset_mock_pod("my-superset-init-db", "Succeeded", False),
+            ]
+        )
+        await poller.poll()
+        assert state.status == "online"
 
 
 

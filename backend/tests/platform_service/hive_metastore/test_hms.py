@@ -78,6 +78,7 @@ def test_hms_validation():
 async def test_hms_template_rendering(mock_service_dependencies):
     """Test that the HMS templates render correctly"""
     request, session = mock_service_dependencies
+    session.flush = AsyncMock()
     svc = HiveMetastorePlatformService(request, session)
 
     model = HiveMetastorePlatform(
@@ -165,6 +166,7 @@ async def test_hms_template_rendering(mock_service_dependencies):
 async def test_hms_manifest_parsing(mock_service_dependencies):
     """Replicate YAML parsing error by rendering and parsing manifests"""
     request, session = mock_service_dependencies
+    session.flush = AsyncMock()
     svc = HiveMetastorePlatformService(request, session)
 
     model = HiveMetastorePlatform(
@@ -209,6 +211,7 @@ async def test_hms_manifest_parsing(mock_service_dependencies):
 async def test_hms_fullname_override(mock_service_dependencies):
     """Test that fullnameOverride is present in the rendered manifest"""
     request, session = mock_service_dependencies
+    session.flush = AsyncMock()
     svc = HiveMetastorePlatformService(request, session)
 
     model = HiveMetastorePlatform(
@@ -245,6 +248,7 @@ async def test_hms_fullname_override(mock_service_dependencies):
 async def test_hms_image_tag_preserved(mock_service_dependencies):
     """Test that HiveMetastorePlatformService preserves the resolved image tag in manifests."""
     request, session = mock_service_dependencies
+    session.flush = AsyncMock()
     svc = HiveMetastorePlatformService(request, session)
 
     model = HiveMetastorePlatform(
@@ -277,6 +281,83 @@ async def test_hms_image_tag_preserved(mock_service_dependencies):
     assert 'tag: "4.2.0-rev.6"' in manifest
     assert 'repository: "ghcr.io/kagesenshi/citadel/hive-metastore"' in manifest
     assert 'tag: "latest"' not in manifest
+
+
+def _make_hms_mock_pod(name: str, phase: str = "Running", ready: bool = True) -> MagicMock:
+    """Create a mock Kubernetes pod object for Hive Metastore poller tests."""
+    pod = MagicMock()
+    pod.metadata.name = name
+    pod.status.phase = phase
+    cs = MagicMock()
+    cs.ready = ready
+    pod.status.container_statuses = [cs]
+    return pod
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "argo_health,replica_count,ready_count,expected_status",
+    [
+        ("Healthy", 1, 0, "pending"),
+        ("Healthy", 2, 1, "pending"),
+        ("Healthy", 2, 2, "online"),
+        ("Degraded", 1, 1, "error"),
+    ],
+)
+async def test_hms_poller_instance_counts(
+    mock_service_dependencies,
+    argo_health,
+    replica_count,
+    ready_count,
+    expected_status,
+):
+    """Test HiveMetastorePoller compares running pods against configured replica_count."""
+    from citadel.platform_service.hive_metastore.model import HiveMetastorePlatformState
+    from citadel.platform_service.hive_metastore.poller import HiveMetastorePoller
+
+    request, session = mock_service_dependencies
+    session.flush = AsyncMock()
+    svc = HiveMetastorePlatformService(request, session)
+    model = HiveMetastorePlatform(
+        id=21,
+        name="hms-test",
+        title="HMS Test",
+        project_id=1,
+        database_id=10,
+        replica_count=replica_count,
+    )
+    state = HiveMetastorePlatformState(platform_id=21, active=True)
+    svc.platform_state = AsyncMock(return_value=state)
+    svc.kubeconfig = AsyncMock(return_value=None)
+    svc._resolve_namespace = AsyncMock(return_value="ns")
+
+    pods = [
+        _make_hms_mock_pod(f"hms-test-{i}", phase="Running", ready=(i < ready_count))
+        for i in range(replica_count)
+    ]
+
+    mock_custom_api = MagicMock()
+    mock_custom_api.get_namespaced_custom_object.return_value = {
+        "status": {"sync": {"status": "Synced"}, "health": {"status": argo_health}}
+    }
+    mock_core_v1 = MagicMock()
+    mock_core_v1.list_namespaced_pod.return_value = MagicMock(items=pods)
+    mock_core_v1.list_namespaced_service.return_value = MagicMock(items=[])
+    mock_core_v1.list_node.return_value = MagicMock(items=[])
+
+    with (
+        patch("citadel.platform_service.hive_metastore.poller.config.load_incluster_config"),
+        patch("citadel.platform_service.hive_metastore.poller.client.ApiClient"),
+        patch("citadel.platform_service.hive_metastore.poller.client.CustomObjectsApi", return_value=mock_custom_api),
+        patch("citadel.platform_service.hive_metastore.poller.client.AppsV1Api"),
+        patch("citadel.platform_service.hive_metastore.poller.client.CoreV1Api", return_value=mock_core_v1),
+    ):
+        poller = HiveMetastorePoller(svc, model)
+        await poller.poll()
+
+    assert state.status == expected_status
+    if expected_status != "error":
+        assert f"Pods: {ready_count}/{replica_count}" in state.message
 
 
 

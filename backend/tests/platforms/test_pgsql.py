@@ -622,4 +622,27 @@ async def test_pgsql_poller_loadbalancer_and_no_nodeport(postgresql_proc, test_p
             == f"test-pg-lb-poll-pooler-rw.{state.extra_data['namespace']}.svc.cluster.local"
         )
 
+        # When readyInstances < configured instances even if phase is healthy, status must be pending
+        await session.refresh(platform)
+        await session.refresh(state)
+        with patch("kubernetes.config.new_client_from_config"), patch(
+            "kubernetes.client.CustomObjectsApi"
+        ) as mock_custom, patch("kubernetes.client.CoreV1Api") as mock_core_v1:
+            mock_custom.return_value.get_namespaced_custom_object.return_value = {
+                "status": {
+                    "phase": "Cluster in healthy state",
+                    "instances": 3,
+                    "readyInstances": 2,
+                }
+            }
+            mock_core_v1.return_value.read_namespaced_service.return_value = mock_lb_svc
+            mock_core_v1.return_value.list_node.return_value.items = []
+            mock_core_v1.return_value.read_namespaced_secret.side_effect = Exception("no secret")
+
+            await poller.poll()
+            await session.commit()
+
+        await session.refresh(state)
+        assert state.status == "pending"
+
     await engine.dispose()

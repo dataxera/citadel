@@ -100,6 +100,7 @@ def test_trino_validation():
 async def test_trino_template_rendering(mock_service_dependencies):
     """Test that the Trino templates render correctly with HMS and DataSources"""
     request, session = mock_service_dependencies
+    session.flush = AsyncMock()
     svc = TrinoPlatformService(request, session)
 
     model = TrinoPlatform(
@@ -228,6 +229,7 @@ async def test_trino_template_rendering(mock_service_dependencies):
 async def test_trino_override_image_template(mock_service_dependencies):
     """Test that custom image is rendered correctly when resolved from stack"""
     request, session = mock_service_dependencies
+    session.flush = AsyncMock()
     svc = TrinoPlatformService(request, session)
     svc._resolve_namespace = AsyncMock(return_value="trino-ns")
     svc.project = AsyncMock(return_value=MagicMock(ldap_config_id=None))
@@ -250,6 +252,7 @@ async def test_trino_override_image_template(mock_service_dependencies):
 async def test_trino_catalog_filtering(mock_service_dependencies):
     """Test that only supported catalog drivers are rendered"""
     request, session = mock_service_dependencies
+    session.flush = AsyncMock()
     svc = TrinoPlatformService(request, session)
     svc._resolve_namespace = AsyncMock(return_value="trino-ns")
 
@@ -295,6 +298,7 @@ async def test_trino_catalog_filtering(mock_service_dependencies):
 async def test_trino_mssql_catalog_rendering(mock_service_dependencies):
     """Test that MSSQL engine is correctly mapped to sqlserver connector and URL"""
     request, session = mock_service_dependencies
+    session.flush = AsyncMock()
     svc = TrinoPlatformService(request, session)
     svc._resolve_namespace = AsyncMock(return_value="trino-ns")
     svc.project = AsyncMock(return_value=MagicMock(ldap_config_id=None))
@@ -340,6 +344,7 @@ async def test_trino_mssql_catalog_rendering(mock_service_dependencies):
 async def test_trino_mssql_ssl_rendering(mock_service_dependencies):
     """Test that MSSQL SSL parameters are correctly mapped"""
     request, session = mock_service_dependencies
+    session.flush = AsyncMock()
     svc = TrinoPlatformService(request, session)
     svc._resolve_namespace = AsyncMock(return_value="trino-ns")
     svc.project = AsyncMock(return_value=MagicMock(ldap_config_id=None))
@@ -380,6 +385,7 @@ async def test_trino_mssql_ssl_rendering(mock_service_dependencies):
 async def test_trino_oracle_catalog_rendering(mock_service_dependencies):
     """Test that Oracle engine is correctly mapped to oracle connector and thin URL"""
     request, session = mock_service_dependencies
+    session.flush = AsyncMock()
     svc = TrinoPlatformService(request, session)
     svc._resolve_namespace = AsyncMock(return_value="trino-ns")
     svc.project = AsyncMock(return_value=MagicMock(ldap_config_id=None))
@@ -421,6 +427,7 @@ async def test_trino_oracle_catalog_rendering(mock_service_dependencies):
 async def test_trino_oracle_catalog_rendering_sid_and_defaults(mock_service_dependencies):
     """Test that Oracle catalog handles SID syntax, default port, and empty database"""
     request, session = mock_service_dependencies
+    session.flush = AsyncMock()
     svc = TrinoPlatformService(request, session)
     svc._resolve_namespace = AsyncMock(return_value="trino-ns")
     svc.project = AsyncMock(return_value=MagicMock(ldap_config_id=None))
@@ -464,6 +471,7 @@ from citadel.service.ldap_config.model import LdapConfig
 async def test_trino_ldap_rendering(mock_service_dependencies):
     """Test that LDAP configuration is correctly rendered"""
     request, session = mock_service_dependencies
+    session.flush = AsyncMock()
     svc = TrinoPlatformService(request, session)
     svc._resolve_namespace = AsyncMock(return_value="trino-ns")
 
@@ -540,6 +548,7 @@ async def test_trino_ldap_rendering(mock_service_dependencies):
 async def test_trino_https_rendering(mock_service_dependencies):
     """Test that HTTPS configuration is correctly rendered"""
     request, session = mock_service_dependencies
+    session.flush = AsyncMock()
     svc = TrinoPlatformService(request, session)
     svc._resolve_namespace = AsyncMock(return_value="trino-ns")
 
@@ -636,6 +645,7 @@ async def test_trino_https_rendering(mock_service_dependencies):
 async def test_trino_poll_status_with_https_nodeport(mock_service_dependencies):
     """Test that poll_status picks the correct NodePort for the HTTPS service"""
     request, session = mock_service_dependencies
+    session.flush = AsyncMock()
     svc = TrinoPlatformService(request, session)
 
     # Mock base methods to avoid hitting real logic or requiring complex mocks
@@ -677,6 +687,7 @@ async def test_trino_poll_status_with_https_nodeport(mock_service_dependencies):
 async def test_trino_poll_status_with_ingress_domain(mock_service_dependencies):
     """Test that poll_status sets the correct trino_uri when ingress_domain is configured"""
     request, session = mock_service_dependencies
+    session.flush = AsyncMock()
     svc = TrinoPlatformService(request, session)
 
     svc._resolve_namespace = AsyncMock(return_value="trino-ns")
@@ -711,6 +722,7 @@ async def test_trino_poll_status_with_ingress_domain(mock_service_dependencies):
 async def test_trino_envoy_route_rendering(mock_service_dependencies):
     """Test that Envoy Gateway HTTPRoute and BackendTLSPolicy are rendered when ingress_domain is set"""
     request, session = mock_service_dependencies
+    session.flush = AsyncMock()
     svc = TrinoPlatformService(request, session)
     svc._resolve_namespace = AsyncMock(return_value="trino-ns")
 
@@ -765,6 +777,7 @@ async def test_trino_envoy_route_rendering(mock_service_dependencies):
 async def test_trino_internal_shared_secret_visibility(mock_service_dependencies):
     """Test that internal_shared_secret is hidden from form and has a random default"""
     request, session = mock_service_dependencies
+    session.flush = AsyncMock()
     svc = TrinoPlatformService(request, session)
     
     # Check internal_fields
@@ -789,6 +802,7 @@ async def test_trino_internal_shared_secret_visibility(mock_service_dependencies
 async def test_trino_catalog_custom_parameters(mock_service_dependencies):
     """Test that trino.* parameters in data source are passed to catalog properties without prefix"""
     request, session = mock_service_dependencies
+    session.flush = AsyncMock()
     svc = TrinoPlatformService(request, session)
     svc._resolve_namespace = AsyncMock(return_value="trino-ns")
     svc.project = AsyncMock(return_value=MagicMock(ldap_config_id=None))
@@ -886,6 +900,7 @@ async def test_trino_state_credentials_no_admin(mock_service_dependencies):
 async def test_trino_jwt_rendering(mock_service_dependencies):
     """Test that JWT authentication is correctly rendered in Trino config"""
     request, session = mock_service_dependencies
+    session.flush = AsyncMock()
     svc = TrinoPlatformService(request, session)
     svc._resolve_namespace = AsyncMock(return_value="trino-ns")
     
@@ -941,6 +956,7 @@ async def test_trino_configurable_rules(mock_service_dependencies):
     """Test that custom rules can be configured and automated rule is merged"""
     import json
     request, session = mock_service_dependencies
+    session.flush = AsyncMock()
     svc = TrinoPlatformService(request, session)
     svc._resolve_namespace = AsyncMock(return_value="trino-ns")
     
@@ -1019,6 +1035,86 @@ async def test_trino_images_default_and_stack(mock_service_dependencies, test_st
     assert 'repository: "test.registry/trinodb/trino"' in stack_manifest
     assert 'tag: "499"' in stack_manifest
     assert 'image: "test.registry/eclipse-temurin:21-jre-test"' in stack_manifest
+
+
+def _make_trino_mock_pod(name: str, phase: str = "Running", ready: bool = True) -> MagicMock:
+    """Create a mock Kubernetes pod object for Trino poller tests."""
+    pod = MagicMock()
+    pod.metadata.name = name
+    pod.status.phase = phase
+    cs = MagicMock()
+    cs.ready = ready
+    pod.status.container_statuses = [cs]
+    return pod
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "argo_health,replica_count,ready_count,expected_status",
+    [
+        # 1 coordinator + 2 workers = 3 expected pods
+        ("Healthy", 2, 0, "pending"),
+        ("Healthy", 2, 2, "pending"),
+        ("Healthy", 2, 3, "online"),
+        ("Healthy", 1, 2, "online"),
+        ("Degraded", 1, 2, "error"),
+    ],
+)
+async def test_trino_poller_instance_counts(
+    mock_service_dependencies,
+    argo_health,
+    replica_count,
+    ready_count,
+    expected_status,
+):
+    """Test TrinoPoller compares running pods against 1 coordinator + replica_count workers."""
+    from citadel.platform_service.trino.model import TrinoPlatformState
+    from citadel.platform_service.trino.poller import TrinoPoller
+
+    request, session = mock_service_dependencies
+    session.flush = AsyncMock()
+    svc = TrinoPlatformService(request, session)
+    model = TrinoPlatform(
+        id=23,
+        name="my-trino",
+        title="My Trino",
+        project_id=1,
+        replica_count=replica_count,
+    )
+    state = TrinoPlatformState(platform_id=23, active=True)
+    svc.platform_state = AsyncMock(return_value=state)
+    svc.kubeconfig = AsyncMock(return_value=None)
+    svc._resolve_namespace = AsyncMock(return_value="ns")
+    svc.project = AsyncMock(return_value=MagicMock(ingress_domain="example.com"))
+
+    expected_pods = 1 + replica_count
+    pods = [
+        _make_trino_mock_pod(f"my-trino-{i}", phase="Running", ready=(i < ready_count))
+        for i in range(expected_pods)
+    ]
+
+    mock_custom_api = MagicMock()
+    mock_custom_api.get_namespaced_custom_object.return_value = {
+        "status": {"sync": {"status": "Synced"}, "health": {"status": argo_health}}
+    }
+    mock_core_v1 = MagicMock()
+    mock_core_v1.list_namespaced_pod.return_value = MagicMock(items=pods)
+    mock_core_v1.list_namespaced_service.return_value = MagicMock(items=[])
+    mock_core_v1.list_node.return_value = MagicMock(items=[])
+
+    with (
+        patch("citadel.platform_service.trino.poller.config.load_incluster_config"),
+        patch("citadel.platform_service.trino.poller.client.ApiClient"),
+        patch("citadel.platform_service.trino.poller.client.CustomObjectsApi", return_value=mock_custom_api),
+        patch("citadel.platform_service.trino.poller.client.AppsV1Api"),
+        patch("citadel.platform_service.trino.poller.client.CoreV1Api", return_value=mock_core_v1),
+    ):
+        poller = TrinoPoller(svc, model)
+        await poller.poll()
+
+    assert state.status == expected_status
+    if expected_status != "error":
+        assert f"Pods: {ready_count}/{expected_pods}" in state.message
 
 
 

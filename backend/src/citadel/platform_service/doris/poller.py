@@ -98,9 +98,20 @@ class DorisPoller:
                     if p.status.phase == "Running" and any(c.ready for c in (p.status.container_statuses or []))
                 )
 
-                message += f" | Pods: FE {fe_ready}/{len(fe_pods)}, BE {be_ready}/{len(be_pods)}"
+                if status == "online" and (
+                    fe_ready < self.model.fe_replicas
+                    or be_ready < self.model.be_replicas
+                ):
+                    status = "pending"
+
+                message += (
+                    f" | Pods: FE {fe_ready}/{self.model.fe_replicas}, "
+                    f"BE {be_ready}/{self.model.be_replicas}"
+                )
             except Exception as e:
                 logger.error(f"Failed to fetch pods for {self.model.name}: {e}")
+                if status == "online":
+                    status = "pending"
 
             # 3. NodePorts are intentionally disabled (FE/BE are internal ClusterIP services; Web UI uses Ingress)
             node_ports = []

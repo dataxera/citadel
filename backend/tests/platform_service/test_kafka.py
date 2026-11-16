@@ -381,3 +381,78 @@ async def test_kafka_default_image_and_chart_locked(test_stack_session):
     assert vars["chart_name"] == "kafka"
     assert vars["chart_version"] == "0.99.3"
 
+
+def _make_kafka_mock_pod(name: str, phase: str = "Running", ready: bool = True) -> MagicMock:
+    """Create a mock Kubernetes pod object for Kafka poller tests."""
+    pod = MagicMock()
+    pod.metadata.name = name
+    pod.status.phase = phase
+    cs = MagicMock()
+    cs.ready = ready
+    pod.status.container_statuses = [cs]
+    return pod
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "argo_health,replica_count,ready_count,expected_status",
+    [
+        ("Healthy", 3, 0, "pending"),
+        ("Healthy", 3, 2, "pending"),
+        ("Healthy", 3, 3, "online"),
+        ("Healthy", 1, 1, "online"),
+        ("Degraded", 3, 3, "error"),
+    ],
+)
+async def test_kafka_poller_instance_counts(
+    mock_service_dependencies,
+    argo_health,
+    replica_count,
+    ready_count,
+    expected_status,
+):
+    """Test KafkaPoller compares running pods against configured replica_count."""
+    from citadel.platform_service.kafka.model import KafkaPlatformState
+    from citadel.platform_service.kafka.poller import KafkaPoller
+
+    request, session = mock_service_dependencies
+    svc = KafkaPlatformService(request, session)
+    model = KafkaPlatform(
+        id=20,
+        name="my-kafka",
+        title="My Kafka",
+        project_id=1,
+        replica_count=replica_count,
+    )
+    state = KafkaPlatformState(platform_id=20, active=True)
+    svc.platform_state = AsyncMock(return_value=state)
+    svc.kubeconfig = AsyncMock(return_value=None)
+    svc._resolve_namespace = AsyncMock(return_value="ns")
+
+    pods = [
+        _make_kafka_mock_pod(f"my-kafka-controller-{i}", phase="Running", ready=(i < ready_count))
+        for i in range(replica_count)
+    ]
+
+    mock_custom_api = MagicMock()
+    mock_custom_api.get_namespaced_custom_object.return_value = {
+        "status": {"sync": {"status": "Synced"}, "health": {"status": argo_health}}
+    }
+    mock_core_v1 = MagicMock()
+    mock_core_v1.list_namespaced_pod.return_value = MagicMock(items=pods)
+    mock_core_v1.list_namespaced_service.return_value = MagicMock(items=[])
+    mock_core_v1.list_node.return_value = MagicMock(items=[])
+
+    with (
+        patch("citadel.platform_service.kafka.poller.config.load_incluster_config"),
+        patch("citadel.platform_service.kafka.poller.client.ApiClient"),
+        patch("citadel.platform_service.kafka.poller.client.CustomObjectsApi", return_value=mock_custom_api),
+        patch("citadel.platform_service.kafka.poller.client.CoreV1Api", return_value=mock_core_v1),
+    ):
+        poller = KafkaPoller(svc, model)
+        await poller.poll()
+
+    assert state.status == expected_status
+    if expected_status != "error":
+        assert f"Pods: {ready_count}/{replica_count}" in state.message
+

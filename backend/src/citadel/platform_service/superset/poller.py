@@ -83,16 +83,23 @@ class SupersetPoller:
                     namespace=namespace,
                     label_selector=f"app.kubernetes.io/instance={self.model.name}",
                 )
+                active_pods = [
+                    p for p in pods.items if p.status.phase != "Succeeded"
+                ]
                 ready_pods = sum(
                     1
-                    for p in pods.items
+                    for p in active_pods
                     if p.status.phase == "Running"
                     and any(c.ready for c in (p.status.container_statuses or []))
                 )
-                total_pods = len(pods.items)
+                total_pods = len(active_pods)
+                if status == "online" and (total_pods == 0 or ready_pods < total_pods):
+                    status = "pending"
                 message += f" | Pods: {ready_pods}/{total_pods}"
             except Exception as e:
                 logger.error(f"Failed to fetch pods for {self.model.name}: {e}")
+                if status == "online":
+                    status = "pending"
 
             # 3. Fetch NodePorts (for Superset UI)
             node_ports = []

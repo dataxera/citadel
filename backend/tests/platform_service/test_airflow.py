@@ -599,12 +599,24 @@ async def test_airflow_poller_pod_stats():
         poller = AirflowPoller(svc, model)
         await poller.poll()
 
-    mock_core_v1.list_namespaced_pod.assert_called_once_with(
-        namespace="test-ns",
-        label_selector="release=my-airflow",
-    )
-    assert state.status == "online"
-    assert state.message == "Sync: Synced, Health: Healthy | Pods: API 1/1, Scheduler 1/1, Worker 1/2"
+        mock_core_v1.list_namespaced_pod.assert_called_once_with(
+            namespace="test-ns",
+            label_selector="release=my-airflow",
+        )
+        assert state.status == "pending"
+        assert state.message == "Sync: Synced, Health: Healthy | Pods: API 1/1, Scheduler 1/1, Worker 1/2"
+
+        # When all core pods are running and ready, status becomes online
+        mock_pods.items[3] = _make_pod("my-airflow-worker-1", "Running", True)
+        await poller.poll()
+        assert state.status == "online"
+        assert state.message == "Sync: Synced, Health: Healthy | Pods: API 1/1, Scheduler 1/1, Worker 2/2"
+
+        # When 0/0 pods exist for a core component, status is pending
+        mock_pods.items = []
+        await poller.poll()
+        assert state.status == "pending"
+        assert state.message == "Sync: Synced, Health: Healthy | Pods: API 0/0, Scheduler 0/0, Worker 0/0"
 
 
 

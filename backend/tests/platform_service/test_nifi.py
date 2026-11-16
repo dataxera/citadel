@@ -357,3 +357,79 @@ def test_nifi_auth_role_mapping_dict_assignment():
     assert model.auth_role_mapping[0]["entity"] == "user1"
     assert model.auth_role_mapping[0]["role"] == "Admin"
 
+
+def _make_nifi_mock_pod(name: str, phase: str = "Running", ready: bool = True) -> MagicMock:
+    """Create a mock Kubernetes pod object for NiFi poller tests."""
+    pod = MagicMock()
+    pod.metadata.name = name
+    pod.status.phase = phase
+    cs = MagicMock()
+    cs.ready = ready
+    pod.status.container_statuses = [cs]
+    return pod
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "argo_health,replica_count,ready_count,expected_status",
+    [
+        ("Healthy", 3, 0, "pending"),
+        ("Healthy", 3, 2, "pending"),
+        ("Healthy", 3, 3, "online"),
+        ("Healthy", 1, 1, "online"),
+        ("Degraded", 1, 1, "error"),
+    ],
+)
+async def test_nifi_poller_instance_counts(
+    mock_service_dependencies,
+    argo_health,
+    replica_count,
+    ready_count,
+    expected_status,
+):
+    """Test NifiPoller compares running pods against configured replica_count."""
+    from citadel.platform_service.nifi.model import NifiPlatformState
+    from citadel.platform_service.nifi.poller import NifiPoller
+
+    request, session = mock_service_dependencies
+    svc = NifiPlatformService(request, session)
+    model = NifiPlatform(
+        id=22,
+        name="my-nifi",
+        title="My NiFi",
+        project_id=1,
+        replica_count=replica_count,
+    )
+    state = NifiPlatformState(platform_id=22, active=True)
+    svc.platform_state = AsyncMock(return_value=state)
+    svc.kubeconfig = AsyncMock(return_value=None)
+    svc._resolve_namespace = AsyncMock(return_value="ns")
+    svc.project = AsyncMock(return_value=MagicMock(ingress_domain="example.com"))
+
+    pods = [
+        _make_nifi_mock_pod(f"my-nifi-{i}", phase="Running", ready=(i < ready_count))
+        for i in range(replica_count)
+    ]
+
+    mock_custom_api = MagicMock()
+    mock_custom_api.get_namespaced_custom_object.return_value = {
+        "status": {"sync": {"status": "Synced"}, "health": {"status": argo_health}}
+    }
+    mock_core_v1 = MagicMock()
+    mock_core_v1.list_namespaced_pod.return_value = MagicMock(items=pods)
+    mock_core_v1.list_namespaced_service.return_value = MagicMock(items=[])
+    mock_core_v1.list_node.return_value = MagicMock(items=[])
+
+    with (
+        patch("citadel.platform_service.nifi.poller.config.load_incluster_config"),
+        patch("citadel.platform_service.nifi.poller.client.ApiClient"),
+        patch("citadel.platform_service.nifi.poller.client.CustomObjectsApi", return_value=mock_custom_api),
+        patch("citadel.platform_service.nifi.poller.client.CoreV1Api", return_value=mock_core_v1),
+    ):
+        poller = NifiPoller(svc, model)
+        await poller.poll()
+
+    assert state.status == expected_status
+    if expected_status != "error":
+        assert f"Pods: {ready_count}/{replica_count}" in state.message
+
