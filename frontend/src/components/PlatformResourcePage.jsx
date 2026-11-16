@@ -21,7 +21,7 @@ const PlatformResourcePage = (props) => {
         notFoundTitle = 'Deployment Not Found',
         notFoundDescription = 'The requested deployment could not be found or may have been deleted.',
     } = props;
-    const { darkMode, selectedProject } = useOutletContext();
+    const { darkMode, selectedProject, projects = [] } = useOutletContext();
     const { id } = useParams();
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
@@ -67,6 +67,7 @@ const PlatformResourcePage = (props) => {
     const listingProps = {
         darkMode,
         selectedProject,
+        projects,
         onSelectPlatform: handleSelectPlatform,
         [resourcePropName]: resource,
     };

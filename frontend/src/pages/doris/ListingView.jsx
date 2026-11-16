@@ -4,40 +4,15 @@ SPDX-License-Identifier: AGPLv3+
 */
 
 import React from 'react';
-import { Database, Briefcase, Activity } from 'lucide-react';
+import { Database } from 'lucide-react';
 import GenericListingView from '../../components/GenericListingView';
-import { cn } from '../../utils/cn';
+import PlatformListingSubtitle from '../../components/PlatformListingSubtitle';
 
-const ListingView = ({ darkMode, selectedProject, onSelectPlatform, doris }) => {
+const ListingView = ({ darkMode, selectedProject, projects = [], onSelectPlatform, doris }) => {
     const { platforms, loading, fetchPlatforms, getPlatformState } = doris;
 
     const renderSubtitle = (platform, state) => (
-        <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400">
-                <Briefcase size={14} />
-                <span>Project: {platform.project_id}</span>
-            </div>
-            <div className={cn(
-                "flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px] font-bold uppercase border",
-                state.status === 'online' ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20" :
-                    state.status === 'error' ? "bg-rose-500/10 text-rose-500 border-rose-500/20" :
-                        "bg-slate-500/10 text-slate-400 border-slate-500/20"
-            )}>
-                <div className={cn(
-                    "w-1.5 h-1.5 rounded-full",
-                    state.status === 'online' ? "bg-emerald-500" :
-                        state.status === 'error' ? "bg-rose-500" :
-                            "bg-slate-400"
-                )} />
-                {state.status || 'unknown'}
-            </div>
-            {state.active && (
-                <div className="flex items-center gap-1 bg-blue-500/10 text-blue-500 border border-blue-500/20 px-2 py-0.5 rounded-md text-[10px] font-bold uppercase">
-                    <Activity size={10} />
-                    Active
-                </div>
-            )}
-        </div>
+        <PlatformListingSubtitle platform={platform} state={state} projects={projects} />
     );
 
     const renderBadges = (platform, state) => {
