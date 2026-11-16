@@ -26,6 +26,7 @@ CORE_INTEGRATIONS = [
     ("kafka_operator", "Kafka Operator", "kafka_operator_installed"),
     ("nifikop", "NiFi Operator", "nifikop_installed"),
     ("doris_operator", "Doris Operator", "doris_operator_installed"),
+    ("kube_prometheus_stack", "Kube Prometheus Stack", "kube_prometheus_stack_installed"),
 ]
 
 
@@ -63,6 +64,7 @@ def get_integration_action_class(key: str):
         "kafka_operator": InstallKafkaOperatorAction,
         "nifikop": InstallNifikopAction,
         "doris_operator": InstallDorisOperatorAction,
+        "kube_prometheus_stack": InstallKubePrometheusStackAction,
     }
     if key not in mapping:
         raise ValueError(f"Unknown core integration key: {key}")
@@ -839,5 +841,175 @@ class InstallDorisOperatorAction(InstallArgoCDAction):
             chart_version=chart_version,
             image=image,
             image_tag=image_tag,
+        )
+
+
+def _split_registry_repository(image: str) -> tuple[str, str]:
+    """Split a container image reference into (registry, repository)."""
+    if "/" in image:
+        first, rest = image.split("/", 1)
+        if "." in first or ":" in first or first == "localhost":
+            return first, rest
+        return "docker.io", image
+    return "docker.io", image
+
+
+@K8sClusterService.register_action("install_kube_prometheus_stack")
+class InstallKubePrometheusStackAction(InstallArgoCDAction):
+    """Action to install kube-prometheus-stack on the cluster if not already available."""
+
+    async def available(self) -> bool:
+        """Check if kube-prometheus-stack action is available (not installed yet)."""
+        stmt = select(K8sClusterStatus).where(
+            K8sClusterStatus.k8s_cluster_id == self.model.id
+        )
+        result = await self.session.exec(stmt)
+        status = result.one_or_none()
+        return not (status and status.kube_prometheus_stack_installed)
+
+    async def __call__(self, **kwargs):
+        """Queue kube-prometheus-stack installation task asynchronously."""
+        from citadel.tasks.k8s_cluster_status import install_kube_prometheus_stack_task
+
+        stmt = select(K8sClusterStatus).where(
+            K8sClusterStatus.k8s_cluster_id == self.model.id
+        )
+        result = await self.session.exec(stmt)
+        status_model = result.one_or_none()
+        if not status_model:
+            status_model = K8sClusterStatus(k8s_cluster_id=self.model.id)
+            self.session.add(status_model)
+        status_model.kube_prometheus_stack_installed = True
+        await self.session.flush()
+
+        install_kube_prometheus_stack_task.delay(self.model.id)
+        return {
+            "status": "success",
+            "message": "Kube Prometheus Stack installation triggered and status being refreshed.",
+        }
+
+    def _check_already_available_sync(self) -> bool:
+        """Synchronously check if Prometheus / kube-prometheus-stack is already present outside Citadel."""
+        try:
+            core_api, ext_api = self._get_kubernetes_clients()
+        except Exception as e:
+            logger.debug(f"Could not load Kubernetes clients for pre-check: {e}")
+            return False
+
+        # If Citadel's own ArgoCD Application exists, allow idempotent reconciliation.
+        try:
+            custom_api = client.CustomObjectsApi(core_api.api_client)
+            custom_api.get_namespaced_custom_object(
+                group="argoproj.io",
+                version="v1alpha1",
+                namespace="argocd",
+                plural="applications",
+                name="kube-prometheus-stack",
+            )
+            return False
+        except Exception:
+            pass
+
+        # Check for Prometheus Operator CRD
+        try:
+            ext_api.read_custom_resource_definition("prometheuses.monitoring.coreos.com")
+            return True
+        except Exception:
+            pass
+
+        # Check for existing Helm release secrets
+        try:
+            secrets = core_api.list_secret_for_all_namespaces(label_selector="owner=helm")
+            for secret in getattr(secrets, "items", None) or []:
+                name = getattr(getattr(secret, "metadata", None), "name", "") or ""
+                if "kube-prometheus-stack" in name:
+                    return True
+        except Exception:
+            pass
+
+        # Check for running Prometheus pods
+        for selector in (
+            "app.kubernetes.io/name=prometheus",
+            "app.kubernetes.io/name=kube-prometheus-stack-prometheus",
+            "app=kube-prometheus-stack-prometheus",
+        ):
+            try:
+                pods = core_api.list_pod_for_all_namespaces(label_selector=selector)
+                if getattr(pods, "items", None):
+                    return True
+            except Exception:
+                pass
+
+        return False
+
+    async def _is_already_available(self) -> bool:
+        """Return True if kube-prometheus-stack or Prometheus is already available in the cluster."""
+        return await asyncio.to_thread(self._check_already_available_sync)
+
+    async def run(self):
+        """Install kube-prometheus-stack via ArgoCD Application if not already available."""
+        if await self._is_already_available():
+            logger.info(
+                f"Prometheus / kube-prometheus-stack already available in cluster {self.model.name}; skipping install"
+            )
+            return
+
+        logger.info(f"Installing kube-prometheus-stack for cluster {self.model.name}")
+        chart_repo, chart_name, chart_version = await self.resolve_integration_chart(
+            "kube-prometheus-stack",
+            "main",
+            "https://prometheus-community.github.io/helm-charts",
+            "kube-prometheus-stack",
+            "93.3.0",
+        )
+        main_img, main_tag = await self.resolve_integration_image(
+            "kube-prometheus-stack", "main", "quay.io/prometheus/prometheus", "v3.16.0-distroless"
+        )
+        op_img, op_tag = await self.resolve_integration_image(
+            "kube-prometheus-stack", "operator", "quay.io/prometheus-operator/prometheus-operator", "v0.95.2"
+        )
+        reloader_img, reloader_tag = await self.resolve_integration_image(
+            "kube-prometheus-stack", "config_reloader", "quay.io/prometheus-operator/prometheus-config-reloader", "v0.95.2"
+        )
+        ksm_img, ksm_tag = await self.resolve_integration_image(
+            "kube-prometheus-stack", "kube_state_metrics", "registry.k8s.io/kube-state-metrics/kube-state-metrics", "v2.20.0"
+        )
+        ne_img, ne_tag = await self.resolve_integration_image(
+            "kube-prometheus-stack", "node_exporter", "quay.io/prometheus/node-exporter", "v1.12.1-distroless"
+        )
+        certgen_img, certgen_tag = await self.resolve_integration_image(
+            "kube-prometheus-stack", "webhook_certgen", "ghcr.io/jkroepke/kube-webhook-certgen", "1.11.1"
+        )
+
+        main_reg, main_repo = _split_registry_repository(main_img)
+        op_reg, op_repo = _split_registry_repository(op_img)
+        reloader_reg, reloader_repo = _split_registry_repository(reloader_img)
+        ksm_reg, ksm_repo = _split_registry_repository(ksm_img)
+        ne_reg, ne_repo = _split_registry_repository(ne_img)
+        certgen_reg, certgen_repo = _split_registry_repository(certgen_img)
+
+        await self._apply_template(
+            "kube-prometheus-stack.yml.j2",
+            chart_repo=chart_repo,
+            chart_name=chart_name,
+            chart_version=chart_version,
+            main_registry=main_reg,
+            main_repository=main_repo,
+            main_tag=main_tag,
+            operator_registry=op_reg,
+            operator_repository=op_repo,
+            operator_tag=op_tag,
+            config_reloader_registry=reloader_reg,
+            config_reloader_repository=reloader_repo,
+            config_reloader_tag=reloader_tag,
+            kube_state_metrics_registry=ksm_reg,
+            kube_state_metrics_repository=ksm_repo,
+            kube_state_metrics_tag=ksm_tag,
+            node_exporter_registry=ne_reg,
+            node_exporter_repository=ne_repo,
+            node_exporter_tag=ne_tag,
+            webhook_certgen_registry=certgen_reg,
+            webhook_certgen_repository=certgen_repo,
+            webhook_certgen_tag=certgen_tag,
         )
 

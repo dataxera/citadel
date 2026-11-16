@@ -302,6 +302,7 @@ def test_default_stack_file_versions_locked():
         "kafka-operator",
         "nifikop-operator",
         "doris-operator",
+        "kube-prometheus-stack",
     ]
     for comp_name in expected_components:
         assert comp_name in components, f"Missing component {comp_name} in stack"

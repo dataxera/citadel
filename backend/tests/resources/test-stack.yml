@@ -210,3 +210,29 @@ configuration:
         main:
           repository: test.registry/apache/doris
           tag: "operator-26.99.1"
+    kube-prometheus-stack:
+      package_type: helm
+      charts:
+        main:
+          repo: https://test.example.com/prometheus-community
+          chart: kube-prometheus-stack
+          version: "93.99.0"
+      images:
+        main:
+          repository: test.registry/prometheus/prometheus
+          tag: "v3.99.0-distroless"
+        operator:
+          repository: test.registry/prometheus-operator/prometheus-operator
+          tag: "v0.99.2"
+        config_reloader:
+          repository: test.registry/prometheus-operator/prometheus-config-reloader
+          tag: "v0.99.2"
+        kube_state_metrics:
+          repository: test.registry/kube-state-metrics/kube-state-metrics
+          tag: "v2.99.0"
+        node_exporter:
+          repository: test.registry/prometheus/node-exporter
+          tag: "v1.99.1-distroless"
+        webhook_certgen:
+          repository: test.registry/jkroepke/kube-webhook-certgen
+          tag: "1.99.1"

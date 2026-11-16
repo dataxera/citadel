@@ -98,6 +98,9 @@ class K8sClusterStatus(Base, table=True):
     doris_operator_installed: bool = Field(default=False)
     doris_operator_version: Optional[str] = Field(default=None)
 
+    kube_prometheus_stack_installed: bool = Field(default=False)
+    kube_prometheus_stack_version: Optional[str] = Field(default=None)
+
     integrations_status: dict[str, Any] = Field(default_factory=dict, sa_type=JSONType())
     sync_state: dict[str, Any] = Field(default_factory=dict, sa_type=JSONType())
 

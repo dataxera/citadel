@@ -32,6 +32,9 @@ def mock_k8s():
         # Mock Nodes
         mock_node = MagicMock()
         mock_node.metadata.name = "node-1"
+        mock_node.metadata.creation_timestamp = None
+        mock_node.metadata.labels = {}
+        mock_node.status.node_info.kubelet_version = "v1.27.0"
         mock_node.status.conditions = [MagicMock(type="Ready", status="True")]
         mock_node.status.capacity = {"cpu": "2", "memory": "4Gi"}
 
@@ -85,9 +88,16 @@ def mock_k8s():
         mock_pod_doris.metadata.labels = {"app.kubernetes.io/version": "v25.8.0"}
         mock_pod_doris.spec.containers = [MagicMock(image="doris-operator:v25.8.0")]
 
+        # Mock Pods (kube-prometheus-stack version)
+        mock_pod_prom = MagicMock()
+        mock_pod_prom.metadata.labels = {"app.kubernetes.io/version": "v3.16.0-distroless"}
+        mock_pod_prom.spec.containers = [MagicMock(image="quay.io/prometheus/prometheus:v3.16.0-distroless")]
+
         def _mock_list_pod_for_all_namespaces(label_selector=None):
             m_list = MagicMock()
-            if "argocd-server" in label_selector:
+            if not label_selector:
+                m_list.items = []
+            elif "argocd-server" in label_selector:
                 m_list.items = [mock_pod_argo]
             elif "cert-manager" in label_selector:
                 m_list.items = [mock_pod_cm]
@@ -101,6 +111,8 @@ def mock_k8s():
                 m_list.items = [mock_pod_nifikop]
             elif "doris-operator" in label_selector:
                 m_list.items = [mock_pod_doris]
+            elif "prometheus" in label_selector:
+                m_list.items = [mock_pod_prom]
             else:
                 m_list.items = []
             return m_list
@@ -124,6 +136,8 @@ def mock_k8s():
         mock_secret_nifikop.metadata.name = "sh.helm.release.v1.nifikop.v1"
         mock_secret_doris = MagicMock()
         mock_secret_doris.metadata.name = "sh.helm.release.v1.doris-operator.v1"
+        mock_secret_prom = MagicMock()
+        mock_secret_prom.metadata.name = "sh.helm.release.v1.kube-prometheus-stack.v1"
 
         mock_secret_list = MagicMock()
         mock_secret_list.items = [
@@ -133,6 +147,7 @@ def mock_k8s():
             mock_secret_eg,
             mock_secret_nifikop,
             mock_secret_doris,
+            mock_secret_prom,
         ]
         mock_core.return_value.list_secret_for_all_namespaces.return_value = (
             mock_secret_list
@@ -189,6 +204,8 @@ def test_poll_k8s_cluster_status(client: TestClient, mock_k8s):
     assert data["kafka_operator_version"] == "v0.50.1"
     assert data["nifikop_installed"] is True
     assert data["nifikop_version"] == "v1.17.0"
+    assert data["kube_prometheus_stack_installed"] is True
+    assert data["kube_prometheus_stack_version"] == "v3.16.0-distroless"
 
 
 def test_poll_k8s_cluster_unreachable_cascades_to_services(client: TestClient, test_project):
@@ -1063,7 +1080,7 @@ def test_sync_core_integrations_initializes_sync_state(client: TestClient):
     sync_state = resp_state.json().get("sync_state")
     assert sync_state is not None
     assert sync_state["status"] == "in_progress"
-    assert sync_state["total"] == 7
+    assert sync_state["total"] == 8
     assert sync_state["completed"] == 0
     for key in [
         "argocd",
@@ -1073,6 +1090,7 @@ def test_sync_core_integrations_initializes_sync_state(client: TestClient):
         "kafka_operator",
         "nifikop",
         "doris_operator",
+        "kube_prometheus_stack",
     ]:
         assert key in sync_state["tasks"]
         assert sync_state["tasks"][key]["status"] == "pending"
@@ -1117,6 +1135,7 @@ async def test_sync_core_integrations_orchestration_dispatches_tasks(client: Tes
             "kafka_operator",
             "nifikop",
             "doris_operator",
+            "kube_prometheus_stack",
         ]
         assert mock_sub_delay.call_count == len(expected_keys)
         called_keys = [c.args[1] for c in mock_sub_delay.call_args_list]
@@ -1224,6 +1243,9 @@ async def test_sync_core_integration_task_updates_progress_and_completes(client:
         new_callable=AsyncMock,
         side_effect=RuntimeError("Doris apply error"),
     ), patch(
+        "citadel.service.k8s_cluster.actions.InstallKubePrometheusStackAction.run",
+        new_callable=AsyncMock,
+    ), patch(
         "citadel.tasks.k8s_cluster_status.poll_k8s_cluster_status.delay"
     ) as mock_poll_delay:
         await _sync_core_integration_task(p1["id"], "cert_manager")
@@ -1232,13 +1254,13 @@ async def test_sync_core_integration_task_updates_progress_and_completes(client:
         assert state_mid["status"] == "in_progress"
         assert state_mid["tasks"]["cert_manager"]["status"] == "completed"
 
-        for key in ["cnpg", "envoy_gateway", "kafka_operator", "nifikop", "doris_operator"]:
+        for key in ["cnpg", "envoy_gateway", "kafka_operator", "nifikop", "doris_operator", "kube_prometheus_stack"]:
             await _sync_core_integration_task(p1["id"], key)
 
         mock_poll_delay.assert_called_once_with(p1["id"])
 
     state_end = client.get(f"/api/v1/k8s_clusters/{p1['id']}/_state").json()["sync_state"]
-    assert state_end["completed"] == 7
+    assert state_end["completed"] == 8
     assert state_end["status"] == "error"
     assert state_end["completed_at"] is not None
     assert state_end["tasks"]["doris_operator"]["status"] == "failed"
@@ -1416,6 +1438,7 @@ async def test_sync_core_integrations_resume_skips_completed_tasks(client: TestC
             "kafka_operator",
             "nifikop",
             "doris_operator",
+            "kube_prometheus_stack",
         ]
 
 
@@ -1615,7 +1638,7 @@ async def test_sync_core_integrations_resume_reconciles_all_done_state(client: T
 
     state = client.get(f"/api/v1/k8s_clusters/{p1['id']}/_state").json()["sync_state"]
     assert state["status"] == "completed"
-    assert state["completed"] == 7
+    assert state["completed"] == 8
     assert state["completed_at"] is not None
 
 
@@ -1886,6 +1909,210 @@ async def test_sync_core_integrations_ensures_argocd_load_balancer_when_already_
 
     mock_run.assert_not_called()
     mock_ensure_lb.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_install_kube_prometheus_stack():
+    """Verify InstallKubePrometheusStackAction renders ArgoCD Application with K3s defaults."""
+    import os
+    from unittest.mock import AsyncMock
+    from citadel.service.k8s_cluster.actions import InstallKubePrometheusStackAction
+
+    cluster = K8sCluster(
+        name="test-cluster-prom",
+        title="Test Cluster Prom",
+        type=K8sClusterType.REMOTE,
+        kubeconfig="fake-kubeconfig",
+    )
+
+    mock_svc = MagicMock()
+    mock_svc.kubeconfig = AsyncMock(return_value="fake-kubeconfig")
+
+    applied_manifests = []
+
+    def mock_subprocess(*args, **kwargs):
+        cmd = args
+        if len(cmd) > 0 and "kubectl" in cmd:
+            path = cmd[-1]
+            if os.path.exists(path):
+                with open(path, "r") as f:
+                    applied_manifests.append(f.read())
+        mock_proc = MagicMock()
+        mock_proc.returncode = 0
+        mock_proc.communicate = AsyncMock(return_value=(b"success", b""))
+        return mock_proc
+
+    with patch.object(
+        InstallKubePrometheusStackAction, "_is_already_available", new=AsyncMock(return_value=False)
+    ), patch("asyncio.create_subprocess_exec", side_effect=mock_subprocess):
+        action = InstallKubePrometheusStackAction(cluster, mock_svc)
+        await action.run()
+
+    assert len(applied_manifests) == 1
+    manifest = applied_manifests[0]
+    assert "kind: Application" in manifest
+    assert "name: kube-prometheus-stack" in manifest
+    assert "namespace: monitoring" in manifest
+    assert "repoURL: https://prometheus-community.github.io/helm-charts" in manifest
+    assert "chart: kube-prometheus-stack" in manifest
+    assert "targetRevision: 93.3.0" in manifest
+    assert "ServerSideApply=true" in manifest
+    assert "grafana:\n          enabled: false" in manifest
+    assert "alertmanager:\n          enabled: false" in manifest
+    assert "kubeControllerManager:\n          enabled: false" in manifest
+    assert "kubeScheduler:\n          enabled: false" in manifest
+    assert "kubeEtcd:\n          enabled: false" in manifest
+    assert "kubeProxy:\n          enabled: false" in manifest
+    assert "distroless: false" in manifest
+
+
+@pytest.mark.asyncio
+async def test_install_kube_prometheus_stack_skips_when_already_available():
+    """Verify InstallKubePrometheusStackAction skips installation when Prometheus CRD or pods already exist."""
+    from unittest.mock import AsyncMock
+    from citadel.service.k8s_cluster.actions import InstallKubePrometheusStackAction
+
+    cluster = K8sCluster(
+        name="test-cluster-prom-exists",
+        title="Test Cluster Prom Exists",
+        type=K8sClusterType.REMOTE,
+        kubeconfig="fake-kubeconfig",
+    )
+    mock_svc = MagicMock()
+
+    with patch(
+        "citadel.service.k8s_cluster.actions.client.CustomObjectsApi"
+    ) as mock_custom, patch(
+        "citadel.service.k8s_cluster.actions.InstallArgoCDAction._get_kubernetes_clients"
+    ) as mock_clients, patch(
+        "asyncio.create_subprocess_exec", new_callable=AsyncMock
+    ) as mock_exec:
+        mock_custom.return_value.get_namespaced_custom_object.side_effect = Exception("NotFound")
+        mock_core = MagicMock()
+        mock_ext = MagicMock()
+        mock_ext.read_custom_resource_definition.return_value = MagicMock()
+        mock_clients.return_value = (mock_core, mock_ext)
+
+        action = InstallKubePrometheusStackAction(cluster, mock_svc)
+        await action.run()
+
+        mock_exec.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_install_kube_prometheus_stack_reconciles_when_argocd_managed():
+    """Verify InstallKubePrometheusStackAction reconciles when Citadel ArgoCD Application already exists."""
+    from unittest.mock import AsyncMock
+    from citadel.service.k8s_cluster.actions import InstallKubePrometheusStackAction
+
+    cluster = K8sCluster(
+        name="test-cluster-prom-argo",
+        title="Test Cluster Prom Argo",
+        type=K8sClusterType.REMOTE,
+        kubeconfig="fake-kubeconfig",
+    )
+    mock_svc = MagicMock()
+
+    with patch(
+        "citadel.service.k8s_cluster.actions.client.CustomObjectsApi"
+    ) as mock_custom, patch(
+        "citadel.service.k8s_cluster.actions.InstallArgoCDAction._get_kubernetes_clients"
+    ) as mock_clients, patch.object(
+        InstallKubePrometheusStackAction, "_apply_template", new=AsyncMock()
+    ) as mock_apply:
+        mock_custom.return_value.get_namespaced_custom_object.return_value = {"metadata": {"name": "kube-prometheus-stack"}}
+        mock_clients.return_value = (MagicMock(), MagicMock())
+
+        action = InstallKubePrometheusStackAction(cluster, mock_svc)
+        await action.run()
+
+        mock_apply.assert_awaited_once()
+
+
+def test_install_kube_prometheus_stack_action_triggers_task(client: TestClient):
+    """Verify install_kube_prometheus_stack action queues Celery task and updates DB status."""
+    p1 = client.post(
+        "/api/v1/k8s_clusters",
+        json={
+            "name": "task-test-prom",
+            "title": "Task Test Prom",
+            "type": "in-cluster",
+        },
+    ).json()["data"]
+
+    with patch(
+        "citadel.tasks.k8s_cluster_status.install_kube_prometheus_stack_task.delay"
+    ) as mock_delay:
+        resp = client.post(
+            f"/api/v1/k8s_clusters/{p1['id']}/_actions",
+            json={"action": "install_kube_prometheus_stack"},
+        )
+        assert resp.status_code == 200
+        assert (
+            resp.json()["message"]
+            == "Kube Prometheus Stack installation triggered and status being refreshed."
+        )
+        mock_delay.assert_called_once_with(p1["id"])
+
+        resp_state = client.get(f"/api/v1/k8s_clusters/{p1['id']}/_state")
+        assert resp_state.json()["kube_prometheus_stack_installed"] is True
+
+
+@pytest.mark.asyncio
+async def test_install_kube_prometheus_stack_locks_images(test_stack):
+    """Verify InstallKubePrometheusStackAction resolves chart and all 6 image roles from test_stack."""
+    import os
+    from unittest.mock import AsyncMock
+    from citadel.service.k8s_cluster.actions import InstallKubePrometheusStackAction
+
+    cluster = K8sCluster(
+        name="test-cluster-prom-lock",
+        title="Test Cluster Prom Lock",
+        type=K8sClusterType.REMOTE,
+        kubeconfig="fake-kubeconfig",
+    )
+
+    mock_svc = MagicMock()
+    mock_svc.kubeconfig = AsyncMock(return_value="fake-kubeconfig")
+
+    applied_manifests = []
+
+    def mock_subprocess(*args, **kwargs):
+        cmd = args
+        if len(cmd) > 0 and "kubectl" in cmd:
+            path = cmd[-1]
+            if os.path.exists(path):
+                with open(path, "r") as f:
+                    applied_manifests.append(f.read())
+        mock_proc = MagicMock()
+        mock_proc.returncode = 0
+        mock_proc.communicate = AsyncMock(return_value=(b"success", b""))
+        return mock_proc
+
+    with patch.object(
+        InstallKubePrometheusStackAction, "_is_already_available", new=AsyncMock(return_value=False)
+    ), patch.object(
+        InstallKubePrometheusStackAction, "_resolve_stack", new=AsyncMock(return_value=test_stack)
+    ), patch("asyncio.create_subprocess_exec", side_effect=mock_subprocess):
+        action = InstallKubePrometheusStackAction(cluster, mock_svc)
+        await action.run()
+
+    assert len(applied_manifests) == 1
+    manifest = applied_manifests[0]
+    assert "repoURL: https://test.example.com/prometheus-community" in manifest
+    assert "targetRevision: 93.99.0" in manifest
+    assert "repository: prometheus/prometheus" in manifest
+    assert 'tag: "v3.99.0-distroless"' in manifest
+    assert "repository: prometheus-operator/prometheus-operator" in manifest
+    assert 'tag: "v0.99.2"' in manifest
+    assert "repository: prometheus-operator/prometheus-config-reloader" in manifest
+    assert "repository: kube-state-metrics/kube-state-metrics" in manifest
+    assert 'tag: "v2.99.0"' in manifest
+    assert "repository: prometheus/node-exporter" in manifest
+    assert 'tag: "v1.99.1-distroless"' in manifest
+    assert "repository: jkroepke/kube-webhook-certgen" in manifest
+    assert 'tag: "1.99.1"' in manifest
+
 
 
 

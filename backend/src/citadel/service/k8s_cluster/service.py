@@ -874,6 +874,38 @@ class K8sClusterService(Service[K8sCluster]):
                 except Exception as e:
                     logger.warning(f"Failed to check Doris Operator presence: {e}")
 
+                # Check kube-prometheus-stack
+                kube_prometheus_stack_installed = False
+                kube_prometheus_stack_version = None
+                kube_prometheus_stack_pods = []
+                try:
+                    if secrets:
+                        for secret in secrets.items:
+                            if (
+                                secret.metadata.name.startswith("sh.helm.release.v1.kube-prometheus-stack")
+                                or secret.metadata.name.startswith("sh.helm.release.v1.prometheus-operator")
+                            ):
+                                kube_prometheus_stack_installed = True
+                                break
+                    pods = core_v1.list_pod_for_all_namespaces(
+                        label_selector="app.kubernetes.io/name=prometheus"
+                    )
+                    if not pods.items:
+                        pods = core_v1.list_pod_for_all_namespaces(
+                            label_selector="app.kubernetes.io/name=kube-prometheus-stack-prometheus"
+                        )
+                    if not pods.items:
+                        pods = core_v1.list_pod_for_all_namespaces(
+                            label_selector="app=kube-prometheus-stack-prometheus"
+                        )
+                    kube_prometheus_stack_pods = pods.items or []
+                    if kube_prometheus_stack_pods:
+                        if not kube_prometheus_stack_installed:
+                            kube_prometheus_stack_installed = True
+                        kube_prometheus_stack_version = _get_version(kube_prometheus_stack_pods[0])
+                except Exception as e:
+                    logger.warning(f"Failed to check kube-prometheus-stack presence: {e}")
+
                 argocd_st, argocd_installed = _integration_status(
                     argocd_installed, argocd_version, argocd_pods
                 )
@@ -899,6 +931,12 @@ class K8sClusterService(Service[K8sCluster]):
                 doris_operator_st, doris_operator_installed = _integration_status(
                     doris_operator_installed, doris_operator_version, doris_operator_pods, "doris-operator"
                 )
+                kube_prometheus_stack_st, kube_prometheus_stack_installed = _integration_status(
+                    kube_prometheus_stack_installed,
+                    kube_prometheus_stack_version,
+                    kube_prometheus_stack_pods,
+                    "kube-prometheus-stack",
+                )
 
                 integrations_status = {
                     "argocd": argocd_st,
@@ -908,6 +946,7 @@ class K8sClusterService(Service[K8sCluster]):
                     "kafka_operator": kafka_operator_st,
                     "nifikop": nifikop_st,
                     "doris_operator": doris_operator_st,
+                    "kube_prometheus_stack": kube_prometheus_stack_st,
                 }
 
                 return {
@@ -934,6 +973,8 @@ class K8sClusterService(Service[K8sCluster]):
                     "nifikop_version": nifikop_version,
                     "doris_operator_installed": doris_operator_installed,
                     "doris_operator_version": doris_operator_version,
+                    "kube_prometheus_stack_installed": kube_prometheus_stack_installed,
+                    "kube_prometheus_stack_version": kube_prometheus_stack_version,
                     "integrations_status": integrations_status,
                     "node_ips": node_ips,
                 }
@@ -975,6 +1016,8 @@ class K8sClusterService(Service[K8sCluster]):
             status_model.nifikop_version = info["nifikop_version"]
             status_model.doris_operator_installed = info["doris_operator_installed"]
             status_model.doris_operator_version = info["doris_operator_version"]
+            status_model.kube_prometheus_stack_installed = info["kube_prometheus_stack_installed"]
+            status_model.kube_prometheus_stack_version = info["kube_prometheus_stack_version"]
             status_model.integrations_status = info["integrations_status"]
             status_model.node_ips = info["node_ips"]
             status_model.last_update = ts_now()

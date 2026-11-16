@@ -209,3 +209,29 @@ configuration:
         main:
           repository: apache/doris
           tag: "operator-26.0.1"
+    kube-prometheus-stack:
+      package_type: helm
+      charts:
+        main:
+          repo: https://prometheus-community.github.io/helm-charts
+          chart: kube-prometheus-stack
+          version: "93.3.0"
+      images:
+        main:
+          repository: quay.io/prometheus/prometheus
+          tag: "v3.16.0-distroless"
+        operator:
+          repository: quay.io/prometheus-operator/prometheus-operator
+          tag: "v0.95.2"
+        config_reloader:
+          repository: quay.io/prometheus-operator/prometheus-config-reloader
+          tag: "v0.95.2"
+        kube_state_metrics:
+          repository: registry.k8s.io/kube-state-metrics/kube-state-metrics
+          tag: "v2.20.0"
+        node_exporter:
+          repository: quay.io/prometheus/node-exporter
+          tag: "v1.12.1-distroless"
+        webhook_certgen:
+          repository: ghcr.io/jkroepke/kube-webhook-certgen
+          tag: "1.11.1"

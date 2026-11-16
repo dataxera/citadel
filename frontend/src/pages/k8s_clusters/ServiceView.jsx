@@ -21,6 +21,7 @@ const CORE_INTEGRATIONS_CONFIG = [
     { key: 'kafka_operator', name: 'Kafka Operator', installedField: 'kafka_operator_installed', versionField: 'kafka_operator_version' },
     { key: 'nifikop', name: 'NiFi Operator', installedField: 'nifikop_installed', versionField: 'nifikop_version' },
     { key: 'doris_operator', name: 'Doris Operator', installedField: 'doris_operator_installed', versionField: 'doris_operator_version' },
+    { key: 'kube_prometheus_stack', name: 'Kube Prometheus Stack', installedField: 'kube_prometheus_stack_installed', versionField: 'kube_prometheus_stack_version' },
 ];
 
 const IntegrationStatusBadge = ({ status }) => {
