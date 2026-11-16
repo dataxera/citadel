@@ -4,6 +4,7 @@ import {
     RotateCcw, Upload, ChevronUp, Search, Download, Trash2
 } from 'lucide-react';
 import { useNotification } from '../../providers/NotificationProvider';
+import { useResourcePermissions } from '../../hooks/usePermissions';
 import PageLayout from '../../components/PageLayout';
 import ResourceConfirmModal from '../../components/ResourceConfirmModal';
 import { cn } from '../../utils/cn';
@@ -16,6 +17,10 @@ const ServiceView = ({
 }) => {
     const { browseStorage, uploadFile, downloadFile, deleteFile } = s3Storages;
     const { showSuccess, showError } = useNotification();
+    const { canUpdate, canDelete, canExecute } = useResourcePermissions('/s3-storages', {
+        resourceId: browsingStorage?.id,
+    });
+    const canWriteFs = canUpdate || canExecute;
     const fileInputRef = useRef(null);
     const [uploading, setUploading] = useState(false);
 
@@ -211,21 +216,23 @@ const ServiceView = ({
                         >
                             <ChevronUp size={18} />
                         </button>
-                        <button
-                            disabled={!currentBucket || uploading}
-                            onClick={handleUploadClick}
-                            className={cn(
-                                "p-2 rounded-lg border transition-colors",
-                                !currentBucket || uploading
-                                    ? "bg-slate-50 text-slate-300 border-slate-100 cursor-not-allowed opacity-50"
-                                    : darkMode
-                                        ? "bg-slate-800 text-slate-200 border-slate-700 hover:bg-slate-700 hover:text-white"
-                                        : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50 hover:text-blue-600 shadow-sm"
-                            )}
-                            title={currentBucket ? "Upload File" : "Select a bucket to upload"}
-                        >
-                            {uploading ? <RotateCcw size={18} className="animate-spin" /> : <Upload size={18} />}
-                        </button>
+                        {canWriteFs && (
+                            <button
+                                disabled={!currentBucket || uploading}
+                                onClick={handleUploadClick}
+                                className={cn(
+                                    "p-2 rounded-lg border transition-colors",
+                                    !currentBucket || uploading
+                                        ? "bg-slate-50 text-slate-300 border-slate-100 cursor-not-allowed opacity-50"
+                                        : darkMode
+                                            ? "bg-slate-800 text-slate-200 border-slate-700 hover:bg-slate-700 hover:text-white"
+                                            : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50 hover:text-blue-600 shadow-sm"
+                                )}
+                                title={currentBucket ? "Upload File" : "Select a bucket to upload"}
+                            >
+                                {uploading ? <RotateCcw size={18} className="animate-spin" /> : <Upload size={18} />}
+                            </button>
+                        )}
                         <button
                             onClick={() => fetchFsItems(browsingStorage.id, currentBucket, currentPrefix)}
                             className={cn(
@@ -347,7 +354,7 @@ const ServiceView = ({
                                             </button>
                                         )}
 
-                                        {item.type === 'file' && (
+                                        {item.type === 'file' && (canDelete || canWriteFs) && (
                                             <button
                                                 onClick={(e) => {
                                                     e.stopPropagation();

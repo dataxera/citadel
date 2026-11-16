@@ -3,6 +3,7 @@ import { useOutletContext } from 'react-router-dom';
 import { Terminal, RefreshCcw, Zap, Loader2, Activity, Clock, Copy, Check, Briefcase, Server } from 'lucide-react';
 import { cn } from '../utils/cn';
 import { useNotification } from '../providers/NotificationProvider';
+import { useResourcePermissions } from '../hooks/usePermissions';
 import Drawer from './Drawer';
 import Modal from './Modal';
 import {
@@ -84,6 +85,9 @@ const PlatformServiceView = ({
     const { showSuccess, showError } = useNotification();
 
     const platformId = selectedPlatformId ?? selectedPlatform?.id;
+    const { canUpdate, canDelete, canExecute } = useResourcePermissions(entityPath, {
+        resourceId: platformId,
+    });
 
     useEffect(() => {
         if (!fetchActions || availableActionsProp !== undefined) return;
@@ -180,7 +184,7 @@ const PlatformServiceView = ({
                     </div>
                 </div>
                 <div className="flex gap-3 shrink-0">
-                    {availableActions.length > 0 && (
+                    {canExecute && availableActions.length > 0 && (
                         <Drawer
                             darkMode={darkMode}
                             trigger={({ isOpen }) => (
@@ -241,6 +245,7 @@ const PlatformServiceView = ({
                             <ConnectionTab
                                 isActive={platformState?.active}
                                 onDeploy={onToggleActive}
+                                canDeploy={canExecute}
                                 notDeployedTitle={notDeployedTitle}
                                 notDeployedDescription={notDeployedDescription}
                                 deployButtonText={deployButtonText}
@@ -249,7 +254,7 @@ const PlatformServiceView = ({
                         ),
                     },
                     ...extraTabs,
-                    {
+                    ...(canUpdate ? [{
                         id: 'configure',
                         label: 'Configuration',
                         render: ({ setActiveTab }) => (
@@ -265,8 +270,8 @@ const PlatformServiceView = ({
                                 }}
                             />
                         ),
-                    },
-                    {
+                    }] : []),
+                    ...((canExecute || canDelete) ? [{
                         id: 'admin',
                         label: 'Administrative',
                         render: () => (
@@ -275,16 +280,16 @@ const PlatformServiceView = ({
                                 resourceName={selectedPlatform?.name}
                                 isActive={platformState?.active}
                                 icon={Icon}
-                                onDecommission={onDecommission}
+                                onDecommission={canExecute ? onDecommission : null}
                                 decommissionWarningText={decommissionWarningText}
-                                onDelete={onDelete}
+                                onDelete={canDelete ? onDelete : null}
                                 deleteTitle={deleteTitle}
                                 deleteWarningText={deleteWarningText}
                                 deleteModalTitle={deleteModalTitle}
                                 deleteButtonText={deleteButtonText}
                             />
                         ),
-                    },
+                    }] : []),
                 ]}
             />
             {isStatusModalOpen && (

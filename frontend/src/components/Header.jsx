@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import Drawer from './Drawer';
 import {
-    Search,
+    Shield,
+    ShieldAlert,
     Sun,
     Moon,
     Briefcase,
@@ -9,9 +10,11 @@ import {
     LayoutGrid
 } from 'lucide-react';
 import { cn } from '../utils/cn';
+import { useAuth } from '../providers/AuthProvider';
 
 const Header = ({ darkMode, setDarkMode, selectedProject, setSelectedProject, projects = [] }) => {
     const [showProjectDropdown, setShowProjectDropdown] = useState(false);
+    const { user } = useAuth();
 
     const headerBg = darkMode ? "bg-[#08090b]/80 border-slate-800" : "bg-white/90 border-slate-200";
 
@@ -84,15 +87,27 @@ const Header = ({ darkMode, setDarkMode, selectedProject, setSelectedProject, pr
             </div>
 
             <div className="flex items-center gap-4">
-                <div className="dxc-search-box py-1">
-                    <Search size={14} className="text-slate-500" />
-                    <input
-                        type="text"
-                        placeholder="Search resources..."
-                        className="bg-transparent text-lg focus:outline-none w-48"
-                    />
-                </div>
+                {user && (
+                    <div
+                        id="user-role-indicator"
+                        className={cn(
+                            "dxc-role-indicator flex items-center gap-2 px-3 py-1.5 rounded-lg border text-sm font-bold tracking-wide",
+                            user.is_superadmin
+                                ? (darkMode
+                                    ? "bg-rose-500/10 border-rose-500/30 text-rose-400"
+                                    : "bg-rose-50 border-rose-200 text-rose-600")
+                                : (darkMode
+                                    ? "bg-blue-500/10 border-blue-500/30 text-blue-400"
+                                    : "bg-blue-50 border-blue-200 text-blue-600")
+                        )}
+                        title={user.is_superadmin ? "Role Level: Superadmin (Full administrative access)" : "Role Level: Standard User"}
+                    >
+                        {user.is_superadmin ? <ShieldAlert size={15} /> : <Shield size={15} />}
+                        <span>{user.is_superadmin ? 'Superadmin' : 'Standard User'}</span>
+                    </div>
+                )}
                 <button
+                    id="theme-toggle-btn"
                     onClick={() => setDarkMode(!darkMode)}
                     className={cn(
                         "p-2 rounded-lg border transition-all",

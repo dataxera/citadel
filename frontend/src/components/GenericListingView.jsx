@@ -8,6 +8,7 @@ import PageLayout from './PageLayout';
 import ListingItem from './ListingItem';
 import ResourceConfirmModal from './ResourceConfirmModal';
 import { DEFAULT_POLL_INTERVAL_MS, useVisibilityPolling } from '../hooks/useStatePolling';
+import { useResourcePermissions } from '../hooks/usePermissions';
 
 const GenericListingView = ({
     title,
@@ -39,6 +40,7 @@ const GenericListingView = ({
     const [itemStates, setItemStates] = useState({});
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [selectedItemForDelete, setSelectedItemForDelete] = useState(null);
+    const { permissions, canCreate, canUpdate, canDelete, canExecute } = useResourcePermissions(entityPath);
 
     const filteredItems = items.filter(item => {
         const matchesProject = !selectedProject || !item.project_id || item.project_id === selectedProject.id;
@@ -84,6 +86,7 @@ const GenericListingView = ({
             <PageLayout
                 title={title}
                 description={description}
+                canCreate={entityPath ? canCreate : undefined}
                 createConfig={{
                     ...createConfig,
                     entityPath: entityPath,
@@ -114,9 +117,16 @@ const GenericListingView = ({
                                     onClick={() => onSelectItem && onSelectItem(item)}
                                     actions={
                                         <div className="flex items-center gap-2">
-                                            {renderActions ? renderActions(item, state, { onEdit: onEditItem, onDelete: handleDeleteClick }) : (
+                                            {renderActions ? renderActions(item, state, {
+                                                onEdit: canUpdate ? onEditItem : null,
+                                                onDelete: canDelete ? handleDeleteClick : null,
+                                                canUpdate,
+                                                canDelete,
+                                                canExecute,
+                                                permissions,
+                                            }) : (
                                                 <React.Fragment>
-                                                    {onEditItem && (
+                                                    {onEditItem && canUpdate && (
                                                         <button
                                                             onClick={(e) => {
                                                                 e.stopPropagation();
@@ -128,7 +138,7 @@ const GenericListingView = ({
                                                             <Edit2 size={18} />
                                                         </button>
                                                     )}
-                                                    {deleteItem && (
+                                                    {deleteItem && canDelete && (
                                                         <button
                                                             onClick={(e) => handleDeleteClick(e, item)}
                                                             className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors text-slate-400 hover:text-red-500"

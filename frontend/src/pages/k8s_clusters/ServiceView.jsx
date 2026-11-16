@@ -7,6 +7,7 @@ import { useNotification } from '../../providers/NotificationProvider';
 import Modal from '../../components/Modal';
 import { cn } from '../../utils/cn';
 import { useVisibilityPolling } from '../../hooks/useStatePolling';
+import { useResourcePermissions } from '../../hooks/usePermissions';
 import NodeConfigModal from './NodeConfigModal';
 import RackTopologyModal from './RackTopologyModal';
 import TopologyPresetsModal from './TopologyPresetsModal';
@@ -81,6 +82,10 @@ const ServiceView = ({
     clustersHook
 }) => {
     const { getClusterState, refreshClusterState, updateNodeLabels, getClusterTopology, updateClusterTopology } = clustersHook;
+    const { canUpdate, canExecute } = useResourcePermissions('/k8s_clusters', {
+        resourceId: selectedClusterId,
+    });
+    const canConfigureNodes = canUpdate || canExecute;
     const [clusterState, setClusterState] = useState(null);
     const [isRefreshing, setIsRefreshing] = useState(false);
     const [installingActions, setInstallingActions] = useState({});
@@ -373,26 +378,28 @@ const ServiceView = ({
                                         </button>
                                     </div>
                                 </div>
-                                <div className="flex items-center gap-2">
-                                    <button
-                                        id="configure-topology-presets-btn"
-                                        type="button"
-                                        onClick={handleOpenTopologyPresets}
-                                        className="dxc-btn-secondary px-3 py-1.5 text-xs flex items-center gap-1.5"
-                                    >
-                                        <Layers size={14} />
-                                        TOPOLOGY PRESETS
-                                    </button>
-                                    <button
-                                        id="configure-rack-topology-btn"
-                                        type="button"
-                                        onClick={handleOpenRackTopology}
-                                        className="dxc-btn-secondary px-3 py-1.5 text-xs flex items-center gap-1.5"
-                                    >
-                                        <Network size={14} />
-                                        RACK TOPOLOGY
-                                    </button>
-                                </div>
+                                {canConfigureNodes && (
+                                    <div className="flex items-center gap-2">
+                                        <button
+                                            id="configure-topology-presets-btn"
+                                            type="button"
+                                            onClick={handleOpenTopologyPresets}
+                                            className="dxc-btn-secondary px-3 py-1.5 text-xs flex items-center gap-1.5"
+                                        >
+                                            <Layers size={14} />
+                                            TOPOLOGY PRESETS
+                                        </button>
+                                        <button
+                                            id="configure-rack-topology-btn"
+                                            type="button"
+                                            onClick={handleOpenRackTopology}
+                                            className="dxc-btn-secondary px-3 py-1.5 text-xs flex items-center gap-1.5"
+                                        >
+                                            <Network size={14} />
+                                            RACK TOPOLOGY
+                                        </button>
+                                    </div>
+                                )}
                             </div>
 
                             {nodeRows.length === 0 ? (
@@ -529,18 +536,20 @@ const ServiceView = ({
                                                             />
                                                         </td>
                                                         <td className="py-3 pl-3 text-right whitespace-nowrap">
-                                                            <button
-                                                                id={`configure-node-${node.hostname}-btn`}
-                                                                type="button"
-                                                                onClick={() => {
-                                                                    loadTopology();
-                                                                    setSelectedNodeForConfig(node);
-                                                                }}
-                                                                className="p-2 rounded-lg text-slate-400 hover:text-indigo-500 hover:bg-slate-200/60 dark:hover:bg-slate-800 transition-colors"
-                                                                title="Configure Node Labels, Roles & GPU"
-                                                            >
-                                                                <SlidersHorizontal size={15} />
-                                                            </button>
+                                                            {canConfigureNodes && (
+                                                                <button
+                                                                    id={`configure-node-${node.hostname}-btn`}
+                                                                    type="button"
+                                                                    onClick={() => {
+                                                                        loadTopology();
+                                                                        setSelectedNodeForConfig(node);
+                                                                    }}
+                                                                    className="p-2 rounded-lg text-slate-400 hover:text-indigo-500 hover:bg-slate-200/60 dark:hover:bg-slate-800 transition-colors"
+                                                                    title="Configure Node Labels, Roles & GPU"
+                                                                >
+                                                                    <SlidersHorizontal size={15} />
+                                                                </button>
+                                                            )}
                                                         </td>
                                                     </tr>
                                                 );

@@ -10,6 +10,7 @@ import { useNotification } from '../../providers/NotificationProvider';
 import { ExternalNetworkAccessBlock } from '../../components/ServiceBlocks';
 import apiClient from '../../services/api';
 import { useVisibilityPolling } from '../../hooks/useStatePolling';
+import { useResourcePermissions } from '../../hooks/usePermissions';
 
 const ServiceView = ({
     context,
@@ -133,6 +134,14 @@ const ServiceView = ({
 
     const localUsersHook = useProjectLocalUsers();
     const { items: localUsers, loading: loadingUsers, fetchItems: fetchUsers, deleteItem: deleteUser } = localUsersHook;
+    const {
+        canCreate: canCreateLocalUser,
+        canUpdate: canUpdateLocalUser,
+        canDelete: canDeleteLocalUser,
+    } = useResourcePermissions('/project-local-users', {
+        headers: selectedProjectId ? { 'X-Project-ID': String(selectedProjectId) } : null,
+        enabled: Boolean(selectedProjectId),
+    });
 
     const [isCreateOpen, setIsCreateOpen] = useState(false);
     const [editItem, setEditItem] = useState(null);
@@ -456,13 +465,15 @@ ${projectState.cluster_node_ips?.map((ip, idx) => `    server node${idx + 1} ${i
                                 <p className="text-sm text-slate-500 font-medium uppercase tracking-tight">Manage project-scoped credentials for OIDC integration</p>
                             </div>
                         </div>
-                        <button
-                            onClick={() => setIsCreateOpen(true)}
-                            className="dxc-btn-primary px-6 py-2.5 flex items-center gap-2"
-                        >
-                            <UserPlus size={16} />
-                            ADD LOCAL USER
-                        </button>
+                        {canCreateLocalUser && (
+                            <button
+                                onClick={() => setIsCreateOpen(true)}
+                                className="dxc-btn-primary px-6 py-2.5 flex items-center gap-2"
+                            >
+                                <UserPlus size={16} />
+                                ADD LOCAL USER
+                            </button>
+                        )}
                     </div>
 
                     {loadingUsers ? (
@@ -489,20 +500,24 @@ ${projectState.cluster_node_ips?.map((ip, idx) => `    server node${idx + 1} ${i
                                             <td className="py-4 px-6 font-semibold text-slate-900 dark:text-white">{user.username}</td>
                                             <td className="py-4 px-6 text-slate-500 dark:text-slate-400">{user.email}</td>
                                             <td className="py-4 px-6 text-right flex justify-end gap-2">
-                                                <button
-                                                    onClick={() => setEditItem(user)}
-                                                    className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg text-slate-400 hover:text-blue-500 transition-colors"
-                                                    title="Edit User"
-                                                >
-                                                    <Edit size={16} />
-                                                </button>
-                                                <button
-                                                    onClick={() => setDeleteItem(user)}
-                                                    className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg text-slate-400 hover:text-rose-500 transition-colors"
-                                                    title="Delete User"
-                                                >
-                                                    <Trash2 size={16} />
-                                                </button>
+                                                {canUpdateLocalUser && (
+                                                    <button
+                                                        onClick={() => setEditItem(user)}
+                                                        className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg text-slate-400 hover:text-blue-500 transition-colors"
+                                                        title="Edit User"
+                                                    >
+                                                        <Edit size={16} />
+                                                    </button>
+                                                )}
+                                                {canDeleteLocalUser && (
+                                                    <button
+                                                        onClick={() => setDeleteItem(user)}
+                                                        className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg text-slate-400 hover:text-rose-500 transition-colors"
+                                                        title="Delete User"
+                                                    >
+                                                        <Trash2 size={16} />
+                                                    </button>
+                                                )}
                                             </td>
                                         </tr>
                                     ))}

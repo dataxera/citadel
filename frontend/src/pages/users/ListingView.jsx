@@ -78,22 +78,24 @@ const ListingView = ({
         }
     };
 
-    const renderActions = (item, state, { onEdit, onDelete }) => {
+    const renderActions = (item, state, { onEdit, onDelete, canUpdate }) => {
         return (
             <div className="flex items-center gap-2">
-                <button
-                    onClick={(e) => {
-                        e.stopPropagation();
-                        setChangePasswordItem(item);
-                        setPasswordError('');
-                        setNewPassword('');
-                        setConfirmPassword('');
-                    }}
-                    className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors text-slate-400 hover:text-amber-500"
-                    title="Change Password"
-                >
-                    <Key size={18} />
-                </button>
+                {canUpdate && (
+                    <button
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            setChangePasswordItem(item);
+                            setPasswordError('');
+                            setNewPassword('');
+                            setConfirmPassword('');
+                        }}
+                        className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors text-slate-400 hover:text-amber-500"
+                        title="Change Password"
+                    >
+                        <Key size={18} />
+                    </button>
+                )}
                 {onEdit && (
                     <button
                         onClick={(e) => {

@@ -8,7 +8,7 @@ from typing import Annotated, Any
 from ..schema import ListResult, FormResult, Result, BaseResult
 from ..exc import ModelValidationError
 from ..action import ActionRequest
-from ..permission import All, Create, Delete, Execute, List, Update, View, require
+from ..permission import All, Create, Delete, Execute, List, Update, View, has_permission, require
 
 
 class ServiceViewMixin:
@@ -143,6 +143,24 @@ class ServiceViewMixin:
             return {"data": [await svc.post_process_model(r) for r in records]}
 
         @router.get(
+            f"{service_path}/_permissions",
+            operation_id=f"dxc-permissions-{entity_type}",
+            dependencies=extra_deps,
+            tags=path_tags,
+        )
+        async def get_service_permissions(request: fastapi.Request):
+            """Return current user's collection-level permissions for this service."""
+            actions = ("list", "view", "create", "update", "delete", "execute")
+            perms = {
+                action: await has_permission(
+                    request=request,
+                    perm=cls.get_permission(action),
+                )
+                for action in actions
+            }
+            return {"data": perms}
+
+        @router.get(
             f"{service_path}/_create-form",
             operation_id=f"dxc-create-form-{entity_type}",
             dependencies=extra_deps + [require(cls.get_permission("view"))],
@@ -234,6 +252,28 @@ class ServiceViewMixin:
                 )
             await svc.delete(model.id)
             return {"status": "success"}
+
+        @router.get(
+            f"{model_path}/_permissions",
+            operation_id=f"dxc-model-permissions-{entity_type}",
+            dependencies=extra_deps + [require(cls.get_permission("view"))],
+            tags=path_tags,
+        )
+        async def get_model_permissions(
+            request: fastapi.Request,
+            model: Annotated[model_class, Depends(cls.get_model)],  # type: ignore
+        ):
+            """Return current user's object-level permissions for a specific model instance."""
+            actions = ("view", "update", "delete", "execute")
+            perms = {
+                action: await has_permission(
+                    request=request,
+                    perm=cls.get_permission(action),
+                    context=model,
+                )
+                for action in actions
+            }
+            return {"data": perms}
 
         state_class = cls.get_state_class()
         if state_class:

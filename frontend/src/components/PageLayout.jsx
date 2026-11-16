@@ -4,12 +4,14 @@ import { Search, Loader2, Plus } from 'lucide-react';
 import { cn } from '../utils/cn';
 import Modal from './Modal';
 import DynamicForm from './DynamicForm';
+import { useResourcePermissions } from '../hooks/usePermissions';
 
 const PageLayout = ({
     title,
     description,
     headerActions,
     createConfig, // { title, entityPath, buttonText, icon, initialData, onSuccess, renderExtraActions, extraContent }
+    canCreate,
     searchQuery,
     onSearchChange,
     searchPlaceholder = "Search...",
@@ -21,6 +23,12 @@ const PageLayout = ({
 }) => {
     const { darkMode } = useOutletContext() || {};
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+    const { canCreate: resolvedCanCreate } = useResourcePermissions(createConfig?.entityPath, {
+        enabled: canCreate === undefined && Boolean(createConfig?.entityPath),
+    });
+    const effectiveCanCreate = canCreate !== undefined
+        ? canCreate
+        : (createConfig?.entityPath ? resolvedCanCreate : true);
 
     const CreateIcon = createConfig?.icon || Plus;
 
@@ -38,7 +46,7 @@ const PageLayout = ({
                     )}
                 </div>
                 <div className="flex items-center gap-2">
-                    {createConfig && (
+                    {createConfig && effectiveCanCreate && (
                         <button
                             onClick={() => setIsCreateModalOpen(true)}
                             className="dxc-btn-primary px-4 py-2"
@@ -83,7 +91,7 @@ const PageLayout = ({
                 children
             )}
 
-            {createConfig && (
+            {createConfig && effectiveCanCreate && (
                 <Modal
                     isOpen={isCreateModalOpen}
                     onClose={() => {
