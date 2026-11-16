@@ -4,7 +4,7 @@
 fullnameOverride: "kafka"
 
 image:
-  repository: ghcr.io/kagesenshi/mindweaver/kafka
+  repository: ghcr.io/kagesenshi/citadel/kafka
   pullPolicy: Always
   tag: "4.0.0-rev.1"
 
