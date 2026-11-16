@@ -6,7 +6,7 @@ fullnameOverride: "kafka"
 image:
   repository: ghcr.io/kagesenshi/citadel/kafka
   pullPolicy: Always
-  tag: "4.0.0-rev.1"
+  tag: "4.0.0-rev.2"
 
 controller:
   replicaCount: 3
