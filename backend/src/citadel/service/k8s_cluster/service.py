@@ -3,6 +3,7 @@
 
 import asyncio
 import base64
+import json
 import logging
 import re
 import tempfile
@@ -390,6 +391,165 @@ def build_nodes_details(
     )
 
 
+def _extract_pv_node_name(pv: Any) -> str | None:
+    """Extract the target node hostname from a PersistentVolume's nodeAffinity."""
+    spec = getattr(pv, "spec", None)
+    node_affinity = getattr(spec, "node_affinity", None) if spec else None
+    required = getattr(node_affinity, "required", None) if node_affinity else None
+    terms = getattr(required, "node_selector_terms", None) or []
+    for term in terms:
+        for expr in getattr(term, "match_expressions", None) or []:
+            if (
+                getattr(expr, "key", None) == "kubernetes.io/hostname"
+                and getattr(expr, "operator", None) == "In"
+            ):
+                values = getattr(expr, "values", None) or []
+                if values:
+                    return values[0]
+    return None
+
+
+def _find_prometheus_service(core_v1: Any) -> tuple[str, str, int] | None:
+    """Locate the Prometheus HTTP service (namespace, name, port) in the cluster."""
+    selectors = (
+        "app.kubernetes.io/name=prometheus",
+        "app.kubernetes.io/name=kube-prometheus-stack-prometheus",
+        "app=kube-prometheus-stack-prometheus",
+    )
+    for selector in selectors:
+        try:
+            svcs = core_v1.list_service_for_all_namespaces(label_selector=selector)
+        except Exception as e:
+            logger.debug(f"Failed to list Prometheus service ({selector}): {e}")
+            return None
+        for svc in getattr(svcs, "items", None) or []:
+            meta = getattr(svc, "metadata", None)
+            spec = getattr(svc, "spec", None)
+            if not meta or not spec:
+                continue
+            ports = getattr(spec, "ports", None) or []
+            port_num = getattr(ports[0], "port", 9090) or 9090 if ports else 9090
+            for p in ports:
+                if getattr(p, "name", None) in ("http-web", "web", "http") or getattr(p, "port", None) == 9090:
+                    port_num = getattr(p, "port", 9090) or 9090
+                    break
+            return meta.namespace, meta.name, port_num
+    return None
+
+
+def query_prometheus_volume_stats(
+    core_v1: Any, k8s_client: Any
+) -> dict[tuple[str, str], dict[str, float]]:
+    """Query kubelet volume usage metrics from Prometheus via the Kubernetes API proxy."""
+    svc_info = _find_prometheus_service(core_v1)
+    if not svc_info:
+        return {}
+
+    prom_ns, prom_svc, prom_port = svc_info
+    metric_map = {
+        "kubelet_volume_stats_used_bytes": "used_bytes",
+        "kubelet_volume_stats_capacity_bytes": "capacity_bytes",
+        "kubelet_volume_stats_available_bytes": "available_bytes",
+    }
+    stats: dict[tuple[str, str], dict[str, float]] = {}
+    proxy_path = f"/api/v1/namespaces/{prom_ns}/services/{prom_svc}:{prom_port}/proxy/api/v1/query"
+
+    for prom_metric, field_name in metric_map.items():
+        try:
+            resp = k8s_client.call_api(
+                proxy_path,
+                "GET",
+                query_params=[("query", prom_metric)],
+                response_type="str",
+                _return_http_data_only=True,
+                _request_timeout=5,
+            )
+            payload = json.loads(resp) if isinstance(resp, str) else resp
+            results = (
+                (payload or {}).get("data", {}).get("result", [])
+                if isinstance(payload, dict)
+                else []
+            )
+            for item in results:
+                metric = item.get("metric") or {}
+                ns = metric.get("namespace")
+                pvc = metric.get("persistentvolumeclaim")
+                val_pair = item.get("value") or []
+                if not ns or not pvc or len(val_pair) < 2:
+                    continue
+                try:
+                    val = float(val_pair[1])
+                except (TypeError, ValueError):
+                    continue
+                stats.setdefault((ns, pvc), {})[field_name] = val
+        except Exception as e:
+            logger.debug(f"Failed to query Prometheus metric {prom_metric}: {e}")
+
+    return stats
+
+
+def build_pvs_details(
+    pvs_items: list[Any],
+    volume_stats: dict[tuple[str, str], dict[str, float]] | None = None,
+) -> list[dict[str, Any]]:
+    """Build normalized PersistentVolume inventory and disk utilization entries."""
+    stats_lookup = volume_stats or {}
+    bytes_per_gib = float(1024**3)
+    details: list[dict[str, Any]] = []
+
+    for pv in pvs_items or []:
+        meta = getattr(pv, "metadata", None)
+        spec = getattr(pv, "spec", None)
+        status = getattr(pv, "status", None)
+        if not meta or not spec:
+            continue
+
+        capacity_map = getattr(spec, "capacity", None) or {}
+        capacity_gib = parse_k8s_bytes_to_gib(capacity_map.get("storage"))
+        claim_ref = getattr(spec, "claim_ref", None)
+        claim_namespace = getattr(claim_ref, "namespace", None) if claim_ref else None
+        claim_name = getattr(claim_ref, "name", None) if claim_ref else None
+        created_at = getattr(meta, "creation_timestamp", None)
+
+        used_gib: float | None = None
+        available_gib: float | None = None
+        utilization_pct: float | None = None
+
+        if claim_namespace and claim_name:
+            stat = stats_lookup.get((claim_namespace, claim_name))
+            if stat and "used_bytes" in stat:
+                used_bytes = stat["used_bytes"]
+                cap_bytes = stat.get("capacity_bytes") or (capacity_gib * bytes_per_gib)
+                avail_bytes = stat.get("available_bytes")
+                used_gib = round(used_bytes / bytes_per_gib, 4)
+                if avail_bytes is not None:
+                    available_gib = round(avail_bytes / bytes_per_gib, 4)
+                elif cap_bytes > 0:
+                    available_gib = round(max(0.0, cap_bytes - used_bytes) / bytes_per_gib, 4)
+                if cap_bytes > 0:
+                    utilization_pct = round(min(100.0, (used_bytes / cap_bytes) * 100.0), 2)
+
+        details.append(
+            {
+                "name": meta.name,
+                "storage_class": getattr(spec, "storage_class_name", None),
+                "capacity_gib": round(capacity_gib, 4),
+                "status": getattr(status, "phase", None) or "Unknown",
+                "reclaim_policy": getattr(spec, "persistent_volume_reclaim_policy", None),
+                "access_modes": list(getattr(spec, "access_modes", None) or []),
+                "claim_namespace": claim_namespace,
+                "claim_name": claim_name,
+                "node_name": _extract_pv_node_name(pv),
+                "used_gib": used_gib,
+                "available_gib": available_gib,
+                "utilization_pct": utilization_pct,
+                "creation_timestamp": created_at.isoformat() if created_at else None,
+            }
+        )
+
+    return details
+
+
 class K8sClusterService(Service[K8sCluster]):
     permissions = permission
 
@@ -475,6 +635,20 @@ class K8sClusterService(Service[K8sCluster]):
                     all_pods_items,
                     topology_levels=topology_levels,
                 )
+
+                pvs_items = []
+                try:
+                    pvs_res = core_v1.list_persistent_volume()
+                    pvs_items = getattr(pvs_res, "items", None) or []
+                except Exception as e:
+                    logger.warning(f"Failed to list persistent volumes: {e}")
+
+                volume_stats = (
+                    query_prometheus_volume_stats(core_v1, k8s_client)
+                    if pvs_items
+                    else {}
+                )
+                pvs_details = build_pvs_details(pvs_items, volume_stats=volume_stats)
 
                 def _pod_readiness(pods_items) -> tuple[str, str]:
                     if not pods_items:
@@ -954,6 +1128,7 @@ class K8sClusterService(Service[K8sCluster]):
                     "node_count": node_count,
                     "nodes_status": nodes_status,
                     "nodes_details": nodes_details,
+                    "pvs_details": pvs_details,
                     "cpu_total": cpu_total,
                     "cpu_allocated": cpu_allocated,
                     "ram_total": ram_total,
@@ -997,6 +1172,7 @@ class K8sClusterService(Service[K8sCluster]):
             status_model.node_count = info["node_count"]
             status_model.nodes_status = info["nodes_status"]
             status_model.nodes_details = info["nodes_details"]
+            status_model.pvs_details = info["pvs_details"]
             status_model.cpu_total = info["cpu_total"]
             status_model.cpu_allocated = info["cpu_allocated"]
             status_model.ram_total = info["ram_total"]

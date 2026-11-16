@@ -68,6 +68,10 @@ class K8sClusterStatus(Base, table=True):
     node_count: int = Field(default=0)
     nodes_status: dict[str, Any] = Field(default_factory=dict, sa_type=JSONType())
     nodes_details: list[dict[str, Any]] = Field(default_factory=list, sa_type=JSONType())
+    pvs_details: list[dict[str, Any]] = Field(
+        default_factory=list,
+        sa_column=Column(JSONType(), nullable=False, server_default=text("'[]'")),
+    )
     node_ips: list[str] = Field(default_factory=list, sa_type=JSONType())
 
     cpu_total: float = Field(default=0.0)

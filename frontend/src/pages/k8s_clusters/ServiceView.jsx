@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
     Activity, Monitor, RefreshCw, CheckCircle2, AlertCircle, Loader2, Clock, Copy, Check,
-    Network, SlidersHorizontal, Cpu, Layers, Table2, GitBranch, ExternalLink, Eye, EyeOff
+    Network, SlidersHorizontal, Cpu, Layers, Table2, GitBranch, ExternalLink, Eye, EyeOff, HardDrive
 } from 'lucide-react';
 import { useNotification } from '../../providers/NotificationProvider';
 import Modal from '../../components/Modal';
@@ -63,6 +63,56 @@ const NodeResourceCell = ({ requested, total, unit, barClass }) => {
             <div className="flex items-center justify-between gap-2 text-xs">
                 <span className="font-semibold text-slate-700 dark:text-slate-200 tabular-nums">
                     {reqVal.toFixed(2)} / {total.toFixed(1)} {unit}
+                </span>
+                <span className="text-[11px] font-bold text-slate-400 tabular-nums">{pct}%</span>
+            </div>
+            <div className="h-1.5 w-full bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden">
+                <div
+                    className={cn('h-full transition-all duration-500', barClass)}
+                    style={{ width: `${pct}%` }}
+                />
+            </div>
+        </div>
+    );
+};
+
+const PvStatusBadge = ({ status }) => {
+    const normalized = (status || 'unknown').toLowerCase();
+    const styles = {
+        bound: 'dxc-badge-success',
+        available: 'dxc-badge-neutral',
+        released: 'dxc-badge-warning',
+        failed: 'dxc-badge-danger',
+    };
+    return (
+        <span className={cn(styles[normalized] || 'dxc-badge-neutral')}>
+            {(status || 'Unknown').toUpperCase()}
+        </span>
+    );
+};
+
+const PvUtilizationCell = ({ pv }) => {
+    const cap = typeof pv.capacity_gib === 'number' ? pv.capacity_gib : 0;
+    const hasTelemetry = typeof pv.used_gib === 'number';
+    if (!hasTelemetry) {
+        return (
+            <div className="min-w-[160px] space-y-0.5">
+                <span className="text-xs font-semibold text-slate-700 dark:text-slate-200 tabular-nums">
+                    {cap > 0 ? `${cap.toFixed(1)} GiB` : '—'}
+                </span>
+                <p className="text-[11px] text-slate-400">No usage telemetry</p>
+            </div>
+        );
+    }
+    const pct = typeof pv.utilization_pct === 'number'
+        ? Math.min(100, Math.round(pv.utilization_pct))
+        : (cap > 0 ? Math.min(100, Math.round((pv.used_gib / cap) * 100)) : 0);
+    const barClass = pct >= 90 ? 'bg-red-500' : pct >= 80 ? 'bg-amber-500' : 'bg-emerald-500';
+    return (
+        <div className="min-w-[160px] space-y-1">
+            <div className="flex items-center justify-between gap-2 text-xs">
+                <span className="font-semibold text-slate-700 dark:text-slate-200 tabular-nums">
+                    {pv.used_gib.toFixed(2)} / {cap.toFixed(1)} GiB
                 </span>
                 <span className="text-[11px] font-bold text-slate-400 tabular-nums">{pct}%</span>
             </div>
@@ -308,277 +358,7 @@ const ServiceView = ({
                     </div>
                 )}
 
-                {/* Resource Utilization */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-slate-50/50 dark:bg-slate-900/50 p-6 rounded-2xl border border-slate-200/50 dark:border-slate-800/50">
-                    <div className="space-y-4">
-                        <div className="flex justify-between items-end">
-                            <p className="text-xs font-bold uppercase tracking-widest text-slate-400">CPU Requests / Capacity</p>
-                            <p className="text-sm font-bold text-slate-900 dark:text-white tabular-nums">
-                                {(clusterState.cpu_allocated || 0).toFixed(2)} / {(clusterState.cpu_total || 0).toFixed(1)} Cores
-                            </p>
-                        </div>
-                        <div className="h-2 w-full bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden">
-                            <div
-                                className="h-full bg-blue-500 transition-all duration-1000"
-                                style={{
-                                    width: `${clusterState.cpu_total > 0 ? Math.min(100, Math.round(((clusterState.cpu_allocated || 0) / clusterState.cpu_total) * 100)) : 0}%`
-                                }}
-                            />
-                        </div>
-                    </div>
-                    <div className="space-y-4">
-                        <div className="flex justify-between items-end">
-                            <p className="text-xs font-bold uppercase tracking-widest text-slate-400">RAM Requests / Capacity</p>
-                            <p className="text-sm font-bold text-slate-900 dark:text-white tabular-nums">
-                                {(clusterState.ram_allocated || 0).toFixed(2)} / {(clusterState.ram_total || 0).toFixed(1)} GiB
-                            </p>
-                        </div>
-                        <div className="h-2 w-full bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden">
-                            <div
-                                className="h-full bg-purple-500 transition-all duration-1000"
-                                style={{
-                                    width: `${clusterState.ram_total > 0 ? Math.min(100, Math.round(((clusterState.ram_allocated || 0) / clusterState.ram_total) * 100)) : 0}%`
-                                }}
-                            />
-                        </div>
-                    </div>
-                </div>
-
-                {/* Node Topology (Full-Width Widget) */}
-                {(() => {
-                    const nodeRows = Array.isArray(clusterState.nodes_details) && clusterState.nodes_details.length > 0
-                        ? clusterState.nodes_details
-                        : Object.entries(clusterState.nodes_status || {}).map(([hostname, status]) => ({
-                            hostname,
-                            status,
-                        }));
-
-                    return (
-                        <div
-                            id="node-topology-widget"
-                            className="space-y-4 bg-slate-50/50 dark:bg-slate-900/50 p-6 rounded-2xl border border-slate-200/50 dark:border-slate-800/50"
-                        >
-                            <div className="flex flex-wrap items-center justify-between gap-3">
-                                <div className="flex items-center gap-4">
-                                    <p className="text-xs font-bold uppercase tracking-widest text-slate-400">
-                                        Node Topology ({clusterState.node_count || nodeRows.length || 0})
-                                    </p>
-                                    <div className="inline-flex rounded-lg p-0.5 bg-slate-200/70 dark:bg-slate-800/80 border border-slate-300/60 dark:border-slate-700/60">
-                                        <button
-                                            id="node-topology-tab-table"
-                                            type="button"
-                                            onClick={() => setNodeTopologyTab('table')}
-                                            className={cn(
-                                                "px-2.5 py-1 rounded-md text-[11px] font-bold uppercase tracking-wider flex items-center gap-1.5 transition-all",
-                                                nodeTopologyTab === 'table'
-                                                    ? "bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-sm"
-                                                    : "text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
-                                            )}
-                                        >
-                                            <Table2 size={12} />
-                                            Table
-                                        </button>
-                                        <button
-                                            id="node-topology-tab-hierarchy"
-                                            type="button"
-                                            onClick={() => setNodeTopologyTab('hierarchy')}
-                                            className={cn(
-                                                "px-2.5 py-1 rounded-md text-[11px] font-bold uppercase tracking-wider flex items-center gap-1.5 transition-all",
-                                                nodeTopologyTab === 'hierarchy'
-                                                    ? "bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-sm"
-                                                    : "text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
-                                            )}
-                                        >
-                                            <GitBranch size={12} />
-                                            Hierarchy
-                                        </button>
-                                    </div>
-                                </div>
-                                {canConfigureNodes && (
-                                    <div className="flex items-center gap-2">
-                                        <button
-                                            id="configure-topology-presets-btn"
-                                            type="button"
-                                            onClick={handleOpenTopologyPresets}
-                                            className="dxc-btn-secondary px-3 py-1.5 text-xs flex items-center gap-1.5"
-                                        >
-                                            <Layers size={14} />
-                                            TOPOLOGY PRESETS
-                                        </button>
-                                        <button
-                                            id="configure-rack-topology-btn"
-                                            type="button"
-                                            onClick={handleOpenRackTopology}
-                                            className="dxc-btn-secondary px-3 py-1.5 text-xs flex items-center gap-1.5"
-                                        >
-                                            <Network size={14} />
-                                            RACK TOPOLOGY
-                                        </button>
-                                    </div>
-                                )}
-                            </div>
-
-                            {nodeRows.length === 0 ? (
-                                <p className="text-sm text-slate-500">No nodes reported.</p>
-                            ) : nodeTopologyTab === 'hierarchy' ? (
-                                <NodeHierarchyView
-                                    nodes={nodeRows}
-                                    assignments={topologyData?.assignments || {}}
-                                    onConfigureNode={(node) => {
-                                        loadTopology();
-                                        setSelectedNodeForConfig(node);
-                                    }}
-                                />
-                            ) : (
-                                <div className="overflow-x-auto">
-                                    <table className="w-full text-left border-collapse">
-                                        <thead>
-                                            <tr className="border-b border-slate-200/70 dark:border-slate-800 text-[11px] font-bold uppercase tracking-wider text-slate-400">
-                                                <th className="py-2.5 pr-4">Hostname</th>
-                                                <th className="py-2.5 px-3">IP</th>
-                                                <th className="py-2.5 px-3">Status</th>
-                                                <th className="py-2.5 px-3">Roles</th>
-                                                <th className="py-2.5 px-3">GPU</th>
-                                                <th className="py-2.5 px-3">Topology</th>
-                                                <th className="py-2.5 px-3">Age</th>
-                                                <th className="py-2.5 px-3">Version</th>
-                                                <th className="py-2.5 px-3">CPU (Req / Total)</th>
-                                                <th className="py-2.5 px-3">RAM (Req / Total)</th>
-                                                <th className="py-2.5 px-3">Ephemeral Storage (Req / Total)</th>
-                                                <th className="py-2.5 pl-3 text-right">Actions</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody className="divide-y divide-slate-200/50 dark:divide-slate-800/60 text-sm">
-                                            {nodeRows.map((node) => {
-                                                const isReady = node.status === 'Ready';
-                                                return (
-                                                    <tr
-                                                        key={node.hostname}
-                                                        className="hover:bg-slate-100/50 dark:hover:bg-slate-800/30 transition-colors"
-                                                    >
-                                                        <td className="py-3 pr-4 font-semibold text-slate-900 dark:text-white whitespace-nowrap">
-                                                            {node.hostname}
-                                                        </td>
-                                                        <td className="py-3 px-3 font-mono text-xs text-slate-600 dark:text-slate-300 whitespace-nowrap">
-                                                            {node.ip || '—'}
-                                                        </td>
-                                                        <td className="py-3 px-3 whitespace-nowrap">
-                                                            <span
-                                                                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold border ${isReady
-                                                                    ? 'bg-green-500/10 border-green-500/20 text-green-500'
-                                                                    : 'bg-red-500/10 border-red-500/20 text-red-500'
-                                                                    }`}
-                                                            >
-                                                                <span className={`w-1.5 h-1.5 rounded-full ${isReady ? 'bg-green-500' : 'bg-red-500'}`} />
-                                                                {node.status || 'Unknown'}
-                                                            </span>
-                                                        </td>
-                                                        <td className="py-3 px-3 whitespace-nowrap">
-                                                            {Array.isArray(node.roles) && node.roles.length > 0 ? (
-                                                                <div className="flex flex-wrap gap-1">
-                                                                    {node.roles.map((role) => (
-                                                                        <span
-                                                                            key={role}
-                                                                            className="px-2 py-0.5 rounded-md text-[11px] font-semibold bg-slate-200/70 dark:bg-slate-800 text-slate-700 dark:text-slate-300"
-                                                                        >
-                                                                            {role}
-                                                                        </span>
-                                                                    ))}
-                                                                </div>
-                                                            ) : (
-                                                                <span className="text-xs text-slate-400">—</span>
-                                                            )}
-                                                        </td>
-                                                        <td className="py-3 px-3 whitespace-nowrap">
-                                                            {node.gpu_vendor ? (
-                                                                <span
-                                                                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-bold bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 uppercase"
-                                                                    title={node.gpu_product || `${node.gpu_vendor.toUpperCase()} GPU`}
-                                                                >
-                                                                    <Cpu size={11} />
-                                                                    {node.gpu_count > 0 ? `${node.gpu_count}x ` : ''}{node.gpu_vendor}
-                                                                </span>
-                                                            ) : (
-                                                                <span className="text-xs text-slate-400">—</span>
-                                                            )}
-                                                        </td>
-                                                        <td className="py-3 px-3 whitespace-nowrap">
-                                                            {node.topology && Object.keys(node.topology).length > 0 ? (
-                                                                <div className="flex flex-wrap gap-1">
-                                                                    {Object.entries(node.topology).map(([tier, val]) => (
-                                                                        <span
-                                                                            key={tier}
-                                                                            className="px-2 py-0.5 rounded-md text-[11px] font-mono bg-indigo-500/10 border border-indigo-500/20 text-indigo-500 dark:text-indigo-400"
-                                                                        >
-                                                                            {tier}:{val}
-                                                                        </span>
-                                                                    ))}
-                                                                </div>
-                                                            ) : (
-                                                                <span className="text-xs text-slate-400">—</span>
-                                                            )}
-                                                        </td>
-                                                        <td
-                                                            className="py-3 px-3 text-xs font-medium text-slate-600 dark:text-slate-300 whitespace-nowrap tabular-nums"
-                                                            title={node.creation_timestamp || ''}
-                                                        >
-                                                            {formatNodeAge(node.creation_timestamp)}
-                                                        </td>
-                                                        <td className="py-3 px-3 font-mono text-xs text-slate-600 dark:text-slate-300 whitespace-nowrap">
-                                                            {node.version || '—'}
-                                                        </td>
-                                                        <td className="py-3 px-3">
-                                                            <NodeResourceCell
-                                                                requested={node.cpu_requested}
-                                                                total={node.cpu_total}
-                                                                unit="Cores"
-                                                                barClass="bg-blue-500"
-                                                            />
-                                                        </td>
-                                                        <td className="py-3 px-3">
-                                                            <NodeResourceCell
-                                                                requested={node.ram_requested}
-                                                                total={node.ram_total}
-                                                                unit="GiB"
-                                                                barClass="bg-purple-500"
-                                                            />
-                                                        </td>
-                                                        <td className="py-3 px-3">
-                                                            <NodeResourceCell
-                                                                requested={node.ephemeral_storage_requested}
-                                                                total={node.ephemeral_storage_total}
-                                                                unit="GiB"
-                                                                barClass="bg-amber-500"
-                                                            />
-                                                        </td>
-                                                        <td className="py-3 pl-3 text-right whitespace-nowrap">
-                                                            {canConfigureNodes && (
-                                                                <button
-                                                                    id={`configure-node-${node.hostname}-btn`}
-                                                                    type="button"
-                                                                    onClick={() => {
-                                                                        loadTopology();
-                                                                        setSelectedNodeForConfig(node);
-                                                                    }}
-                                                                    className="p-2 rounded-lg text-slate-400 hover:text-indigo-500 hover:bg-slate-200/60 dark:hover:bg-slate-800 transition-colors"
-                                                                    title="Configure Node Labels, Roles & GPU"
-                                                                >
-                                                                    <SlidersHorizontal size={15} />
-                                                                </button>
-                                                            )}
-                                                        </td>
-                                                    </tr>
-                                                );
-                                            })}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            )}
-                        </div>
-                    );
-                })()}
-
-                {/* Core Integrations (Bottom Full-Width Widget) */}
+                {/* Core Integrations (Top Full-Width Widget) */}
                 {(() => {
                     const hasSyncState = Boolean(
                         syncState &&
@@ -886,6 +666,376 @@ const ServiceView = ({
                         </div>
                     );
                 })()}
+
+                {/* Resource Utilization */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-slate-50/50 dark:bg-slate-900/50 p-6 rounded-2xl border border-slate-200/50 dark:border-slate-800/50">
+                    <div className="space-y-4">
+                        <div className="flex justify-between items-end">
+                            <p className="text-xs font-bold uppercase tracking-widest text-slate-400">CPU Requests / Capacity</p>
+                            <p className="text-sm font-bold text-slate-900 dark:text-white tabular-nums">
+                                {(clusterState.cpu_allocated || 0).toFixed(2)} / {(clusterState.cpu_total || 0).toFixed(1)} Cores
+                            </p>
+                        </div>
+                        <div className="h-2 w-full bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden">
+                            <div
+                                className="h-full bg-blue-500 transition-all duration-1000"
+                                style={{
+                                    width: `${clusterState.cpu_total > 0 ? Math.min(100, Math.round(((clusterState.cpu_allocated || 0) / clusterState.cpu_total) * 100)) : 0}%`
+                                }}
+                            />
+                        </div>
+                    </div>
+                    <div className="space-y-4">
+                        <div className="flex justify-between items-end">
+                            <p className="text-xs font-bold uppercase tracking-widest text-slate-400">RAM Requests / Capacity</p>
+                            <p className="text-sm font-bold text-slate-900 dark:text-white tabular-nums">
+                                {(clusterState.ram_allocated || 0).toFixed(2)} / {(clusterState.ram_total || 0).toFixed(1)} GiB
+                            </p>
+                        </div>
+                        <div className="h-2 w-full bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden">
+                            <div
+                                className="h-full bg-purple-500 transition-all duration-1000"
+                                style={{
+                                    width: `${clusterState.ram_total > 0 ? Math.min(100, Math.round(((clusterState.ram_allocated || 0) / clusterState.ram_total) * 100)) : 0}%`
+                                }}
+                            />
+                        </div>
+                    </div>
+                </div>
+
+                {/* Node Topology (Full-Width Widget) */}
+                {(() => {
+                    const nodeRows = Array.isArray(clusterState.nodes_details) && clusterState.nodes_details.length > 0
+                        ? clusterState.nodes_details
+                        : Object.entries(clusterState.nodes_status || {}).map(([hostname, status]) => ({
+                            hostname,
+                            status,
+                        }));
+
+                    return (
+                        <div
+                            id="node-topology-widget"
+                            className="space-y-4 bg-slate-50/50 dark:bg-slate-900/50 p-6 rounded-2xl border border-slate-200/50 dark:border-slate-800/50"
+                        >
+                            <div className="flex flex-wrap items-center justify-between gap-3">
+                                <div className="flex items-center gap-4">
+                                    <p className="text-xs font-bold uppercase tracking-widest text-slate-400">
+                                        Node Topology ({clusterState.node_count || nodeRows.length || 0})
+                                    </p>
+                                    <div className="inline-flex rounded-lg p-0.5 bg-slate-200/70 dark:bg-slate-800/80 border border-slate-300/60 dark:border-slate-700/60">
+                                        <button
+                                            id="node-topology-tab-table"
+                                            type="button"
+                                            onClick={() => setNodeTopologyTab('table')}
+                                            className={cn(
+                                                "px-2.5 py-1 rounded-md text-[11px] font-bold uppercase tracking-wider flex items-center gap-1.5 transition-all",
+                                                nodeTopologyTab === 'table'
+                                                    ? "bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-sm"
+                                                    : "text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
+                                            )}
+                                        >
+                                            <Table2 size={12} />
+                                            Table
+                                        </button>
+                                        <button
+                                            id="node-topology-tab-hierarchy"
+                                            type="button"
+                                            onClick={() => setNodeTopologyTab('hierarchy')}
+                                            className={cn(
+                                                "px-2.5 py-1 rounded-md text-[11px] font-bold uppercase tracking-wider flex items-center gap-1.5 transition-all",
+                                                nodeTopologyTab === 'hierarchy'
+                                                    ? "bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-sm"
+                                                    : "text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
+                                            )}
+                                        >
+                                            <GitBranch size={12} />
+                                            Hierarchy
+                                        </button>
+                                    </div>
+                                </div>
+                                {canConfigureNodes && (
+                                    <div className="flex items-center gap-2">
+                                        <button
+                                            id="configure-topology-presets-btn"
+                                            type="button"
+                                            onClick={handleOpenTopologyPresets}
+                                            className="dxc-btn-secondary px-3 py-1.5 text-xs flex items-center gap-1.5"
+                                        >
+                                            <Layers size={14} />
+                                            TOPOLOGY PRESETS
+                                        </button>
+                                        <button
+                                            id="configure-rack-topology-btn"
+                                            type="button"
+                                            onClick={handleOpenRackTopology}
+                                            className="dxc-btn-secondary px-3 py-1.5 text-xs flex items-center gap-1.5"
+                                        >
+                                            <Network size={14} />
+                                            RACK TOPOLOGY
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+
+                            {nodeRows.length === 0 ? (
+                                <p className="text-sm text-slate-500">No nodes reported.</p>
+                            ) : nodeTopologyTab === 'hierarchy' ? (
+                                <NodeHierarchyView
+                                    nodes={nodeRows}
+                                    assignments={topologyData?.assignments || {}}
+                                    onConfigureNode={(node) => {
+                                        loadTopology();
+                                        setSelectedNodeForConfig(node);
+                                    }}
+                                />
+                            ) : (
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-left border-collapse">
+                                        <thead>
+                                            <tr className="border-b border-slate-200/70 dark:border-slate-800 text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                                                <th className="py-2.5 pr-4">Hostname</th>
+                                                <th className="py-2.5 px-3">IP</th>
+                                                <th className="py-2.5 px-3">Status</th>
+                                                <th className="py-2.5 px-3">Roles</th>
+                                                <th className="py-2.5 px-3">GPU</th>
+                                                <th className="py-2.5 px-3">Topology</th>
+                                                <th className="py-2.5 px-3">Age</th>
+                                                <th className="py-2.5 px-3">Version</th>
+                                                <th className="py-2.5 px-3">CPU (Req / Total)</th>
+                                                <th className="py-2.5 px-3">RAM (Req / Total)</th>
+                                                <th className="py-2.5 px-3">Ephemeral Storage (Req / Total)</th>
+                                                <th className="py-2.5 pl-3 text-right">Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-200/50 dark:divide-slate-800/60 text-sm">
+                                            {nodeRows.map((node) => {
+                                                const isReady = node.status === 'Ready';
+                                                return (
+                                                    <tr
+                                                        key={node.hostname}
+                                                        className="hover:bg-slate-100/50 dark:hover:bg-slate-800/30 transition-colors"
+                                                    >
+                                                        <td className="py-3 pr-4 font-semibold text-slate-900 dark:text-white whitespace-nowrap">
+                                                            {node.hostname}
+                                                        </td>
+                                                        <td className="py-3 px-3 font-mono text-xs text-slate-600 dark:text-slate-300 whitespace-nowrap">
+                                                            {node.ip || '—'}
+                                                        </td>
+                                                        <td className="py-3 px-3 whitespace-nowrap">
+                                                            <span
+                                                                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold border ${isReady
+                                                                    ? 'bg-green-500/10 border-green-500/20 text-green-500'
+                                                                    : 'bg-red-500/10 border-red-500/20 text-red-500'
+                                                                    }`}
+                                                            >
+                                                                <span className={`w-1.5 h-1.5 rounded-full ${isReady ? 'bg-green-500' : 'bg-red-500'}`} />
+                                                                {node.status || 'Unknown'}
+                                                            </span>
+                                                        </td>
+                                                        <td className="py-3 px-3 whitespace-nowrap">
+                                                            {Array.isArray(node.roles) && node.roles.length > 0 ? (
+                                                                <div className="flex flex-wrap gap-1">
+                                                                    {node.roles.map((role) => (
+                                                                        <span
+                                                                            key={role}
+                                                                            className="px-2 py-0.5 rounded-md text-[11px] font-semibold bg-slate-200/70 dark:bg-slate-800 text-slate-700 dark:text-slate-300"
+                                                                        >
+                                                                            {role}
+                                                                        </span>
+                                                                    ))}
+                                                                </div>
+                                                            ) : (
+                                                                <span className="text-xs text-slate-400">—</span>
+                                                            )}
+                                                        </td>
+                                                        <td className="py-3 px-3 whitespace-nowrap">
+                                                            {node.gpu_vendor ? (
+                                                                <span
+                                                                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-bold bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 uppercase"
+                                                                    title={node.gpu_product || `${node.gpu_vendor.toUpperCase()} GPU`}
+                                                                >
+                                                                    <Cpu size={11} />
+                                                                    {node.gpu_count > 0 ? `${node.gpu_count}x ` : ''}{node.gpu_vendor}
+                                                                </span>
+                                                            ) : (
+                                                                <span className="text-xs text-slate-400">—</span>
+                                                            )}
+                                                        </td>
+                                                        <td className="py-3 px-3 whitespace-nowrap">
+                                                            {node.topology && Object.keys(node.topology).length > 0 ? (
+                                                                <div className="flex flex-wrap gap-1">
+                                                                    {Object.entries(node.topology).map(([tier, val]) => (
+                                                                        <span
+                                                                            key={tier}
+                                                                            className="px-2 py-0.5 rounded-md text-[11px] font-mono bg-indigo-500/10 border border-indigo-500/20 text-indigo-500 dark:text-indigo-400"
+                                                                        >
+                                                                            {tier}:{val}
+                                                                        </span>
+                                                                    ))}
+                                                                </div>
+                                                            ) : (
+                                                                <span className="text-xs text-slate-400">—</span>
+                                                            )}
+                                                        </td>
+                                                        <td
+                                                            className="py-3 px-3 text-xs font-medium text-slate-600 dark:text-slate-300 whitespace-nowrap tabular-nums"
+                                                            title={node.creation_timestamp || ''}
+                                                        >
+                                                            {formatNodeAge(node.creation_timestamp)}
+                                                        </td>
+                                                        <td className="py-3 px-3 font-mono text-xs text-slate-600 dark:text-slate-300 whitespace-nowrap">
+                                                            {node.version || '—'}
+                                                        </td>
+                                                        <td className="py-3 px-3">
+                                                            <NodeResourceCell
+                                                                requested={node.cpu_requested}
+                                                                total={node.cpu_total}
+                                                                unit="Cores"
+                                                                barClass="bg-blue-500"
+                                                            />
+                                                        </td>
+                                                        <td className="py-3 px-3">
+                                                            <NodeResourceCell
+                                                                requested={node.ram_requested}
+                                                                total={node.ram_total}
+                                                                unit="GiB"
+                                                                barClass="bg-purple-500"
+                                                            />
+                                                        </td>
+                                                        <td className="py-3 px-3">
+                                                            <NodeResourceCell
+                                                                requested={node.ephemeral_storage_requested}
+                                                                total={node.ephemeral_storage_total}
+                                                                unit="GiB"
+                                                                barClass="bg-amber-500"
+                                                            />
+                                                        </td>
+                                                        <td className="py-3 pl-3 text-right whitespace-nowrap">
+                                                            {canConfigureNodes && (
+                                                                <button
+                                                                    id={`configure-node-${node.hostname}-btn`}
+                                                                    type="button"
+                                                                    onClick={() => {
+                                                                        loadTopology();
+                                                                        setSelectedNodeForConfig(node);
+                                                                    }}
+                                                                    className="p-2 rounded-lg text-slate-400 hover:text-indigo-500 hover:bg-slate-200/60 dark:hover:bg-slate-800 transition-colors"
+                                                                    title="Configure Node Labels, Roles & GPU"
+                                                                >
+                                                                    <SlidersHorizontal size={15} />
+                                                                </button>
+                                                            )}
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            )}
+                        </div>
+                    );
+                })()}
+
+                {/* Persistent Volumes & Disk Utilization */}
+                {(() => {
+                    const pvRows = Array.isArray(clusterState.pvs_details) ? clusterState.pvs_details : [];
+                    const totalCapacityGib = pvRows.reduce(
+                        (sum, pv) => sum + (typeof pv.capacity_gib === 'number' ? pv.capacity_gib : 0),
+                        0
+                    );
+                    const pvsWithUsage = pvRows.filter((pv) => typeof pv.used_gib === 'number');
+                    const totalUsedGib = pvsWithUsage.reduce((sum, pv) => sum + pv.used_gib, 0);
+
+                    return (
+                        <div
+                            id="pvs-utilization-widget"
+                            className="space-y-4 bg-slate-50/50 dark:bg-slate-900/50 p-6 rounded-2xl border border-slate-200/50 dark:border-slate-800/50"
+                        >
+                            <div className="flex flex-wrap items-center justify-between gap-4">
+                                <div className="flex items-center gap-3">
+                                    <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-500">
+                                        <HardDrive size={18} />
+                                    </div>
+                                    <div>
+                                        <p className="text-xs font-bold uppercase tracking-widest text-slate-400">
+                                            Persistent Volumes ({pvRows.length})
+                                        </p>
+                                        <p className="text-xs text-slate-500 mt-0.5 tabular-nums">
+                                            Total Allocated: {totalCapacityGib.toFixed(1)} GiB
+                                            {pvsWithUsage.length > 0 && ` • Used: ${totalUsedGib.toFixed(2)} GiB`}
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {pvRows.length === 0 ? (
+                                <p className="text-sm text-slate-500 dark:text-slate-400">
+                                    No persistent volumes found in this cluster.
+                                </p>
+                            ) : (
+                                <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/80">
+                                    <table id="pvs-table" className="w-full text-left border-collapse">
+                                        <thead>
+                                            <tr className="border-b border-slate-200 dark:border-slate-800 text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                                                <th className="py-3 px-4">Volume</th>
+                                                <th className="py-3 px-4">Status</th>
+                                                <th className="py-3 px-4">StorageClass</th>
+                                                <th className="py-3 px-4">Node</th>
+                                                <th className="py-3 px-4">Claim</th>
+                                                <th className="py-3 px-4">Disk Utilization</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-100 dark:divide-slate-800/70 text-sm">
+                                            {pvRows.map((pv) => {
+                                                const claimLabel = pv.claim_namespace && pv.claim_name
+                                                    ? `${pv.claim_namespace}/${pv.claim_name}`
+                                                    : 'Unbound';
+                                                return (
+                                                    <tr
+                                                        key={pv.name}
+                                                        data-pv-name={pv.name}
+                                                        className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors"
+                                                    >
+                                                        <td className="py-3 px-4">
+                                                            <div className="font-mono text-xs font-semibold text-slate-800 dark:text-slate-100">
+                                                                {pv.name}
+                                                            </div>
+                                                            <div className="text-[11px] text-slate-400 mt-0.5">
+                                                                {pv.reclaim_policy || '—'}
+                                                                {Array.isArray(pv.access_modes) && pv.access_modes.length > 0
+                                                                    ? ` • ${pv.access_modes.join(', ')}`
+                                                                    : ''}
+                                                            </div>
+                                                        </td>
+                                                        <td className="py-3 px-4">
+                                                            <PvStatusBadge status={pv.status} />
+                                                        </td>
+                                                        <td className="py-3 px-4">
+                                                            <span className="px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-xs font-mono text-slate-600 dark:text-slate-300">
+                                                                {pv.storage_class || '—'}
+                                                            </span>
+                                                        </td>
+                                                        <td className="py-3 px-4 text-xs font-mono text-slate-600 dark:text-slate-300">
+                                                            {pv.node_name || '—'}
+                                                        </td>
+                                                        <td className="py-3 px-4 text-xs font-mono text-slate-600 dark:text-slate-300">
+                                                            {claimLabel}
+                                                        </td>
+                                                        <td className="py-3 px-4">
+                                                            <PvUtilizationCell pv={pv} />
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            )}
+                        </div>
+                    );
+                })()}
+
             </div>
 
             <Modal
