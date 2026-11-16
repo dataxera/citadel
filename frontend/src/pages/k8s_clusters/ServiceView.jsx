@@ -31,6 +31,44 @@ const IntegrationStatusBadge = ({ status }) => {
     );
 };
 
+const formatNodeAge = (creationTimestamp) => {
+    if (!creationTimestamp) return '—';
+    const createdMs = new Date(creationTimestamp).getTime();
+    if (Number.isNaN(createdMs)) return '—';
+    const diffSec = Math.max(0, Math.floor((Date.now() - createdMs) / 1000));
+    if (diffSec < 60) return `${diffSec}s`;
+    const diffMin = Math.floor(diffSec / 60);
+    if (diffMin < 60) return `${diffMin}m`;
+    const diffHr = Math.floor(diffMin / 60);
+    if (diffHr < 48) return `${diffHr}h`;
+    return `${Math.floor(diffHr / 24)}d`;
+};
+
+const NodeResourceCell = ({ requested, total, unit, barClass }) => {
+    const hasMetrics = typeof total === 'number' && total > 0;
+    if (!hasMetrics) {
+        return <span className="text-xs text-slate-400">—</span>;
+    }
+    const reqVal = typeof requested === 'number' ? requested : 0;
+    const pct = Math.min(100, Math.round((reqVal / total) * 100));
+    return (
+        <div className="min-w-[140px] space-y-1">
+            <div className="flex items-center justify-between gap-2 text-xs">
+                <span className="font-semibold text-slate-700 dark:text-slate-200 tabular-nums">
+                    {reqVal.toFixed(2)} / {total.toFixed(1)} {unit}
+                </span>
+                <span className="text-[11px] font-bold text-slate-400 tabular-nums">{pct}%</span>
+            </div>
+            <div className="h-1.5 w-full bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden">
+                <div
+                    className={cn('h-full transition-all duration-500', barClass)}
+                    style={{ width: `${pct}%` }}
+                />
+            </div>
+        </div>
+    );
+};
+
 const ServiceView = ({
     selectedClusterId,
     selectedCluster,
@@ -189,55 +227,164 @@ const ServiceView = ({
                     </div>
                 )}
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                    {/* Resource Utilization */}
-                    <div className="space-y-6 bg-slate-50/50 dark:bg-slate-900/50 p-6 rounded-2xl border border-slate-200/50 dark:border-slate-800/50">
-                        <div className="space-y-4">
-                            <div className="flex justify-between items-end">
-                                <p className="text-xs font-bold uppercase tracking-widest text-slate-400">Total CPU Allocation</p>
-                                <p className="text-sm font-bold text-slate-900 dark:text-white">{(clusterState.cpu_total || 0).toFixed(1)} Cores</p>
-                            </div>
-                            <div className="h-2 w-full bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden">
-                                <div
-                                    className="h-full bg-blue-500 transition-all duration-1000"
-                                    style={{ width: '100%' }}
-                                />
-                            </div>
+                {/* Resource Utilization */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-slate-50/50 dark:bg-slate-900/50 p-6 rounded-2xl border border-slate-200/50 dark:border-slate-800/50">
+                    <div className="space-y-4">
+                        <div className="flex justify-between items-end">
+                            <p className="text-xs font-bold uppercase tracking-widest text-slate-400">CPU Requests / Capacity</p>
+                            <p className="text-sm font-bold text-slate-900 dark:text-white tabular-nums">
+                                {(clusterState.cpu_allocated || 0).toFixed(2)} / {(clusterState.cpu_total || 0).toFixed(1)} Cores
+                            </p>
                         </div>
-                        <div className="space-y-4">
-                            <div className="flex justify-between items-end">
-                                <p className="text-xs font-bold uppercase tracking-widest text-slate-400">Total RAM Capacity</p>
-                                <p className="text-sm font-bold text-slate-900 dark:text-white">{(clusterState.ram_total || 0).toFixed(1)} GiB</p>
-                            </div>
-                            <div className="h-2 w-full bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden">
-                                <div
-                                    className="h-full bg-purple-500 transition-all duration-1000"
-                                    style={{ width: '100%' }}
-                                />
-                            </div>
+                        <div className="h-2 w-full bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden">
+                            <div
+                                className="h-full bg-blue-500 transition-all duration-1000"
+                                style={{
+                                    width: `${clusterState.cpu_total > 0 ? Math.min(100, Math.round(((clusterState.cpu_allocated || 0) / clusterState.cpu_total) * 100)) : 0}%`
+                                }}
+                            />
                         </div>
                     </div>
-
-                    {/* Node Cluster Map */}
-                    <div className="space-y-4 bg-slate-50/50 dark:bg-slate-900/50 p-6 rounded-2xl border border-slate-200/50 dark:border-slate-800/50">
-                        <p className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-4">Node Topology ({clusterState.node_count || 0})</p>
-                        <div className="flex flex-wrap gap-2">
-                            {Object.entries(clusterState.nodes_status || {}).map(([name, status]) => (
-                                <div
-                                    key={name}
-                                    className={`px-3 py-1.5 rounded-lg text-xs font-bold border flex items-center gap-2 ${status === 'Ready'
-                                        ? 'bg-green-500/10 border-green-500/20 text-green-500'
-                                        : 'bg-red-500/10 border-red-500/20 text-red-500'
-                                        }`}
-                                    title={`${name}: ${status}`}
-                                >
-                                    <div className={`w-1.5 h-1.5 rounded-full ${status === 'Ready' ? 'bg-green-500' : 'bg-red-500'}`} />
-                                    {name.split('-').pop()}
-                                </div>
-                            ))}
+                    <div className="space-y-4">
+                        <div className="flex justify-between items-end">
+                            <p className="text-xs font-bold uppercase tracking-widest text-slate-400">RAM Requests / Capacity</p>
+                            <p className="text-sm font-bold text-slate-900 dark:text-white tabular-nums">
+                                {(clusterState.ram_allocated || 0).toFixed(2)} / {(clusterState.ram_total || 0).toFixed(1)} GiB
+                            </p>
+                        </div>
+                        <div className="h-2 w-full bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden">
+                            <div
+                                className="h-full bg-purple-500 transition-all duration-1000"
+                                style={{
+                                    width: `${clusterState.ram_total > 0 ? Math.min(100, Math.round(((clusterState.ram_allocated || 0) / clusterState.ram_total) * 100)) : 0}%`
+                                }}
+                            />
                         </div>
                     </div>
                 </div>
+
+                {/* Node Topology (Full-Width Widget) */}
+                {(() => {
+                    const nodeRows = Array.isArray(clusterState.nodes_details) && clusterState.nodes_details.length > 0
+                        ? clusterState.nodes_details
+                        : Object.entries(clusterState.nodes_status || {}).map(([hostname, status]) => ({
+                            hostname,
+                            status,
+                        }));
+
+                    return (
+                        <div
+                            id="node-topology-widget"
+                            className="space-y-4 bg-slate-50/50 dark:bg-slate-900/50 p-6 rounded-2xl border border-slate-200/50 dark:border-slate-800/50"
+                        >
+                            <div className="flex items-center justify-between">
+                                <p className="text-xs font-bold uppercase tracking-widest text-slate-400">
+                                    Node Topology ({clusterState.node_count || nodeRows.length || 0})
+                                </p>
+                            </div>
+
+                            {nodeRows.length === 0 ? (
+                                <p className="text-sm text-slate-500">No nodes reported.</p>
+                            ) : (
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-left border-collapse">
+                                        <thead>
+                                            <tr className="border-b border-slate-200/70 dark:border-slate-800 text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                                                <th className="py-2.5 pr-4">Hostname</th>
+                                                <th className="py-2.5 px-3">IP</th>
+                                                <th className="py-2.5 px-3">Status</th>
+                                                <th className="py-2.5 px-3">Roles</th>
+                                                <th className="py-2.5 px-3">Age</th>
+                                                <th className="py-2.5 px-3">Version</th>
+                                                <th className="py-2.5 px-3">CPU (Req / Total)</th>
+                                                <th className="py-2.5 px-3">RAM (Req / Total)</th>
+                                                <th className="py-2.5 pl-3">Ephemeral Storage (Req / Total)</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-200/50 dark:divide-slate-800/60 text-sm">
+                                            {nodeRows.map((node) => {
+                                                const isReady = node.status === 'Ready';
+                                                return (
+                                                    <tr
+                                                        key={node.hostname}
+                                                        className="hover:bg-slate-100/50 dark:hover:bg-slate-800/30 transition-colors"
+                                                    >
+                                                        <td className="py-3 pr-4 font-semibold text-slate-900 dark:text-white whitespace-nowrap">
+                                                            {node.hostname}
+                                                        </td>
+                                                        <td className="py-3 px-3 font-mono text-xs text-slate-600 dark:text-slate-300 whitespace-nowrap">
+                                                            {node.ip || '—'}
+                                                        </td>
+                                                        <td className="py-3 px-3 whitespace-nowrap">
+                                                            <span
+                                                                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold border ${isReady
+                                                                    ? 'bg-green-500/10 border-green-500/20 text-green-500'
+                                                                    : 'bg-red-500/10 border-red-500/20 text-red-500'
+                                                                    }`}
+                                                            >
+                                                                <span className={`w-1.5 h-1.5 rounded-full ${isReady ? 'bg-green-500' : 'bg-red-500'}`} />
+                                                                {node.status || 'Unknown'}
+                                                            </span>
+                                                        </td>
+                                                        <td className="py-3 px-3 whitespace-nowrap">
+                                                            {Array.isArray(node.roles) && node.roles.length > 0 ? (
+                                                                <div className="flex flex-wrap gap-1">
+                                                                    {node.roles.map((role) => (
+                                                                        <span
+                                                                            key={role}
+                                                                            className="px-2 py-0.5 rounded-md text-[11px] font-semibold bg-slate-200/70 dark:bg-slate-800 text-slate-700 dark:text-slate-300"
+                                                                        >
+                                                                            {role}
+                                                                        </span>
+                                                                    ))}
+                                                                </div>
+                                                            ) : (
+                                                                <span className="text-xs text-slate-400">—</span>
+                                                            )}
+                                                        </td>
+                                                        <td
+                                                            className="py-3 px-3 text-xs font-medium text-slate-600 dark:text-slate-300 whitespace-nowrap tabular-nums"
+                                                            title={node.creation_timestamp || ''}
+                                                        >
+                                                            {formatNodeAge(node.creation_timestamp)}
+                                                        </td>
+                                                        <td className="py-3 px-3 font-mono text-xs text-slate-600 dark:text-slate-300 whitespace-nowrap">
+                                                            {node.version || '—'}
+                                                        </td>
+                                                        <td className="py-3 px-3">
+                                                            <NodeResourceCell
+                                                                requested={node.cpu_requested}
+                                                                total={node.cpu_total}
+                                                                unit="Cores"
+                                                                barClass="bg-blue-500"
+                                                            />
+                                                        </td>
+                                                        <td className="py-3 px-3">
+                                                            <NodeResourceCell
+                                                                requested={node.ram_requested}
+                                                                total={node.ram_total}
+                                                                unit="GiB"
+                                                                barClass="bg-purple-500"
+                                                            />
+                                                        </td>
+                                                        <td className="py-3 pl-3">
+                                                            <NodeResourceCell
+                                                                requested={node.ephemeral_storage_requested}
+                                                                total={node.ephemeral_storage_total}
+                                                                unit="GiB"
+                                                                barClass="bg-amber-500"
+                                                            />
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            )}
+                        </div>
+                    );
+                })()}
 
                 {/* Core Integrations (Bottom Full-Width Widget) */}
                 {(() => {

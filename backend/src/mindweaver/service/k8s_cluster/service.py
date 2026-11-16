@@ -17,6 +17,211 @@ from . import permission
 
 logger = logging.getLogger(__name__)
 
+_BYTE_UNITS_TO_GIB: dict[str, float] = {
+    "Ki": 1024 / (1024**3),
+    "Mi": (1024**2) / (1024**3),
+    "Gi": 1.0,
+    "Ti": 1024.0,
+    "Pi": 1024.0**2,
+    "Ei": 1024.0**3,
+    "k": 1000 / (1024**3),
+    "K": 1000 / (1024**3),
+    "M": (1000**2) / (1024**3),
+    "G": (1000**3) / (1024**3),
+    "T": (1000**4) / (1024**3),
+    "P": (1000**5) / (1024**3),
+    "E": (1000**6) / (1024**3),
+}
+
+
+def parse_k8s_cpu(res: str | None) -> float:
+    """Parse a Kubernetes CPU quantity string into cores."""
+    if not res:
+        return 0.0
+    val = str(res).strip()
+    if not val:
+        return 0.0
+    try:
+        if val.endswith("n"):
+            return float(val[:-1]) / 1_000_000_000
+        if val.endswith("u"):
+            return float(val[:-1]) / 1_000_000
+        if val.endswith("m"):
+            return float(val[:-1]) / 1000
+        return float(val)
+    except ValueError:
+        return 0.0
+
+
+def parse_k8s_bytes_to_gib(res: str | None) -> float:
+    """Parse a Kubernetes memory or storage quantity string into GiB."""
+    if not res:
+        return 0.0
+    val = str(res).strip()
+    if not val:
+        return 0.0
+    for suffix, multiplier in _BYTE_UNITS_TO_GIB.items():
+        if val.endswith(suffix):
+            try:
+                return float(val[: -len(suffix)]) * multiplier
+            except ValueError:
+                return 0.0
+    try:
+        return float(val) / (1024**3)
+    except ValueError:
+        return 0.0
+
+
+def _extract_container_requests(container) -> tuple[float, float, float]:
+    """Extract (cpu_cores, ram_gib, ephemeral_gib) requests from a container spec."""
+    resources = getattr(container, "resources", None)
+    requests = getattr(resources, "requests", None) or {}
+    return (
+        parse_k8s_cpu(requests.get("cpu")),
+        parse_k8s_bytes_to_gib(requests.get("memory")),
+        parse_k8s_bytes_to_gib(requests.get("ephemeral-storage")),
+    )
+
+
+def compute_pod_requests(pod) -> tuple[float, float, float]:
+    """Compute effective (cpu_cores, ram_gib, ephemeral_gib) requests for a pod."""
+    spec = getattr(pod, "spec", None)
+    if not spec:
+        return (0.0, 0.0, 0.0)
+
+    cpu_sum = 0.0
+    ram_sum = 0.0
+    eph_sum = 0.0
+    for container in getattr(spec, "containers", None) or []:
+        c_cpu, c_ram, c_eph = _extract_container_requests(container)
+        cpu_sum += c_cpu
+        ram_sum += c_ram
+        eph_sum += c_eph
+
+    init_cpu_max = 0.0
+    init_ram_max = 0.0
+    init_eph_max = 0.0
+    for init_container in getattr(spec, "init_containers", None) or []:
+        ic_cpu, ic_ram, ic_eph = _extract_container_requests(init_container)
+        if getattr(init_container, "restart_policy", None) == "Always":
+            cpu_sum += ic_cpu
+            ram_sum += ic_ram
+            eph_sum += ic_eph
+        else:
+            init_cpu_max = max(init_cpu_max, ic_cpu)
+            init_ram_max = max(init_ram_max, ic_ram)
+            init_eph_max = max(init_eph_max, ic_eph)
+
+    return (
+        max(cpu_sum, init_cpu_max),
+        max(ram_sum, init_ram_max),
+        max(eph_sum, init_eph_max),
+    )
+
+
+def build_nodes_details(
+    nodes_items: list[Any], pods_items: list[Any]
+) -> tuple[
+    dict[str, str],
+    list[str],
+    float,
+    float,
+    float,
+    float,
+    list[dict[str, Any]],
+]:
+    """Aggregate node health, capacity, and pod request utilization per node."""
+    pod_requests_by_node: dict[str, list[float]] = {}
+    for pod in pods_items or []:
+        phase = getattr(getattr(pod, "status", None), "phase", None)
+        if phase in ("Succeeded", "Failed"):
+            continue
+        node_name = getattr(getattr(pod, "spec", None), "node_name", None)
+        if not node_name:
+            continue
+        p_cpu, p_ram, p_eph = compute_pod_requests(pod)
+        acc = pod_requests_by_node.setdefault(node_name, [0.0, 0.0, 0.0])
+        acc[0] += p_cpu
+        acc[1] += p_ram
+        acc[2] += p_eph
+
+    nodes_status: dict[str, str] = {}
+    node_ips: list[str] = []
+    cpu_total = 0.0
+    ram_total = 0.0
+    cpu_allocated = 0.0
+    ram_allocated = 0.0
+    nodes_details: list[dict[str, Any]] = []
+
+    for node in nodes_items or []:
+        name = node.metadata.name
+        status = "Unknown"
+        for cond in getattr(node.status, "conditions", None) or []:
+            if cond.type == "Ready":
+                status = "Ready" if cond.status == "True" else "NotReady"
+                break
+        nodes_status[name] = status
+
+        internal_ip = None
+        external_ip = None
+        for addr in getattr(node.status, "addresses", None) or []:
+            if addr.type in ["InternalIP", "ExternalIP"] and addr.address not in node_ips:
+                node_ips.append(addr.address)
+            if addr.type == "InternalIP" and not internal_ip:
+                internal_ip = addr.address
+            elif addr.type == "ExternalIP" and not external_ip:
+                external_ip = addr.address
+
+        capacity = getattr(node.status, "capacity", None) or {}
+        node_cpu_total = parse_k8s_cpu(capacity.get("cpu"))
+        node_ram_total = parse_k8s_bytes_to_gib(capacity.get("memory"))
+        node_eph_total = parse_k8s_bytes_to_gib(capacity.get("ephemeral-storage"))
+
+        req_cpu, req_ram, req_eph = pod_requests_by_node.get(name, [0.0, 0.0, 0.0])
+
+        cpu_total += node_cpu_total
+        ram_total += node_ram_total
+        cpu_allocated += req_cpu
+        ram_allocated += req_ram
+
+        created_at = getattr(node.metadata, "creation_timestamp", None)
+        labels = getattr(node.metadata, "labels", None) or {}
+        roles = sorted(
+            key.split("node-role.kubernetes.io/", 1)[1]
+            for key in labels
+            if key.startswith("node-role.kubernetes.io/")
+            and key.split("node-role.kubernetes.io/", 1)[1]
+        )
+        node_info = getattr(node.status, "node_info", None)
+        version = getattr(node_info, "kubelet_version", None) if node_info else None
+
+        nodes_details.append(
+            {
+                "hostname": name,
+                "ip": internal_ip or external_ip,
+                "status": status,
+                "roles": roles,
+                "creation_timestamp": created_at.isoformat() if created_at else None,
+                "version": version,
+                "cpu_total": round(node_cpu_total, 4),
+                "cpu_requested": round(req_cpu, 4),
+                "ram_total": round(node_ram_total, 4),
+                "ram_requested": round(req_ram, 4),
+                "ephemeral_storage_total": round(node_eph_total, 4),
+                "ephemeral_storage_requested": round(req_eph, 4),
+            }
+        )
+
+    return (
+        nodes_status,
+        node_ips,
+        cpu_total,
+        ram_total,
+        cpu_allocated,
+        ram_allocated,
+        nodes_details,
+    )
+
 
 class K8sClusterService(Service[K8sCluster]):
     permissions = permission
@@ -75,45 +280,25 @@ class K8sClusterService(Service[K8sCluster]):
                 ver = version_api.get_code()
                 k8s_version = ver.git_version
 
-                # Get Nodes
+                # Get Nodes and Pods for per-node resource utilization
                 nodes = core_v1.list_node()
                 node_count = len(nodes.items)
-                nodes_status = {}
-                cpu_total = 0.0
-                ram_total = 0.0
+                all_pods_items = []
+                try:
+                    all_pods = core_v1.list_pod_for_all_namespaces()
+                    all_pods_items = all_pods.items or []
+                except Exception as e:
+                    logger.warning(f"Failed to list pods for node requests: {e}")
 
-                def _parse_res(res):
-                    if res.endswith("Ki"):
-                        return float(res[:-2]) / 1024 / 1024
-                    if res.endswith("Mi"):
-                        return float(res[:-2]) / 1024
-                    if res.endswith("Gi"):
-                        return float(res[:-2])
-                    if res.endswith("m"):
-                        return float(res[:-1]) / 1000
-                    try:
-                        return float(res)
-                    except ValueError:
-                        return 0.0
-
-                node_ips = []
-                for node in nodes.items:
-                    name = node.metadata.name
-                    status = "Unknown"
-                    for cond in node.status.conditions:
-                        if cond.type == "Ready":
-                            status = "Ready" if cond.status == "True" else "NotReady"
-                            break
-                    nodes_status[name] = status
-
-                    for addr in node.status.addresses:
-                        if addr.type in ["InternalIP", "ExternalIP"] and addr.address not in node_ips:
-                            node_ips.append(addr.address)
-
-                    # Resource totals
-                    cpu_total += _parse_res(node.status.capacity.get("cpu", "0"))
-                    # Convert memory to GiB
-                    ram_total += _parse_res(node.status.capacity.get("memory", "0"))
+                (
+                    nodes_status,
+                    node_ips,
+                    cpu_total,
+                    ram_total,
+                    cpu_allocated,
+                    ram_allocated,
+                    nodes_details,
+                ) = build_nodes_details(nodes.items, all_pods_items)
 
                 def _pod_readiness(pods_items) -> tuple[str, str]:
                     if not pods_items:
@@ -474,8 +659,11 @@ class K8sClusterService(Service[K8sCluster]):
                     "k8s_version": k8s_version,
                     "node_count": node_count,
                     "nodes_status": nodes_status,
+                    "nodes_details": nodes_details,
                     "cpu_total": cpu_total,
+                    "cpu_allocated": cpu_allocated,
                     "ram_total": ram_total,
+                    "ram_allocated": ram_allocated,
                     "argocd_installed": argocd_installed,
                     "argocd_version": argocd_version,
                     "cert_manager_installed": cert_manager_installed,
@@ -512,8 +700,11 @@ class K8sClusterService(Service[K8sCluster]):
             status_model.k8s_version = info["k8s_version"]
             status_model.node_count = info["node_count"]
             status_model.nodes_status = info["nodes_status"]
+            status_model.nodes_details = info["nodes_details"]
             status_model.cpu_total = info["cpu_total"]
+            status_model.cpu_allocated = info["cpu_allocated"]
             status_model.ram_total = info["ram_total"]
+            status_model.ram_allocated = info["ram_allocated"]
             status_model.argocd_installed = info["argocd_installed"]
             status_model.argocd_version = info["argocd_version"]
             status_model.cert_manager_installed = info["cert_manager_installed"]
