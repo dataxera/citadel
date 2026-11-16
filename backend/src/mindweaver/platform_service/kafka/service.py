@@ -1,6 +1,7 @@
 # SPDX-FileCopyrightText: Copyright © 2026 Mohd Izhar Firdaus Bin Ismail
 # SPDX-License-Identifier: AGPLv3+
 
+from datetime import datetime, timezone
 import os
 import logging
 import asyncio
@@ -107,6 +108,70 @@ class KafkaPlatformService(PlatformService[KafkaPlatform]):
         project = await self.project(model)
         vars["ingress_domain"] = project.ingress_domain
         return vars
+
+    async def restart_service(self, model: KafkaPlatform) -> dict:
+        """Trigger a rolling restart of StrimziPodSets and Kafka Deployments."""
+        kubeconfig = await self.kubeconfig(model)
+        namespace = await self._resolve_namespace(model)
+        restarted_at = datetime.now(tz=timezone.utc).isoformat()
+
+        def _restart() -> dict:
+            k8s_client = self._build_k8s_client(kubeconfig)
+            custom_api = client.CustomObjectsApi(k8s_client)
+            apps_api = client.AppsV1Api(k8s_client)
+            restarted: list[str] = []
+
+            try:
+                pod_sets = custom_api.list_namespaced_custom_object(
+                    group="core.strimzi.io",
+                    version="v1beta2",
+                    namespace=namespace,
+                    plural="strimzipodsets",
+                    label_selector=f"strimzi.io/cluster={model.name}",
+                )
+                for pod_set in pod_sets.get("items") or []:
+                    ps_name = (pod_set.get("metadata") or {}).get("name")
+                    if not ps_name:
+                        continue
+                    custom_api.patch_namespaced_custom_object(
+                        group="core.strimzi.io",
+                        version="v1beta2",
+                        namespace=namespace,
+                        plural="strimzipodsets",
+                        name=ps_name,
+                        body={
+                            "metadata": {
+                                "annotations": {
+                                    "strimzi.io/manual-rolling-update": "true"
+                                }
+                            }
+                        },
+                    )
+                    restarted.append(f"StrimziPodSet/{ps_name}")
+
+                deployments = apps_api.list_namespaced_deployment(
+                    namespace=namespace,
+                    label_selector=f"strimzi.io/cluster={model.name}",
+                )
+                for dep in deployments.items:
+                    if dep.metadata and dep.metadata.name:
+                        self._patch_workload_restarted_at(
+                            apps_api, namespace, "Deployment", dep.metadata.name, restarted_at
+                        )
+                        restarted.append(f"Deployment/{dep.metadata.name}")
+            except client.exceptions.ApiException as e:
+                logger.error(f"Failed to restart Kafka cluster {model.name}: {e}")
+                raise RuntimeError(f"Failed to restart {model.name}: {e.reason}")
+
+            if not restarted:
+                raise RuntimeError(
+                    f"No restartable workloads found for {model.name} in namespace {namespace}"
+                )
+
+            logger.info(f"Triggered rolling restart for {model.name}: {restarted}")
+            return {"status": "success", "restarted": restarted}
+
+        return await asyncio.to_thread(_restart)
 
 
 router = KafkaPlatformService.router()

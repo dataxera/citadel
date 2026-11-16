@@ -13,7 +13,7 @@ const ServiceView = ({
     initialTab = 'connect',
     superset
 }) => {
-    const { getPlatformState, refreshPlatformState, updatePlatformState, fetchPlatforms, deletePlatform } = superset;
+    const { getPlatformState, refreshPlatformState, updatePlatformState, fetchPlatforms, fetchActions, executeAction, deletePlatform } = superset;
     const [platformState, setPlatformState] = useState(null);
     const [isRefreshing, setIsRefreshing] = useState(false);
 
@@ -211,6 +211,8 @@ const ServiceView = ({
             onBack={onBack}
             initialTab={initialTab}
             onRefresh={handleRefresh}
+            fetchActions={fetchActions}
+            executeAction={executeAction}
             isRefreshing={isRefreshing}
             onToggleActive={toggleActive}
             onDecommission={handleDecommission}

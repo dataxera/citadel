@@ -19,7 +19,7 @@ const ServiceView = ({
     initialTab = 'connect',
     nifi
 }) => {
-    const { getPlatformState, refreshPlatformState, updatePlatformState, fetchPlatforms, deletePlatform } = nifi;
+    const { getPlatformState, refreshPlatformState, updatePlatformState, fetchPlatforms, fetchActions, executeAction, deletePlatform } = nifi;
     const [platformState, setPlatformState] = useState(null);
     const [isRefreshing, setIsRefreshing] = useState(false);
 
@@ -211,6 +211,8 @@ const ServiceView = ({
             onBack={onBack}
             initialTab={initialTab}
             onRefresh={handleRefresh}
+            fetchActions={fetchActions}
+            executeAction={executeAction}
             isRefreshing={isRefreshing}
             onToggleActive={toggleActive}
             onDecommission={handleDecommission}

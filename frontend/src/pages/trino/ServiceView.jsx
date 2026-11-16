@@ -13,7 +13,7 @@ const ServiceView = ({
     initialTab = 'connect',
     trino
 }) => {
-    const { getPlatformState, refreshPlatformState, updatePlatformState, fetchPlatforms, deletePlatform } = trino;
+    const { getPlatformState, refreshPlatformState, updatePlatformState, fetchPlatforms, fetchActions, executeAction, deletePlatform } = trino;
     const [platformState, setPlatformState] = useState(null);
     const [isRefreshing, setIsRefreshing] = useState(false);
 
@@ -203,6 +203,8 @@ const ServiceView = ({
             onBack={onBack}
             initialTab={initialTab}
             onRefresh={handleRefresh}
+            fetchActions={fetchActions}
+            executeAction={executeAction}
             isRefreshing={isRefreshing}
             onToggleActive={toggleActive}
             onDecommission={handleDecommission}

@@ -18,7 +18,7 @@ const ServiceView = ({
     initialTab = 'connect',
     doris
 }) => {
-    const { getPlatformState, refreshPlatformState, updatePlatformState, fetchPlatforms, deletePlatform } = doris;
+    const { getPlatformState, refreshPlatformState, updatePlatformState, fetchPlatforms, fetchActions, executeAction, deletePlatform } = doris;
     const [platformState, setPlatformState] = useState(null);
     const [isRefreshing, setIsRefreshing] = useState(false);
 
@@ -213,6 +213,8 @@ const ServiceView = ({
             platformState={platformState}
             onBack={onBack}
             onRefresh={handleRefresh}
+            fetchActions={fetchActions}
+            executeAction={executeAction}
             isRefreshing={isRefreshing}
             onToggleActive={toggleActive}
             onDecommission={handleDecommission}

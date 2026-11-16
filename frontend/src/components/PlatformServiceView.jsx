@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { Terminal, RefreshCcw, Zap, Loader2, Activity, Clock, Copy, Check, Briefcase, Server } from 'lucide-react';
 import { cn } from '../utils/cn';
+import { useNotification } from '../providers/NotificationProvider';
 import Drawer from './Drawer';
 import Modal from './Modal';
 import {
@@ -30,8 +31,14 @@ const StatusBadge = ({ status }) => {
     );
 };
 
+const formatActionLabel = (action) =>
+    String(action)
+        .replace(/_/g, ' ')
+        .replace(/\b\w/g, (char) => char.toUpperCase());
+
 const PlatformServiceView = ({
     darkMode,
+    selectedPlatformId,
     selectedPlatform,
     platformState,
     projects: projectsProp,
@@ -46,9 +53,11 @@ const PlatformServiceView = ({
     deleteWarningText = "Permanently delete this cluster and all associated configurations. The cluster must be decommissioned before it can be deleted. This action cannot be undone.",
     deleteModalTitle = "Confirm Deletion",
     deleteButtonText = "DELETE CLUSTER",
-    availableActions = [],
-    isExecutingAction,
-    onExecuteAction,
+    availableActions: availableActionsProp,
+    isExecutingAction: isExecutingActionProp,
+    onExecuteAction: onExecuteActionProp,
+    fetchActions,
+    executeAction,
     icon: Icon,
     iconClassName = "text-blue-400",
     entityPath,
@@ -70,6 +79,42 @@ const PlatformServiceView = ({
 
     const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
     const [copied, setCopied] = useState(false);
+    const [fetchedActions, setFetchedActions] = useState([]);
+    const [internalExecutingAction, setInternalExecutingAction] = useState(null);
+    const { showSuccess, showError } = useNotification();
+
+    const platformId = selectedPlatformId ?? selectedPlatform?.id;
+
+    useEffect(() => {
+        if (!fetchActions || availableActionsProp !== undefined) return;
+        if (platformId && platformState?.active) {
+            fetchActions(platformId).then(setFetchedActions).catch(() => setFetchedActions([]));
+        } else {
+            setFetchedActions([]);
+        }
+    }, [platformId, platformState?.active, fetchActions, availableActionsProp]);
+
+    const availableActions = availableActionsProp ?? fetchedActions;
+    const isExecutingAction = isExecutingActionProp !== undefined ? isExecutingActionProp : internalExecutingAction;
+
+    const handleActionClick = async (actionName) => {
+        if (onExecuteActionProp) {
+            return onExecuteActionProp(actionName);
+        }
+        if (!executeAction || !platformId) return;
+        setInternalExecutingAction(actionName);
+        try {
+            await executeAction(platformId, actionName);
+            showSuccess(`${formatActionLabel(actionName)} triggered successfully`);
+            if (onRefresh) {
+                await onRefresh();
+            }
+        } catch (err) {
+            showError(`Failed to trigger ${formatActionLabel(actionName)}: ${err.message}`);
+        } finally {
+            setInternalExecutingAction(null);
+        }
+    };
 
     const formatTimestamp = (ts) => {
         if (!ts) return null;
@@ -152,11 +197,11 @@ const PlatformServiceView = ({
                                 {availableActions.map(action => (
                                     <button
                                         key={action}
-                                        onClick={() => onExecuteAction(action)}
+                                        onClick={() => handleActionClick(action)}
                                         disabled={isExecutingAction === action}
-                                        className="w-full text-left px-5 py-3.5 text-xs font-bold uppercase tracking-widest hover:bg-slate-100/50 dark:hover:bg-slate-800/50 transition-all flex items-center justify-between group first:rounded-t-lg last:rounded-b-lg border-b last:border-b-0 border-slate-100 dark:border-slate-800/50"
+                                        className="w-full text-left px-5 py-3.5 text-xs font-bold tracking-wider hover:bg-slate-100/50 dark:hover:bg-slate-800/50 transition-all flex items-center justify-between group first:rounded-t-lg last:rounded-b-lg border-b last:border-b-0 border-slate-100 dark:border-slate-800/50"
                                     >
-                                        <span className="text-slate-700 dark:text-slate-300 group-hover:text-blue-500">{action}</span>
+                                        <span className="text-slate-700 dark:text-slate-300 group-hover:text-blue-500">{formatActionLabel(action)}</span>
                                         {isExecutingAction === action ? (
                                             <Loader2 size={14} className="animate-spin text-blue-500" />
                                         ) : (

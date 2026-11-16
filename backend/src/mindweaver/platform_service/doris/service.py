@@ -1,10 +1,13 @@
 # SPDX-FileCopyrightText: Copyright © 2026 Mohd Izhar Firdaus Bin Ismail
 # SPDX-License-Identifier: AGPLv3+
 
+from datetime import datetime, timezone
+import asyncio
 import os
 import secrets
 import logging
 from typing import Any
+from kubernetes import client
 from mindweaver.platform_service.base import PlatformService
 from mindweaver.crypto import decrypt_password, encrypt_password
 from .model import DorisPlatform, DorisPlatformState
@@ -175,3 +178,38 @@ class DorisPlatformService(PlatformService[DorisPlatform]):
         vars["ingress_domain"] = project.ingress_domain
 
         return vars
+
+    async def restart_service(self, model: DorisPlatform) -> dict:
+        """Trigger a rolling restart of Doris FE and BE StatefulSets."""
+        kubeconfig = await self.kubeconfig(model)
+        namespace = await self._resolve_namespace(model)
+        restarted_at = datetime.now(tz=timezone.utc).isoformat()
+
+        def _restart() -> dict:
+            k8s_client = self._build_k8s_client(kubeconfig)
+            apps_api = client.AppsV1Api(k8s_client)
+            restarted: list[str] = []
+
+            try:
+                stateful_sets = apps_api.list_namespaced_stateful_set(
+                    namespace=namespace
+                )
+                for sts in stateful_sets.items:
+                    if sts.metadata and sts.metadata.name and sts.metadata.name.startswith(f"{model.name}-"):
+                        self._patch_workload_restarted_at(
+                            apps_api, namespace, "StatefulSet", sts.metadata.name, restarted_at
+                        )
+                        restarted.append(f"StatefulSet/{sts.metadata.name}")
+            except client.exceptions.ApiException as e:
+                logger.error(f"Failed to restart Doris cluster {model.name}: {e}")
+                raise RuntimeError(f"Failed to restart {model.name}: {e.reason}")
+
+            if not restarted:
+                raise RuntimeError(
+                    f"No restartable workloads found for {model.name} in namespace {namespace}"
+                )
+
+            logger.info(f"Triggered rolling restart for {model.name}: {restarted}")
+            return {"status": "success", "restarted": restarted}
+
+        return await asyncio.to_thread(_restart)

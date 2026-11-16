@@ -1,7 +1,7 @@
 # SPDX-FileCopyrightText: Copyright © 2026 Mohd Izhar Firdaus Bin Ismail
 # SPDX-License-Identifier: AGPLv3+
 
-from datetime import datetime
+from datetime import datetime, timezone
 import abc
 import asyncio
 import enum
@@ -1249,6 +1249,117 @@ class PlatformService(ProjectScopedService[T], abc.ABC):
             default_version=default_chart_version,
         )
         return version
+
+    @staticmethod
+    def _build_k8s_client(kubeconfig: str | None) -> client.ApiClient:
+        """Build a Kubernetes ApiClient from an optional kubeconfig string."""
+        if kubeconfig is None:
+            config.load_incluster_config()
+            return client.ApiClient()
+        with tempfile.NamedTemporaryFile(mode="w") as kf:
+            kf.write(kubeconfig)
+            kf.flush()
+            return config.new_client_from_config(config_file=kf.name)
+
+    @staticmethod
+    def _patch_workload_restarted_at(
+        apps_api: client.AppsV1Api,
+        namespace: str,
+        kind: str,
+        name: str,
+        restarted_at: str,
+    ) -> None:
+        """Patch a Deployment, StatefulSet, or DaemonSet to trigger a rolling restart."""
+        patch_body = {
+            "spec": {
+                "template": {
+                    "metadata": {
+                        "annotations": {
+                            "kubectl.kubernetes.io/restartedAt": restarted_at
+                        }
+                    }
+                }
+            }
+        }
+        patchers = {
+            "Deployment": apps_api.patch_namespaced_deployment,
+            "StatefulSet": apps_api.patch_namespaced_stateful_set,
+            "DaemonSet": apps_api.patch_namespaced_daemon_set,
+        }
+        patcher = patchers.get(kind)
+        if patcher is None:
+            raise ValueError(f"Unsupported workload kind for restart: {kind}")
+        patcher(name=name, namespace=namespace, body=patch_body)
+
+    async def restart_service(self, model: T) -> dict:
+        """Trigger a rolling restart of all Kubernetes workloads for this service."""
+        kubeconfig = await self.kubeconfig(model)
+        namespace = await self._resolve_namespace(model)
+        restarted_at = datetime.now(tz=timezone.utc).isoformat()
+        restartable_kinds = {"Deployment", "StatefulSet", "DaemonSet"}
+
+        def _restart() -> dict:
+            k8s_client = self._build_k8s_client(kubeconfig)
+            custom_api = client.CustomObjectsApi(k8s_client)
+            apps_api = client.AppsV1Api(k8s_client)
+
+            targets: set[tuple[str, str]] = set()
+
+            try:
+                app = custom_api.get_namespaced_custom_object(
+                    group="argoproj.io",
+                    version="v1alpha1",
+                    namespace="argocd",
+                    plural="applications",
+                    name=model.name,
+                )
+                for res in (app.get("status") or {}).get("resources") or []:
+                    kind = res.get("kind")
+                    res_name = res.get("name")
+                    res_ns = res.get("namespace") or namespace
+                    if kind in restartable_kinds and res_name and res_ns == namespace:
+                        targets.add((kind, res_name))
+            except client.exceptions.ApiException as e:
+                if e.status != 404:
+                    logger.warning(
+                        f"Could not read ArgoCD Application {model.name}: {e.reason}"
+                    )
+
+            label_selector = f"app.kubernetes.io/instance={model.name}"
+            for kind, lister in (
+                ("Deployment", apps_api.list_namespaced_deployment),
+                ("StatefulSet", apps_api.list_namespaced_stateful_set),
+            ):
+                try:
+                    items = lister(namespace=namespace, label_selector=label_selector).items
+                    for item in items:
+                        if item.metadata and item.metadata.name:
+                            targets.add((kind, item.metadata.name))
+                except client.exceptions.ApiException as e:
+                    logger.warning(
+                        f"Failed to list {kind}s for {model.name} in {namespace}: {e.reason}"
+                    )
+
+            if not targets:
+                raise RuntimeError(
+                    f"No restartable workloads found for {model.name} in namespace {namespace}"
+                )
+
+            restarted: list[str] = []
+            try:
+                for kind, name in sorted(targets):
+                    self._patch_workload_restarted_at(
+                        apps_api, namespace, kind, name, restarted_at
+                    )
+                    restarted.append(f"{kind}/{name}")
+            except client.exceptions.ApiException as e:
+                logger.error(f"Failed to restart {model.name}: {e}")
+                raise RuntimeError(f"Failed to restart {model.name}: {e.reason}")
+
+            logger.info(f"Triggered rolling restart for {model.name}: {restarted}")
+            return {"status": "success", "restarted": restarted}
+
+        return await asyncio.to_thread(_restart)
 
 
 

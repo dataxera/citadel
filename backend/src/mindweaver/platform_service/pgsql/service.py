@@ -10,6 +10,7 @@ from sqlmodel import Field
 from typing import Any, Optional, Literal
 from pydantic import field_validator, ValidationError, model_validator
 from mindweaver.fw.exc import FieldValidationError
+from datetime import datetime, timezone
 import base64
 import logging
 import os
@@ -160,6 +161,54 @@ class PgSqlPlatformService(PlatformService[PgSqlPlatform]):
                 except Exception:
                     vars["s3_secret_key"] = s3_storage.secret_key
         return vars
+
+    async def restart_service(self, model: PgSqlPlatform) -> dict:
+        """Trigger a rolling restart of the CNPG Cluster and pooler Deployments."""
+        kubeconfig = await self.kubeconfig(model)
+        namespace = await self._resolve_namespace(model)
+        restarted_at = datetime.now(tz=timezone.utc).isoformat()
+
+        def _restart() -> dict:
+            k8s_client = self._build_k8s_client(kubeconfig)
+            custom_api = client.CustomObjectsApi(k8s_client)
+            apps_api = client.AppsV1Api(k8s_client)
+            restarted: list[str] = []
+
+            try:
+                custom_api.patch_namespaced_custom_object(
+                    group="postgresql.cnpg.io",
+                    version="v1",
+                    namespace=namespace,
+                    plural="clusters",
+                    name=model.name,
+                    body={
+                        "metadata": {
+                            "annotations": {
+                                "kubectl.kubernetes.io/restartedAt": restarted_at
+                            }
+                        }
+                    },
+                )
+                restarted.append(f"Cluster/{model.name}")
+
+                poolers = apps_api.list_namespaced_deployment(
+                    namespace=namespace,
+                    label_selector=f"cnpg.io/cluster={model.name}",
+                )
+                for dep in poolers.items:
+                    if dep.metadata and dep.metadata.name:
+                        self._patch_workload_restarted_at(
+                            apps_api, namespace, "Deployment", dep.metadata.name, restarted_at
+                        )
+                        restarted.append(f"Deployment/{dep.metadata.name}")
+            except client.exceptions.ApiException as e:
+                logger.error(f"Failed to restart PostgreSQL cluster {model.name}: {e}")
+                raise RuntimeError(f"Failed to restart {model.name}: {e.reason}")
+
+            logger.info(f"Triggered rolling restart for {model.name}: {restarted}")
+            return {"status": "success", "restarted": restarted}
+
+        return await asyncio.to_thread(_restart)
 
 
 
