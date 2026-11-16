@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Terminal, RefreshCcw, Zap, Loader2, Activity, Clock, Copy, Check } from 'lucide-react';
+import { useOutletContext } from 'react-router-dom';
+import { Terminal, RefreshCcw, Zap, Loader2, Activity, Clock, Copy, Check, Briefcase, Server } from 'lucide-react';
 import { cn } from '../utils/cn';
 import Drawer from './Drawer';
 import Modal from './Modal';
@@ -33,6 +34,7 @@ const PlatformServiceView = ({
     darkMode,
     selectedPlatform,
     platformState,
+    projects: projectsProp,
     onBack,
     initialTab = 'connect',
     onRefresh,
@@ -58,6 +60,14 @@ const PlatformServiceView = ({
     deployButtonText = "DEPLOY CLUSTER",
     extraTabs = [],
 }) => {
+    const outletContext = useOutletContext() || {};
+    const projects = projectsProp ?? outletContext.projects ?? [];
+    const instanceName = selectedPlatform.name || selectedPlatform.title || `#${selectedPlatform.id}`;
+    const project = projects.find((p) => String(p.id) === String(selectedPlatform.project_id));
+    const projectLabel = project
+        ? (project.title || project.name)
+        : (selectedPlatform.project_id != null ? `Project #${selectedPlatform.project_id}` : null);
+
     const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
     const [copied, setCopied] = useState(false);
 
@@ -86,10 +96,23 @@ const PlatformServiceView = ({
                             <h2 className="text-4xl font-bold tracking-tight text-slate-900 dark:text-white">{selectedPlatform.title}</h2>
                             <StatusBadge status={platformState?.status || (platformState?.active ? 'active' : 'stopped')} />
                         </div>
-                        <div className="flex flex-wrap items-center gap-4 mt-2">
-                            <span className="flex items-center gap-1.5 text-sm text-slate-400 shrink-0">
-                                Instance ID: <span className="text-slate-500 font-mono font-bold uppercase tracking-tight">{selectedPlatform.id}</span>
+                        <div className="flex flex-wrap items-center gap-3 mt-2">
+                            <span
+                                className="mw-instance-pill inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold font-mono bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20 shrink-0"
+                                title={`Instance: ${instanceName}`}
+                            >
+                                <Server size={12} />
+                                <span>{instanceName}</span>
                             </span>
+                            {projectLabel && (
+                                <span
+                                    className="mw-project-pill inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-500/10 text-slate-600 dark:text-slate-300 border border-slate-500/20 shrink-0"
+                                    title={`Project: ${projectLabel}`}
+                                >
+                                    <Briefcase size={12} />
+                                    <span>{projectLabel}</span>
+                                </span>
+                            )}
                             <span className="flex items-center gap-1.5 text-sm text-slate-500 font-mono shrink-0">
                                 <Terminal size={14} /> {selectedPlatform.image}
                             </span>

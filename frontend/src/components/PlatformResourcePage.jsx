@@ -56,6 +56,7 @@ const PlatformResourcePage = (props) => {
             darkMode,
             selectedPlatformId: selectedPlatform.id,
             selectedPlatform,
+            projects,
             onBack: handleBack,
             initialTab: searchParams.get('tab') || 'connect',
             [resourcePropName]: resource,
