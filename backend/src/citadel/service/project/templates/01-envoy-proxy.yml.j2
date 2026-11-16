@@ -11,17 +11,7 @@ spec:
     type: Kubernetes
     kubernetes:
       envoyService:
-        type: {{ service_type }}
-        {%- if service_type == "NodePort" and nodeport %}
-        patch:
-          type: StrategicMerge
-          value:
-            spec:
-              ports:
-                - name: https
-                  port: 443
-                  nodePort: {{ nodeport }}
-        {%- endif %}
+        type: LoadBalancer
 #	backendTLS:
 #		clientCertificateRef:
 #			name: envoy-{{ name }}

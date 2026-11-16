@@ -126,7 +126,6 @@ async def test_project_deploy_gateway_with_nodeport(client):
             k8s_cluster_id=cluster.id,
             k8s_namespace="test-proj-gw-np",
             ingress_domain="gw-np.test.local",
-            envoy_nodeport=32111,
         )
         session.add(project)
         await session.commit()
@@ -150,79 +149,20 @@ async def test_project_deploy_gateway_with_nodeport(client):
 
             # Verify that the generated manifest includes EnvoyProxy and references it in the Gateway
             assert mock_exec.call_count >= 1
-            calls = [call[0] for call in mock_exec.call_args_list]
-            
-            # Find the manifest content applied
-            # The manifest string is written to a tempfile, so let's check what was written
-            # We can inspect the tempfile content or mock run_kubectl
-            # But we can also check the helper directly, or verify via mocking tempfile
-            
+
             # Let's test the helper directly to be extremely clean and robust
             from citadel.service.project.actions import _render_gateway_manifests
-            manifest = _render_gateway_manifests(project, "test-proj-gw-np", 32111)
+            manifest = _render_gateway_manifests(project, "test-proj-gw-np")
             assert "EnvoyProxy" in manifest
             assert "project-envoy-proxy-config" in manifest
-            assert "nodePort: 32111" in manifest
+            assert "type: LoadBalancer" in manifest
+            assert "nodePort" not in manifest
+            assert "NodePort" not in manifest
             assert "infrastructure:" in manifest
             assert "parametersRef:" in manifest
             assert "backendTLS:" in manifest
             assert "clientCertificateRef:" in manifest
             assert "name: envoy-test-proj-gw-np" in manifest
-
-
-
-@pytest.mark.asyncio
-async def test_project_deploy_gateway_dynamic_nodeport_capture(client):
-    from citadel.service.project.actions import SyncProjectIntegrationsAction as DeployGatewayAction
-
-    cluster = K8sCluster(
-        name="test-cluster-gw-dyn",
-        title="Test Cluster GW DYN",
-        type=K8sClusterType.REMOTE,
-        kubeconfig="fake-kubeconfig",
-    )
-
-    engine = get_engine()
-    async with AsyncSession(engine, expire_on_commit=False) as session:
-        session.add(cluster)
-        await session.commit()
-        await session.refresh(cluster)
-
-        project = Project(
-            name="test-proj-gw-dyn",
-            title="Test Proj GW DYN",
-            k8s_cluster_id=cluster.id,
-            k8s_namespace="test-proj-gw-dyn",
-            ingress_domain="gw-dyn.test.local",
-            envoy_nodeport=None, # Not set
-        )
-        session.add(project)
-        await session.commit()
-        await session.refresh(project)
-
-        mock_svc = MagicMock()
-        mock_svc.session = session
-        mock_svc.request = MagicMock()
-
-        with patch("asyncio.create_subprocess_exec") as mock_exec, \
-             patch("citadel.service.project.actions._get_existing_nodeport", return_value=32222) as mock_get_np:
-            mock_proc = MagicMock()
-            mock_proc.returncode = 0
-            mock_proc.communicate = pytest.importorskip("unittest.mock").AsyncMock(
-                return_value=(b"success", b"")
-            )
-            mock_exec.return_value = mock_proc
-
-            action = DeployGatewayAction(project, mock_svc)
-            action.session = session
-            await action.run()
-
-            # The helper should have been called and the value saved to the DB
-            mock_get_np.assert_called_once()
-            
-            # Fetch the project from the DB again to verify it has been updated
-            db_project = await session.get(Project, project.id)
-            assert db_project.envoy_nodeport == 32222
 
 
 def test_download_haproxy_cert_view(client: TestClient):

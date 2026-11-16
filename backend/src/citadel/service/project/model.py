@@ -1,16 +1,10 @@
 # SPDX-FileCopyrightText: Copyright © 2025 Mohd Izhar Firdaus Bin Ismail
 # SPDX-License-Identifier: AGPLv3+
 
-import enum
 from typing import Optional
 from sqlmodel import Field
-from sqlalchemy import String, Column, Enum as SQLEnum
+from sqlalchemy import String
 from citadel.service import NamedBase
-
-
-class EnvoyGatewayServiceType(enum.StrEnum):
-    LOAD_BALANCER = "LoadBalancer"
-    NODE_PORT = "NodePort"
 
 
 class Project(NamedBase, table=True):
@@ -25,21 +19,6 @@ class Project(NamedBase, table=True):
     )
     ingress_domain: Optional[str] = Field(
         default=None, sa_type=String(length=255), nullable=True
-    )
-    envoy_gateway_service_type: EnvoyGatewayServiceType = Field(
-        default=EnvoyGatewayServiceType.LOAD_BALANCER,
-        sa_column=Column(
-            SQLEnum(
-                EnvoyGatewayServiceType,
-                native_enum=False,
-                values_callable=lambda x: [i.value for i in x],
-            ),
-            nullable=False,
-            server_default=EnvoyGatewayServiceType.LOAD_BALANCER.value,
-        ),
-    )
-    envoy_nodeport: Optional[int] = Field(
-        default=None, nullable=True
     )
     stack_id: Optional[int] = Field(
         default=None, foreign_key="dxc_stack.id", index=True

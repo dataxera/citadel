@@ -8,7 +8,7 @@ import logging
 import os
 import tempfile
 import yaml
-from typing import Any, Optional
+from typing import Any
 from sqlmodel import select
 
 
@@ -23,49 +23,6 @@ from citadel.fw.util import sanitize_label_value
 logger = logging.getLogger(__name__)
 
 
-async def _get_existing_nodeport(cluster, namespace: str) -> Optional[int]:
-    """Retrieve existing Envoy HTTPS nodePort if it has been dynamically allocated."""
-    from kubernetes import client, config
-    def _get():
-        try:
-            if cluster.type == K8sClusterType.IN_CLUSTER:
-                config.load_incluster_config()
-            else:
-                if not cluster.kubeconfig:
-                    return None
-                with tempfile.NamedTemporaryFile(mode="w", delete=False) as kf:
-                    kf.write(cluster.kubeconfig)
-                    kf.flush()
-                    config.load_kube_config(config_file=kf.name)
-            core_v1 = client.CoreV1Api()
-            # Try project namespace first
-            try:
-                svcs = core_v1.list_namespaced_service(namespace=namespace)
-                for svc in svcs.items:
-                    if "envoy" in svc.metadata.name or "project-gateway" in svc.metadata.name:
-                        for p in svc.spec.ports:
-                            if p.port == 443 and getattr(p, "node_port", None):
-                                return p.node_port
-            except Exception:
-                pass
-
-            # Try envoy-gateway-system namespace next
-            expected_prefix = f"envoy-{namespace}-project-gateway"
-            try:
-                eg_svcs = core_v1.list_namespaced_service(namespace="envoy-gateway-system")
-                for svc in eg_svcs.items:
-                    if svc.metadata.name.startswith(expected_prefix):
-                        for p in svc.spec.ports:
-                            if p.port == 443 and getattr(p, "node_port", None):
-                                return p.node_port
-            except Exception:
-                pass
-        except Exception as e:
-            logger.warning(f"Error checking existing nodeport: {e}")
-        return None
-    return await asyncio.to_thread(_get)
-
-
 @functools.lru_cache(maxsize=32)
 def _get_jinja_env() -> j2.Environment:
     template_directory = os.path.join(os.path.dirname(__file__), "templates")
@@ -73,19 +30,12 @@ def _get_jinja_env() -> j2.Environment:
     return env
 
 
-def _render_gateway_manifests(model, namespace: str, service_type: str = "LoadBalancer", nodeport: Optional[int] = None) -> str:
+def _render_gateway_manifests(model, namespace: str) -> str:
     """Render Gateway and Certificate manifests from YAML templates."""
-    # Handle older test calls passing nodeport as the 3rd positional argument
-    if isinstance(service_type, int):
-        nodeport = service_type
-        service_type = "NodePort"
-
     vars = {
         "name": model.name,
         "namespace": namespace,
         "ingress_domain": model.ingress_domain,
-        "service_type": service_type,
-        "nodeport": nodeport,
     }
 
     env = _get_jinja_env()
@@ -179,16 +129,7 @@ class SyncProjectIntegrationsAction(BaseAction):
 
         namespace = self.model.k8s_namespace or self.model.name
 
-        # 1. Check/Persist nodeport
-        if not self.model.envoy_nodeport:
-            existing_port = await _get_existing_nodeport(cluster, namespace)
-            if existing_port:
-                self.model.envoy_nodeport = existing_port
-                self.session.add(self.model)
-                await self.session.commit()
-                await self.session.refresh(self.model)
-
-        # 2. Render templates
+        # 1. Render templates
         env = _get_jinja_env()
         
         # 2a. ArgoCD Project
@@ -209,7 +150,7 @@ class SyncProjectIntegrationsAction(BaseAction):
         gateway_manifest = ""
         if self.model.ingress_domain:
             gateway_manifest = _render_gateway_manifests(
-                self.model, namespace, self.model.envoy_gateway_service_type, self.model.envoy_nodeport
+                self.model, namespace
             )
 
         # 2d. Trusted Certificates Secret

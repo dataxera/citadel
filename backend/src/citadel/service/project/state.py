@@ -90,7 +90,6 @@ class ProjectState(BaseState):
         dex_installed = False
         dex_version = None
         ingress_ports = []
-        envoy_gateway_service_type = self.model.envoy_gateway_service_type
         if self.model.k8s_cluster_id and self.model.k8s_namespace and status_data.get("status") != "error":
             from citadel.service.k8s_cluster import K8sCluster, K8sClusterType
             stmt_c = select(K8sCluster).where(K8sCluster.id == self.model.k8s_cluster_id)
@@ -210,6 +209,5 @@ class ProjectState(BaseState):
             "dex_version": dex_version,
             "cluster_node_ips": cluster_node_ips,
             "ingress_ports": ingress_ports,
-            "envoy_gateway_service_type": envoy_gateway_service_type,
         }
 

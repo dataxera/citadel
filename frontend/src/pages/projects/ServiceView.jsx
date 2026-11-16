@@ -399,54 +399,12 @@ const ServiceView = ({
                             darkMode={darkMode}
                             ports={projectState.ingress_ports.map(port => ({
                                 label: port.name,
-                                node_port: port.node_port,
                                 port: port.port,
-                                load_balancer_ips: projectState.envoy_gateway_service_type === 'LoadBalancer' ? (port.load_balancer_ips || []) : undefined,
+                                load_balancer_ips: port.load_balancer_ips || [],
                                 scheme: 'https'
                             }))}
-                            clusterNodes={projectState.cluster?.nodes_status
-                                ? Object.keys(projectState.cluster.nodes_status).map(hostname => ({ hostname }))
-                                : (projectState.cluster_node_ips?.map((ip, idx) => ({
-                                    ipv4: ip,
-                                    hostname: `Node ${idx + 1}`
-                                })) || [])}
-                            guideTitle={projectState.envoy_gateway_service_type === 'LoadBalancer' ? "DNS Ingress Domain Setup" : "HAProxy Ingress Gateway Configuration"}
-                            guideText={projectState.envoy_gateway_service_type === 'LoadBalancer' 
-                                ? `To route external traffic to your project, configure a CNAME or A record for your domain <strong>${selectedProject.ingress_domain}</strong> to point to the LoadBalancer IP/hostname.`
-                                : "To route external HTTPS (port 443) traffic to the Envoy Gateway NodePorts, configure your external HAProxy load balancer using SSL Termination (HTTP mode) with your custom SSL certificate."}
-                            cliLanguage={projectState.envoy_gateway_service_type === 'LoadBalancer' ? undefined : "haproxy"}
-                            cliTitle={projectState.envoy_gateway_service_type === 'LoadBalancer' ? undefined : "HAProxy Configuration"}
-                            cliInfo={projectState.envoy_gateway_service_type === 'LoadBalancer' ? undefined : {
-                                command: `global
-    log /dev/log local0
-    log /dev/log local1 notice
-    chroot /var/lib/haproxy
-    user haproxy
-    group haproxy
-    daemon
-
-defaults
-    log     global
-    mode    http
-    option  httplog
-    option  dontlognull
-    timeout connect 5s
-    timeout client  50s
-    timeout server  50s
-
-frontend ingress_443
-    bind :443 ssl crt /etc/pki/tls/certs/haproxy.pem
-    mode http
-    option forwardfor
-    http-request set-header X-Forwarded-Proto https
-    default_backend envoy_gateway_backend
-
-backend envoy_gateway_backend
-    mode http
-    balance roundrobin
-${projectState.cluster_node_ips?.map((ip, idx) => `    server node${idx + 1} ${ip}:${projectState.ingress_ports[0].node_port} ssl verify none no-check-ssl check sni req.hdr(host)`).join('\n') || `    server node1 ${projectState.cluster_node_ips?.[0] || 'NODE_IP'}:${projectState.ingress_ports[0].node_port} ssl verify none no-check-ssl check sni req.hdr(host)`}
-`
-                            }}
+                            guideTitle="DNS Ingress Domain Setup"
+                            guideText={`To route external traffic to your project, configure a CNAME or A record for your domain <strong>${selectedProject.ingress_domain}</strong> to point to the LoadBalancer IP/hostname.`}
                         />
                     </div>
                 )}

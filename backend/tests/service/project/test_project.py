@@ -285,35 +285,24 @@ def test_project_with_ldap(client: TestClient, test_cluster: dict):
     assert get_resp.json()["data"]["ldap_config_id"] == ldap_id
 
 
-def test_project_with_envoy_nodeport(client: TestClient, test_cluster: dict):
-    # 1. Create project with envoy_nodeport
+def test_project_excludes_envoy_nodeport_and_service_type(client: TestClient, test_cluster: dict):
+    """Verify envoy_nodeport and envoy_gateway_service_type are removed from Project API and widgets."""
     proj_resp = client.post(
         "/api/v1/projects",
         json={
-            "name": "proj-with-np",
-            "title": "Project with Envoy NodePort",
+            "name": "proj-lb-only",
+            "title": "Project LB Only",
             "k8s_cluster_id": test_cluster["id"],
-            "envoy_nodeport": 31234,
-        }
+        },
     )
     assert proj_resp.status_code == 200
     data = proj_resp.json()["data"]
-    assert data["envoy_nodeport"] == 31234
+    assert "envoy_nodeport" not in data
+    assert "envoy_gateway_service_type" not in data
 
-    # 2. Verify retrieval
-    get_resp = client.get(f"/api/v1/projects/{data['id']}")
-    assert get_resp.json()["data"]["envoy_nodeport"] == 31234
-
-    # 3. Verify updating envoy_nodeport
-    upd_resp = client.put(
-        f"/api/v1/projects/{data['id']}",
-        json={
-            "name": "proj-with-np",
-            "title": "Project with Envoy NodePort Updated",
-            "k8s_cluster_id": test_cluster["id"],
-            "envoy_nodeport": 31235,
-        }
-    )
-    assert upd_resp.status_code == 200
-    assert upd_resp.json()["data"]["envoy_nodeport"] == 31235
+    widgets_resp = client.get("/api/v1/projects/_widgets")
+    if widgets_resp.status_code == 200:
+        widgets = widgets_resp.json()
+        assert "envoy_nodeport" not in widgets
+        assert "envoy_gateway_service_type" not in widgets
 
