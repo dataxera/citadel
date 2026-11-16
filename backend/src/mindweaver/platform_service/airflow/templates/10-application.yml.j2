@@ -245,3 +245,8 @@ spec:
     syncOptions:
     - CreateNamespace=true
     - RespectIgnoreDifferences=true
+  ignoreDifferences:
+    - group: "*"
+      kind: "*"
+      jsonPointers:
+        - /status

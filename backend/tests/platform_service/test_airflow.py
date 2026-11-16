@@ -528,6 +528,84 @@ async def test_airflow_images_resolved_and_rendered(test_stack_session):
     assert 'tag: "v0.99.0"' in manifest
     assert 'repository: "test.registry/git-sync/git-sync"' in manifest
     assert 'tag: "v4.99.0"' in manifest
+    assert "ignoreDifferences:" in manifest
+    assert "/status" in manifest
+
+
+@pytest.mark.asyncio
+async def test_airflow_poller_pod_stats():
+    """Test AirflowPoller reports pod statistics for core pod types (API, Scheduler, Worker)."""
+    from mindweaver.platform_service.airflow.model import AirflowPlatformState
+    from mindweaver.platform_service.airflow.poller import AirflowPoller
+
+    req = MagicMock()
+    session = MagicMock()
+    session.add = MagicMock()
+    session.flush = AsyncMock()
+
+    svc = AirflowPlatformService(req, session)
+    model = AirflowPlatform(
+        id=1,
+        name="my-airflow",
+        title="My Airflow",
+        project_id=1,
+        platform_pgsql_id=1,
+        admin_password=encrypt_password("secret123"),
+    )
+    state = AirflowPlatformState(platform_id=1, active=True)
+    svc.platform_state = AsyncMock(return_value=state)
+    svc.kubeconfig = AsyncMock(return_value=None)
+    svc._resolve_namespace = AsyncMock(return_value="test-ns")
+    svc.project = AsyncMock(return_value=MagicMock(ingress_domain="apps.example.com"))
+
+    def _make_pod(name: str, phase: str = "Running", ready: bool = True):
+        pod = MagicMock()
+        pod.metadata.name = name
+        pod.status.phase = phase
+        cs = MagicMock()
+        cs.ready = ready
+        pod.status.container_statuses = [cs]
+        return pod
+
+    mock_pods = MagicMock()
+    mock_pods.items = [
+        _make_pod("my-airflow-api-server-abc123", "Running", True),
+        _make_pod("my-airflow-scheduler-def456", "Running", True),
+        _make_pod("my-airflow-worker-0", "Running", True),
+        _make_pod("my-airflow-worker-1", "Pending", False),
+        _make_pod("my-airflow-redis-0", "Running", True),
+        _make_pod("my-airflow-statsd-xyz", "Running", True),
+    ]
+
+    mock_custom_api = MagicMock()
+    mock_custom_api.get_namespaced_custom_object.return_value = {
+        "status": {
+            "sync": {"status": "Synced"},
+            "health": {"status": "Healthy"},
+        }
+    }
+
+    mock_core_v1 = MagicMock()
+    mock_core_v1.list_namespaced_pod.return_value = mock_pods
+    mock_core_v1.list_namespaced_service.return_value = MagicMock(items=[])
+    mock_core_v1.list_node.return_value = MagicMock(items=[])
+
+    with (
+        patch("mindweaver.platform_service.airflow.poller.config.load_incluster_config"),
+        patch("mindweaver.platform_service.airflow.poller.client.ApiClient"),
+        patch("mindweaver.platform_service.airflow.poller.client.CustomObjectsApi", return_value=mock_custom_api),
+        patch("mindweaver.platform_service.airflow.poller.client.CoreV1Api", return_value=mock_core_v1),
+    ):
+        poller = AirflowPoller(svc, model)
+        await poller.poll()
+
+    mock_core_v1.list_namespaced_pod.assert_called_once_with(
+        namespace="test-ns",
+        label_selector="release=my-airflow",
+    )
+    assert state.status == "online"
+    assert state.message == "Sync: Synced, Health: Healthy | Pods: API 1/1, Scheduler 1/1, Worker 1/2"
+
 
 
 

@@ -13,6 +13,18 @@ from .service import AirflowPlatformService
 logger = logging.getLogger(__name__)
 
 
+def _count_ready_pods(pods: list, prefix: str) -> tuple[int, int]:
+    """Counts ready and total pods matching the given name prefix."""
+    matched = [p for p in pods if p.metadata.name.startswith(prefix)]
+    ready = sum(
+        1
+        for p in matched
+        if p.status.phase == "Running"
+        and any(c.ready for c in (p.status.container_statuses or []))
+    )
+    return ready, len(matched)
+
+
 @AirflowPlatformService.register_poller()
 class AirflowPoller:
     """Poller for Airflow platform service."""
@@ -77,20 +89,23 @@ class AirflowPoller:
                     message = f"Cluster is unreachable: {str(e)}"
                 return status, message, {}, [], []
 
-            # 2. Fetch Pod Status
+            # 2. Fetch Pod Status for core pod types (API Server, Scheduler, Worker)
             try:
                 pods = core_v1.list_namespaced_pod(
                     namespace=namespace,
-                    label_selector=f"app.kubernetes.io/instance={self.model.name}",
+                    label_selector=f"release={self.model.name}",
                 )
-                ready_pods = sum(
-                    1
-                    for p in pods.items
-                    if p.status.phase == "Running"
-                    and any(c.ready for c in (p.status.container_statuses or []))
-                )
-                total_pods = len(pods.items)
-                message += f" | Pods: {ready_pods}/{total_pods}"
+                pod_types = [
+                    ("API", f"{self.model.name}-api-server"),
+                    ("Scheduler", f"{self.model.name}-scheduler"),
+                    ("Worker", f"{self.model.name}-worker"),
+                ]
+                stats = [
+                    f"{label} {ready}/{total}"
+                    for label, prefix in pod_types
+                    for ready, total in [_count_ready_pods(pods.items, prefix)]
+                ]
+                message += f" | Pods: {', '.join(stats)}"
             except Exception as e:
                 logger.error(f"Failed to fetch pods for {self.model.name}: {e}")
 
