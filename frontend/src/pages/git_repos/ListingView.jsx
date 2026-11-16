@@ -56,7 +56,7 @@ const ListingView = ({
         const hasCreds = repo.username || repo.password || repo.ssh_key_id;
         const authText = isSsh || repo.ssh_key_id ? "SSH" : (hasCreds ? "HTTP" : "NONE");
         return [
-            { text: authText, variant: "mw-badge-neutral" },
+            { text: authText, variant: "dxc-badge-neutral" },
         ];
     };
 
@@ -83,7 +83,7 @@ const ListingView = ({
                             type="button"
                             onClick={() => runTestConnection(formData)}
                             disabled={testingConnection}
-                            className="mw-btn-secondary px-6 py-4"
+                            className="dxc-btn-secondary px-6 py-4"
                         >
                             {testingConnection ? <Radio className="animate-pulse" size={18} /> : <Radio size={18} />}
                             TEST CONNECTION
@@ -158,7 +158,7 @@ const ListingView = ({
                                     type="button"
                                     onClick={() => runTestConnection(formData)}
                                     disabled={testingConnection}
-                                    className="mw-btn-secondary px-6 py-4"
+                                    className="dxc-btn-secondary px-6 py-4"
                                 >
                                     {testingConnection ? <Radio className="animate-pulse" size={18} /> : <Radio size={18} />}
                                     TEST CONNECTION

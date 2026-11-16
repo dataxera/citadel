@@ -37,7 +37,7 @@ export const ResourceNotFound = ({
             <button
                 type="button"
                 onClick={onBack}
-                className="mw-btn-secondary px-6 py-2.5 mt-2"
+                className="dxc-btn-secondary px-6 py-2.5 mt-2"
             >
                 {backLabel}
             </button>

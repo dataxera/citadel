@@ -1,8 +1,8 @@
 # SPDX-FileCopyrightText: Copyright © 2026 Mohd Izhar Firdaus Bin Ismail
 # SPDX-License-Identifier: AGPLv3+
 
-name: mindweaver-test
-title: Mindweaver Test Stack
+name: citadel-test
+title: Citadel Test Stack
 version: 0.0.1-test
 configuration:
   components:
@@ -40,7 +40,7 @@ configuration:
           version: "1.99.0"
       images:
         main:
-          repository: test.registry/mindweaver/airflow
+          repository: test.registry/citadel/airflow
           tag: "3.99.0"
         redis:
           repository: test.registry/redis
@@ -60,7 +60,7 @@ configuration:
           version: "0.99.3"
       images:
         main:
-          repository: test.registry/mindweaver/kafka
+          repository: test.registry/citadel/kafka
           tag: "4.99.0"
     superset:
       package_type: helm
@@ -71,7 +71,7 @@ configuration:
           version: "0.99.0"
       images:
         main:
-          repository: test.registry/mindweaver/superset
+          repository: test.registry/citadel/superset
           tag: "6.99.0"
         redis:
           repository: test.registry/bitnamilegacy/redis
@@ -88,7 +88,7 @@ configuration:
           version: "0.99.11"
       images:
         main:
-          repository: test.registry/mindweaver/hive-metastore
+          repository: test.registry/citadel/hive-metastore
           tag: "4.99.0"
     trino:
       package_type: helm

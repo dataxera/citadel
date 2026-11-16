@@ -9,9 +9,9 @@ import pytest
 from sqlalchemy.ext.asyncio import create_async_engine
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from mindweaver.config import settings
-from mindweaver.service.k8s_cluster.model import K8sCluster, K8sClusterStatus, K8sClusterType
-from mindweaver.service.k8s_cluster.service import (
+from citadel.config import settings
+from citadel.service.k8s_cluster.model import K8sCluster, K8sClusterStatus, K8sClusterType
+from citadel.service.k8s_cluster.service import (
     K8sClusterService,
     build_nodes_details,
     compute_pod_requests,
@@ -307,7 +307,7 @@ async def test_poll_status_stores_nodes_details_and_state_exposes_it(
             await session.commit()
 
         with patch(
-            "mindweaver.service.k8s_cluster.service.schedule_k8s_cluster_poll"
+            "citadel.service.k8s_cluster.service.schedule_k8s_cluster_poll"
         ):
             resp = client.get(f"/api/v1/k8s_clusters/{cluster_id}/_state")
         assert resp.status_code == 200

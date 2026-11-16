@@ -25,7 +25,7 @@ const renderSafeGuideText = (text) => {
 export const ServiceBlock = ({ darkMode, icon, iconColorClass = "text-emerald-500", iconBgClass = "bg-emerald-500/10", title, headerRight, children }) => {
     const IconComponent = icon;
     return (
-        <div className="mw-panel">
+        <div className="dxc-panel">
             <div className={cn("p-4 border-b flex items-center justify-between gap-4 flex-wrap", darkMode ? 'border-slate-800 bg-slate-950/30' : 'border-slate-200 bg-slate-50')}>
                 <div className="flex items-center gap-3">
                     <div className={cn("p-2 rounded-lg", iconBgClass, iconColorClass)}><IconComponent size={18} /></div>

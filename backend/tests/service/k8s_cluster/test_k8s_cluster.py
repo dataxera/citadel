@@ -6,22 +6,22 @@ from unittest.mock import MagicMock, patch, call
 from fastapi.testclient import TestClient
 from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlalchemy.ext.asyncio import create_async_engine
-from mindweaver.service.k8s_cluster.model import (
+from citadel.service.k8s_cluster.model import (
     K8sClusterStatus,
     K8sClusterType,
     K8sCluster,
 )
-from mindweaver.config import settings
+from citadel.config import settings
 
 
 @pytest.fixture
 def mock_k8s():
     with patch(
-        "mindweaver.service.k8s_cluster.service.config.load_incluster_config"
+        "citadel.service.k8s_cluster.service.config.load_incluster_config"
     ), patch(
-        "mindweaver.service.k8s_cluster.service.client.CoreV1Api"
+        "citadel.service.k8s_cluster.service.client.CoreV1Api"
     ) as mock_core, patch(
-        "mindweaver.service.k8s_cluster.service.client.VersionApi"
+        "citadel.service.k8s_cluster.service.client.VersionApi"
     ) as mock_version:
 
         # Mock Version
@@ -144,7 +144,7 @@ def mock_k8s():
 @pytest.fixture(autouse=True)
 def mock_get_kubernetes_clients():
     with patch(
-        "mindweaver.service.k8s_cluster.actions.InstallArgoCDAction._get_kubernetes_clients"
+        "citadel.service.k8s_cluster.actions.InstallArgoCDAction._get_kubernetes_clients"
     ) as mock_clients:
         mock_core = MagicMock()
         mock_ext = MagicMock()
@@ -236,8 +236,8 @@ def test_poll_k8s_cluster_unreachable_cascades_to_services(client: TestClient, t
     )
 
     # Set initial state to active online with deploy and poll_status mocked
-    with patch("mindweaver.platform_service.base.PlatformService.deploy", return_value=None), \
-         patch("mindweaver.platform_service.base.PlatformService.poll_status", return_value=None):
+    with patch("citadel.platform_service.base.PlatformService.deploy", return_value=None), \
+         patch("citadel.platform_service.base.PlatformService.poll_status", return_value=None):
         resp_init = client.post(
             f"/api/v1/platform/pgsql/{platform_id}/_state",
             json={"status": "online", "active": True, "message": "Cluster is running"},
@@ -276,7 +276,7 @@ def test_poll_k8s_cluster_unreachable_cascades_to_services(client: TestClient, t
 
 @pytest.mark.asyncio
 async def test_install_argocd():
-    from mindweaver.service.k8s_cluster.service import K8sClusterService
+    from citadel.service.k8s_cluster.service import K8sClusterService
 
     cluster = K8sCluster(
         name="test-cluster-argo",
@@ -290,7 +290,7 @@ async def test_install_argocd():
         return_value="fake-kubeconfig"
     )
 
-    from mindweaver.service.k8s_cluster.actions import InstallArgoCDAction
+    from citadel.service.k8s_cluster.actions import InstallArgoCDAction
 
     with patch("asyncio.create_subprocess_exec") as mock_exec:
         mock_proc = MagicMock()
@@ -320,7 +320,7 @@ async def test_install_argocd():
 
 @pytest.mark.asyncio
 async def test_install_cert_manager():
-    from mindweaver.service.k8s_cluster.model import K8sCluster, K8sClusterType
+    from citadel.service.k8s_cluster.model import K8sCluster, K8sClusterType
     import os
 
     cluster = K8sCluster(
@@ -335,7 +335,7 @@ async def test_install_cert_manager():
         return_value="fake-kubeconfig"
     )
 
-    from mindweaver.service.k8s_cluster.actions import InstallCertManagerAction
+    from citadel.service.k8s_cluster.actions import InstallCertManagerAction
 
     applied_manifests = []
 
@@ -369,7 +369,7 @@ async def test_install_cert_manager():
 
 @pytest.mark.asyncio
 async def test_install_cnpg():
-    from mindweaver.service.k8s_cluster.model import K8sCluster, K8sClusterType
+    from citadel.service.k8s_cluster.model import K8sCluster, K8sClusterType
     import os
 
     cluster = K8sCluster(
@@ -384,7 +384,7 @@ async def test_install_cnpg():
         return_value="fake-kubeconfig"
     )
 
-    from mindweaver.service.k8s_cluster.actions import InstallCNPGAction
+    from citadel.service.k8s_cluster.actions import InstallCNPGAction
 
     applied_manifests = []
 
@@ -418,7 +418,7 @@ async def test_install_cnpg():
 def test_poll_k8s_cluster_error(client: TestClient):
 
     with patch(
-        "mindweaver.service.k8s_cluster.service.config.load_incluster_config",
+        "citadel.service.k8s_cluster.service.config.load_incluster_config",
         side_effect=Exception("K8S Error"),
     ):
         # Create cluster
@@ -453,7 +453,7 @@ def test_install_argocd_action_triggers_task(client: TestClient):
     ).json()["data"]
 
     with patch(
-        "mindweaver.tasks.k8s_cluster_status.install_argocd_task.delay"
+        "citadel.tasks.k8s_cluster_status.install_argocd_task.delay"
     ) as mock_delay:
         resp = client.post(
             f"/api/v1/k8s_clusters/{p1['id']}/_actions",
@@ -473,7 +473,7 @@ def test_install_argocd_action_triggers_task(client: TestClient):
 
 @pytest.mark.asyncio
 async def test_install_envoy_gateway():
-    from mindweaver.service.k8s_cluster.model import K8sCluster, K8sClusterType
+    from citadel.service.k8s_cluster.model import K8sCluster, K8sClusterType
     import os
 
     cluster = K8sCluster(
@@ -488,7 +488,7 @@ async def test_install_envoy_gateway():
         return_value="fake-kubeconfig"
     )
 
-    from mindweaver.service.k8s_cluster.actions import InstallEnvoyGatewayAction
+    from citadel.service.k8s_cluster.actions import InstallEnvoyGatewayAction
 
     applied_manifests = []
 
@@ -539,7 +539,7 @@ def test_install_envoy_gateway_action_triggers_task(client: TestClient):
     ).json()["data"]
 
     with patch(
-        "mindweaver.tasks.k8s_cluster_status.install_envoy_gateway_task.delay"
+        "citadel.tasks.k8s_cluster_status.install_envoy_gateway_task.delay"
     ) as mock_delay:
         resp = client.post(
             f"/api/v1/k8s_clusters/{p1['id']}/_actions",
@@ -569,7 +569,7 @@ def test_sync_core_integrations_action_triggers_task(client: TestClient):
     ).json()["data"]
 
     with patch(
-        "mindweaver.tasks.k8s_cluster_status.sync_core_integrations_task.delay"
+        "citadel.tasks.k8s_cluster_status.sync_core_integrations_task.delay"
     ) as mock_delay:
         resp = client.post(
             f"/api/v1/k8s_clusters/{p1['id']}/_actions",
@@ -585,7 +585,7 @@ def test_sync_core_integrations_action_triggers_task(client: TestClient):
 
 @pytest.mark.asyncio
 async def test_install_envoy_gateway_with_loadbalancer():
-    from mindweaver.service.k8s_cluster.model import K8sCluster, K8sClusterType
+    from citadel.service.k8s_cluster.model import K8sCluster, K8sClusterType
     import os
 
     cluster = K8sCluster(
@@ -600,7 +600,7 @@ async def test_install_envoy_gateway_with_loadbalancer():
         return_value="fake-kubeconfig"
     )
 
-    from mindweaver.service.k8s_cluster.actions import InstallEnvoyGatewayAction
+    from citadel.service.k8s_cluster.actions import InstallEnvoyGatewayAction
 
     applied_manifests = []
 
@@ -630,7 +630,7 @@ async def test_install_envoy_gateway_with_loadbalancer():
 
 @pytest.mark.asyncio
 async def test_install_kafka_operator():
-    from mindweaver.service.k8s_cluster.model import K8sCluster, K8sClusterType
+    from citadel.service.k8s_cluster.model import K8sCluster, K8sClusterType
     import os
 
     cluster = K8sCluster(
@@ -645,7 +645,7 @@ async def test_install_kafka_operator():
         return_value="fake-kubeconfig"
     )
 
-    from mindweaver.service.k8s_cluster.actions import InstallKafkaOperatorAction
+    from citadel.service.k8s_cluster.actions import InstallKafkaOperatorAction
 
     applied_manifests = []
 
@@ -678,7 +678,7 @@ async def test_install_kafka_operator():
 
 @pytest.mark.asyncio
 async def test_install_nifikop():
-    from mindweaver.service.k8s_cluster.model import K8sCluster, K8sClusterType
+    from citadel.service.k8s_cluster.model import K8sCluster, K8sClusterType
     import os
 
     cluster = K8sCluster(
@@ -693,7 +693,7 @@ async def test_install_nifikop():
         return_value="fake-kubeconfig"
     )
 
-    from mindweaver.service.k8s_cluster.actions import InstallNifikopAction
+    from citadel.service.k8s_cluster.actions import InstallNifikopAction
 
     applied_manifests = []
 
@@ -744,7 +744,7 @@ def test_install_nifikop_action_triggers_task(client: TestClient):
     ).json()["data"]
 
     with patch(
-        "mindweaver.tasks.k8s_cluster_status.install_nifikop_task.delay"
+        "citadel.tasks.k8s_cluster_status.install_nifikop_task.delay"
     ) as mock_delay:
         resp = client.post(
             f"/api/v1/k8s_clusters/{p1['id']}/_actions",
@@ -764,7 +764,7 @@ def test_install_nifikop_action_triggers_task(client: TestClient):
 
 @pytest.mark.asyncio
 async def test_install_doris_operator():
-    from mindweaver.service.k8s_cluster.model import K8sCluster, K8sClusterType
+    from citadel.service.k8s_cluster.model import K8sCluster, K8sClusterType
     import os
 
     cluster = K8sCluster(
@@ -779,7 +779,7 @@ async def test_install_doris_operator():
         return_value="fake-kubeconfig"
     )
 
-    from mindweaver.service.k8s_cluster.actions import InstallDorisOperatorAction
+    from citadel.service.k8s_cluster.actions import InstallDorisOperatorAction
 
     applied_manifests = []
 
@@ -822,7 +822,7 @@ def test_install_doris_operator_action_triggers_task(client: TestClient):
     ).json()["data"]
 
     with patch(
-        "mindweaver.tasks.k8s_cluster_status.install_doris_operator_task.delay"
+        "citadel.tasks.k8s_cluster_status.install_doris_operator_task.delay"
     ) as mock_delay:
         resp = client.post(
             f"/api/v1/k8s_clusters/{p1['id']}/_actions",
@@ -844,8 +844,8 @@ def test_install_doris_operator_action_triggers_task(client: TestClient):
 async def test_install_doris_operator_locks_image(test_stack):
     """Verify InstallDorisOperatorAction renders dorisOperator image repository and tag from test_stack."""
     from unittest.mock import AsyncMock
-    from mindweaver.service.k8s_cluster.model import K8sCluster, K8sClusterType
-    from mindweaver.service.k8s_cluster.actions import InstallDorisOperatorAction
+    from citadel.service.k8s_cluster.model import K8sCluster, K8sClusterType
+    from citadel.service.k8s_cluster.actions import InstallDorisOperatorAction
     import os
 
     cluster = K8sCluster(
@@ -887,8 +887,8 @@ async def test_install_doris_operator_locks_image(test_stack):
 async def test_install_cert_manager_locks_images(test_stack):
     """Verify InstallCertManagerAction renders image tags and repos from test_stack."""
     from unittest.mock import AsyncMock
-    from mindweaver.service.k8s_cluster.model import K8sCluster, K8sClusterType
-    from mindweaver.service.k8s_cluster.actions import InstallCertManagerAction
+    from citadel.service.k8s_cluster.model import K8sCluster, K8sClusterType
+    from citadel.service.k8s_cluster.actions import InstallCertManagerAction
     import os
 
     cluster = K8sCluster(
@@ -934,8 +934,8 @@ async def test_install_cert_manager_locks_images(test_stack):
 async def test_install_argocd_locks_images_and_chart(test_stack):
     """Verify InstallArgoCDAction passes stack chart version and image overrides from test_stack."""
     from unittest.mock import AsyncMock
-    from mindweaver.service.k8s_cluster.model import K8sCluster, K8sClusterType
-    from mindweaver.service.k8s_cluster.actions import InstallArgoCDAction
+    from citadel.service.k8s_cluster.model import K8sCluster, K8sClusterType
+    from citadel.service.k8s_cluster.actions import InstallArgoCDAction
 
     cluster = K8sCluster(
         name="test-cluster-argo",
@@ -966,8 +966,8 @@ async def test_install_argocd_locks_images_and_chart(test_stack):
 async def test_install_other_integrations_lock_images(test_stack):
     """Verify CNPG, Envoy Gateway, Kafka Operator, and NiFiKop render images from test_stack."""
     from unittest.mock import AsyncMock
-    from mindweaver.service.k8s_cluster.model import K8sCluster, K8sClusterType
-    from mindweaver.service.k8s_cluster.actions import (
+    from citadel.service.k8s_cluster.model import K8sCluster, K8sClusterType
+    from citadel.service.k8s_cluster.actions import (
         InstallCNPGAction,
         InstallEnvoyGatewayAction,
         InstallKafkaOperatorAction,
@@ -1047,7 +1047,7 @@ def test_sync_core_integrations_initializes_sync_state(client: TestClient):
     ).json()["data"]
 
     with patch(
-        "mindweaver.tasks.k8s_cluster_status.sync_core_integrations_task.delay"
+        "citadel.tasks.k8s_cluster_status.sync_core_integrations_task.delay"
     ) as mock_delay:
         resp = client.post(
             f"/api/v1/k8s_clusters/{p1['id']}/_actions",
@@ -1080,7 +1080,7 @@ def test_sync_core_integrations_initializes_sync_state(client: TestClient):
 async def test_sync_core_integrations_orchestration_dispatches_tasks(client: TestClient):
     """_sync_core_integrations_task runs ArgoCD first then dispatches individual integration tasks."""
     from unittest.mock import AsyncMock
-    from mindweaver.tasks.k8s_cluster_status import _sync_core_integrations_task
+    from citadel.tasks.k8s_cluster_status import _sync_core_integrations_task
 
     p1 = client.post(
         "/api/v1/k8s_clusters",
@@ -1092,7 +1092,7 @@ async def test_sync_core_integrations_orchestration_dispatches_tasks(client: Tes
     ).json()["data"]
 
     with patch(
-        "mindweaver.tasks.k8s_cluster_status.sync_core_integrations_task.delay"
+        "citadel.tasks.k8s_cluster_status.sync_core_integrations_task.delay"
     ):
         client.post(
             f"/api/v1/k8s_clusters/{p1['id']}/_actions",
@@ -1100,10 +1100,10 @@ async def test_sync_core_integrations_orchestration_dispatches_tasks(client: Tes
         )
 
     with patch(
-        "mindweaver.service.k8s_cluster.actions.InstallArgoCDAction.run",
+        "citadel.service.k8s_cluster.actions.InstallArgoCDAction.run",
         new_callable=AsyncMock,
     ) as mock_argo_run, patch(
-        "mindweaver.tasks.k8s_cluster_status.sync_core_integration_task.delay"
+        "citadel.tasks.k8s_cluster_status.sync_core_integration_task.delay"
     ) as mock_sub_delay:
         await _sync_core_integrations_task(p1["id"])
 
@@ -1131,7 +1131,7 @@ async def test_sync_core_integrations_orchestration_dispatches_tasks(client: Tes
 async def test_sync_core_integrations_argocd_failure_marks_error(client: TestClient):
     """If ArgoCD installation fails during sync, remaining tasks are skipped and sync_state is error."""
     from unittest.mock import AsyncMock
-    from mindweaver.tasks.k8s_cluster_status import _sync_core_integrations_task
+    from citadel.tasks.k8s_cluster_status import _sync_core_integrations_task
 
     p1 = client.post(
         "/api/v1/k8s_clusters",
@@ -1143,7 +1143,7 @@ async def test_sync_core_integrations_argocd_failure_marks_error(client: TestCli
     ).json()["data"]
 
     with patch(
-        "mindweaver.tasks.k8s_cluster_status.sync_core_integrations_task.delay"
+        "citadel.tasks.k8s_cluster_status.sync_core_integrations_task.delay"
     ):
         client.post(
             f"/api/v1/k8s_clusters/{p1['id']}/_actions",
@@ -1151,11 +1151,11 @@ async def test_sync_core_integrations_argocd_failure_marks_error(client: TestCli
         )
 
     with patch(
-        "mindweaver.service.k8s_cluster.actions.InstallArgoCDAction.run",
+        "citadel.service.k8s_cluster.actions.InstallArgoCDAction.run",
         new_callable=AsyncMock,
         side_effect=RuntimeError("Helm failed"),
     ), patch(
-        "mindweaver.tasks.k8s_cluster_status.sync_core_integration_task.delay"
+        "citadel.tasks.k8s_cluster_status.sync_core_integration_task.delay"
     ) as mock_sub_delay:
         await _sync_core_integrations_task(p1["id"])
         mock_sub_delay.assert_not_called()
@@ -1172,7 +1172,7 @@ async def test_sync_core_integrations_argocd_failure_marks_error(client: TestCli
 async def test_sync_core_integration_task_updates_progress_and_completes(client: TestClient):
     """Each individual integration task updates sync_state and the final one marks sync completed."""
     from unittest.mock import AsyncMock
-    from mindweaver.tasks.k8s_cluster_status import (
+    from citadel.tasks.k8s_cluster_status import (
         _sync_core_integrations_task,
         _sync_core_integration_task,
     )
@@ -1187,7 +1187,7 @@ async def test_sync_core_integration_task_updates_progress_and_completes(client:
     ).json()["data"]
 
     with patch(
-        "mindweaver.tasks.k8s_cluster_status.sync_core_integrations_task.delay"
+        "citadel.tasks.k8s_cluster_status.sync_core_integrations_task.delay"
     ):
         client.post(
             f"/api/v1/k8s_clusters/{p1['id']}/_actions",
@@ -1195,34 +1195,34 @@ async def test_sync_core_integration_task_updates_progress_and_completes(client:
         )
 
     with patch(
-        "mindweaver.service.k8s_cluster.actions.InstallArgoCDAction.run",
+        "citadel.service.k8s_cluster.actions.InstallArgoCDAction.run",
         new_callable=AsyncMock,
     ), patch(
-        "mindweaver.tasks.k8s_cluster_status.sync_core_integration_task.delay"
+        "citadel.tasks.k8s_cluster_status.sync_core_integration_task.delay"
     ):
         await _sync_core_integrations_task(p1["id"])
 
     with patch(
-        "mindweaver.service.k8s_cluster.actions.InstallCertManagerAction.run",
+        "citadel.service.k8s_cluster.actions.InstallCertManagerAction.run",
         new_callable=AsyncMock,
     ), patch(
-        "mindweaver.service.k8s_cluster.actions.InstallCNPGAction.run",
+        "citadel.service.k8s_cluster.actions.InstallCNPGAction.run",
         new_callable=AsyncMock,
     ), patch(
-        "mindweaver.service.k8s_cluster.actions.InstallEnvoyGatewayAction.run",
+        "citadel.service.k8s_cluster.actions.InstallEnvoyGatewayAction.run",
         new_callable=AsyncMock,
     ), patch(
-        "mindweaver.service.k8s_cluster.actions.InstallKafkaOperatorAction.run",
+        "citadel.service.k8s_cluster.actions.InstallKafkaOperatorAction.run",
         new_callable=AsyncMock,
     ), patch(
-        "mindweaver.service.k8s_cluster.actions.InstallNifikopAction.run",
+        "citadel.service.k8s_cluster.actions.InstallNifikopAction.run",
         new_callable=AsyncMock,
     ), patch(
-        "mindweaver.service.k8s_cluster.actions.InstallDorisOperatorAction.run",
+        "citadel.service.k8s_cluster.actions.InstallDorisOperatorAction.run",
         new_callable=AsyncMock,
         side_effect=RuntimeError("Doris apply error"),
     ), patch(
-        "mindweaver.tasks.k8s_cluster_status.poll_k8s_cluster_status.delay"
+        "citadel.tasks.k8s_cluster_status.poll_k8s_cluster_status.delay"
     ) as mock_poll_delay:
         await _sync_core_integration_task(p1["id"], "cert_manager")
         state_mid = client.get(f"/api/v1/k8s_clusters/{p1['id']}/_state").json()["sync_state"]
@@ -1247,8 +1247,8 @@ async def test_sync_core_integration_task_updates_progress_and_completes(client:
 @pytest.mark.asyncio
 async def test_sync_core_integration_task_model_not_expired_after_commit(client: TestClient):
     """Regression test: accessing self.model attributes in action.run() after _update_sync_task_state commit must not raise MissingGreenlet."""
-    from mindweaver.tasks.k8s_cluster_status import _sync_core_integration_task
-    from mindweaver.service.k8s_cluster.actions import InstallCertManagerAction
+    from citadel.tasks.k8s_cluster_status import _sync_core_integration_task
+    from citadel.service.k8s_cluster.actions import InstallCertManagerAction
 
     p1 = client.post(
         "/api/v1/k8s_clusters",
@@ -1260,7 +1260,7 @@ async def test_sync_core_integration_task_model_not_expired_after_commit(client:
     ).json()["data"]
 
     with patch(
-        "mindweaver.tasks.k8s_cluster_status.sync_core_integrations_task.delay"
+        "citadel.tasks.k8s_cluster_status.sync_core_integrations_task.delay"
     ):
         client.post(
             f"/api/v1/k8s_clusters/{p1['id']}/_actions",
@@ -1274,7 +1274,7 @@ async def test_sync_core_integration_task_model_not_expired_after_commit(client:
         observed_names.append(self.model.type)
 
     with patch.object(InstallCertManagerAction, "run", _run_accessing_model), patch(
-        "mindweaver.tasks.k8s_cluster_status.poll_k8s_cluster_status.delay"
+        "citadel.tasks.k8s_cluster_status.poll_k8s_cluster_status.delay"
     ):
         await _sync_core_integration_task(p1["id"], "cert_manager")
 
@@ -1311,7 +1311,7 @@ def test_poll_k8s_cluster_integrations_status(client: TestClient, mock_k8s):
 
     mock_k8s["core"].return_value.list_pod_for_all_namespaces.side_effect = _mock_list_pods
 
-    with patch("mindweaver.service.k8s_cluster.service.client.CustomObjectsApi") as mock_custom:
+    with patch("citadel.service.k8s_cluster.service.client.CustomObjectsApi") as mock_custom:
         mock_custom.return_value.list_namespaced_custom_object.return_value = {
             "items": [
                 {
@@ -1360,10 +1360,10 @@ async def test_sync_core_integrations_resume_skips_completed_tasks(client: TestC
     from sqlmodel import select
     from sqlmodel.ext.asyncio.session import AsyncSession
     from sqlalchemy.orm.attributes import flag_modified
-    from mindweaver.fw.model import get_engine, ts_now
-    from mindweaver.service.k8s_cluster.model import K8sClusterStatus
-    from mindweaver.tasks.k8s_cluster_status import _recover_stuck_sync_tasks
-    from mindweaver.tasks.resiliency import clear_memory_locks
+    from citadel.fw.model import get_engine, ts_now
+    from citadel.service.k8s_cluster.model import K8sClusterStatus
+    from citadel.tasks.k8s_cluster_status import _recover_stuck_sync_tasks
+    from citadel.tasks.resiliency import clear_memory_locks
 
     clear_memory_locks()
 
@@ -1376,7 +1376,7 @@ async def test_sync_core_integrations_resume_skips_completed_tasks(client: TestC
         },
     ).json()["data"]
 
-    with patch("mindweaver.tasks.k8s_cluster_status.sync_core_integrations_task.delay"):
+    with patch("citadel.tasks.k8s_cluster_status.sync_core_integrations_task.delay"):
         client.post(
             f"/api/v1/k8s_clusters/{p1['id']}/_actions",
             json={"action": "sync_core_integrations"},
@@ -1398,9 +1398,9 @@ async def test_sync_core_integrations_resume_skips_completed_tasks(client: TestC
         await session.commit()
 
     with patch(
-        "mindweaver.tasks.k8s_cluster_status.sync_core_integration_task.delay"
+        "citadel.tasks.k8s_cluster_status.sync_core_integration_task.delay"
     ) as mock_sub_delay, patch(
-        "mindweaver.tasks.k8s_cluster_status.sync_core_integrations_task.delay"
+        "citadel.tasks.k8s_cluster_status.sync_core_integrations_task.delay"
     ) as mock_orch_delay:
         await _recover_stuck_sync_tasks(stale_seconds=0)
 
@@ -1420,8 +1420,8 @@ async def test_sync_core_integrations_resume_skips_completed_tasks(client: TestC
 @pytest.mark.asyncio
 async def test_sync_core_integrations_resume_restarts_interrupted_argocd(client: TestClient):
     """If ArgoCD was interrupted mid-install, recovery re-dispatches the orchestrator task."""
-    from mindweaver.tasks.k8s_cluster_status import _recover_stuck_sync_tasks
-    from mindweaver.tasks.resiliency import clear_memory_locks
+    from citadel.tasks.k8s_cluster_status import _recover_stuck_sync_tasks
+    from citadel.tasks.resiliency import clear_memory_locks
 
     clear_memory_locks()
 
@@ -1434,16 +1434,16 @@ async def test_sync_core_integrations_resume_restarts_interrupted_argocd(client:
         },
     ).json()["data"]
 
-    with patch("mindweaver.tasks.k8s_cluster_status.sync_core_integrations_task.delay"):
+    with patch("citadel.tasks.k8s_cluster_status.sync_core_integrations_task.delay"):
         client.post(
             f"/api/v1/k8s_clusters/{p1['id']}/_actions",
             json={"action": "sync_core_integrations"},
         )
 
     with patch(
-        "mindweaver.tasks.k8s_cluster_status.sync_core_integrations_task.delay"
+        "citadel.tasks.k8s_cluster_status.sync_core_integrations_task.delay"
     ) as mock_orch_delay, patch(
-        "mindweaver.tasks.k8s_cluster_status.sync_core_integration_task.delay"
+        "citadel.tasks.k8s_cluster_status.sync_core_integration_task.delay"
     ) as mock_sub_delay:
         await _recover_stuck_sync_tasks(stale_seconds=0)
         mock_orch_delay.assert_called_once_with(p1["id"])
@@ -1456,10 +1456,10 @@ async def test_sync_core_integrations_resume_skips_actively_locked_task(client: 
     from sqlmodel import select
     from sqlmodel.ext.asyncio.session import AsyncSession
     from sqlalchemy.orm.attributes import flag_modified
-    from mindweaver.fw.model import get_engine
-    from mindweaver.service.k8s_cluster.model import K8sClusterStatus
-    from mindweaver.tasks.k8s_cluster_status import _recover_stuck_sync_tasks
-    from mindweaver.tasks.resiliency import (
+    from citadel.fw.model import get_engine
+    from citadel.service.k8s_cluster.model import K8sClusterStatus
+    from citadel.tasks.k8s_cluster_status import _recover_stuck_sync_tasks
+    from citadel.tasks.resiliency import (
         acquire_task_lock,
         clear_memory_locks,
         release_task_lock,
@@ -1476,7 +1476,7 @@ async def test_sync_core_integrations_resume_skips_actively_locked_task(client: 
         },
     ).json()["data"]
 
-    with patch("mindweaver.tasks.k8s_cluster_status.sync_core_integrations_task.delay"):
+    with patch("citadel.tasks.k8s_cluster_status.sync_core_integrations_task.delay"):
         client.post(
             f"/api/v1/k8s_clusters/{p1['id']}/_actions",
             json={"action": "sync_core_integrations"},
@@ -1497,7 +1497,7 @@ async def test_sync_core_integrations_resume_skips_actively_locked_task(client: 
     assert await acquire_task_lock(lock_key, ttl=60)
     try:
         with patch(
-            "mindweaver.tasks.k8s_cluster_status.sync_core_integration_task.delay"
+            "citadel.tasks.k8s_cluster_status.sync_core_integration_task.delay"
         ) as mock_sub_delay:
             await _recover_stuck_sync_tasks(stale_seconds=0)
             called_keys = [c.args[1] for c in mock_sub_delay.call_args_list]
@@ -1514,10 +1514,10 @@ async def test_sync_core_integration_task_skips_already_completed_or_locked(clie
     from sqlmodel import select
     from sqlmodel.ext.asyncio.session import AsyncSession
     from sqlalchemy.orm.attributes import flag_modified
-    from mindweaver.fw.model import get_engine
-    from mindweaver.service.k8s_cluster.model import K8sClusterStatus
-    from mindweaver.tasks.k8s_cluster_status import _sync_core_integration_task
-    from mindweaver.tasks.resiliency import (
+    from citadel.fw.model import get_engine
+    from citadel.service.k8s_cluster.model import K8sClusterStatus
+    from citadel.tasks.k8s_cluster_status import _sync_core_integration_task
+    from citadel.tasks.resiliency import (
         acquire_task_lock,
         clear_memory_locks,
         release_task_lock,
@@ -1534,7 +1534,7 @@ async def test_sync_core_integration_task_skips_already_completed_or_locked(clie
         },
     ).json()["data"]
 
-    with patch("mindweaver.tasks.k8s_cluster_status.sync_core_integrations_task.delay"):
+    with patch("citadel.tasks.k8s_cluster_status.sync_core_integrations_task.delay"):
         client.post(
             f"/api/v1/k8s_clusters/{p1['id']}/_actions",
             json={"action": "sync_core_integrations"},
@@ -1550,7 +1550,7 @@ async def test_sync_core_integration_task_skips_already_completed_or_locked(clie
         await session.commit()
 
     with patch(
-        "mindweaver.service.k8s_cluster.actions.InstallCertManagerAction.run",
+        "citadel.service.k8s_cluster.actions.InstallCertManagerAction.run",
         new_callable=AsyncMock,
     ) as mock_cm_run:
         await _sync_core_integration_task(p1["id"], "cert_manager")
@@ -1560,7 +1560,7 @@ async def test_sync_core_integration_task_skips_already_completed_or_locked(clie
     assert await acquire_task_lock(lock_key, ttl=60)
     try:
         with patch(
-            "mindweaver.service.k8s_cluster.actions.InstallCNPGAction.run",
+            "citadel.service.k8s_cluster.actions.InstallCNPGAction.run",
             new_callable=AsyncMock,
         ) as mock_cnpg_run:
             await _sync_core_integration_task(p1["id"], "cnpg")
@@ -1575,10 +1575,10 @@ async def test_sync_core_integrations_resume_reconciles_all_done_state(client: T
     from sqlmodel import select
     from sqlmodel.ext.asyncio.session import AsyncSession
     from sqlalchemy.orm.attributes import flag_modified
-    from mindweaver.fw.model import get_engine
-    from mindweaver.service.k8s_cluster.model import K8sClusterStatus
-    from mindweaver.tasks.k8s_cluster_status import _recover_stuck_sync_tasks
-    from mindweaver.tasks.resiliency import clear_memory_locks
+    from citadel.fw.model import get_engine
+    from citadel.service.k8s_cluster.model import K8sClusterStatus
+    from citadel.tasks.k8s_cluster_status import _recover_stuck_sync_tasks
+    from citadel.tasks.resiliency import clear_memory_locks
 
     clear_memory_locks()
 
@@ -1591,7 +1591,7 @@ async def test_sync_core_integrations_resume_reconciles_all_done_state(client: T
         },
     ).json()["data"]
 
-    with patch("mindweaver.tasks.k8s_cluster_status.sync_core_integrations_task.delay"):
+    with patch("citadel.tasks.k8s_cluster_status.sync_core_integrations_task.delay"):
         client.post(
             f"/api/v1/k8s_clusters/{p1['id']}/_actions",
             json={"action": "sync_core_integrations"},
@@ -1607,7 +1607,7 @@ async def test_sync_core_integrations_resume_reconciles_all_done_state(client: T
         flag_modified(st, "sync_state")
         await session.commit()
 
-    with patch("mindweaver.tasks.k8s_cluster_status.poll_k8s_cluster_status.delay") as mock_poll:
+    with patch("citadel.tasks.k8s_cluster_status.poll_k8s_cluster_status.delay") as mock_poll:
         await _recover_stuck_sync_tasks(stale_seconds=0)
         mock_poll.assert_called_once_with(p1["id"])
 
@@ -1635,7 +1635,7 @@ def test_resume_sync_core_integrations_action(client: TestClient):
     )
     assert resp_unavail.status_code != 200
 
-    with patch("mindweaver.tasks.k8s_cluster_status.sync_core_integrations_task.delay"):
+    with patch("citadel.tasks.k8s_cluster_status.sync_core_integrations_task.delay"):
         resp_start = client.post(
             f"/api/v1/k8s_clusters/{p1['id']}/_actions",
             json={"action": "sync_core_integrations"},
@@ -1643,7 +1643,7 @@ def test_resume_sync_core_integrations_action(client: TestClient):
         assert resp_start.status_code == 200
 
     with patch(
-        "mindweaver.tasks.k8s_cluster_status.recover_stuck_sync_tasks.delay"
+        "citadel.tasks.k8s_cluster_status.recover_stuck_sync_tasks.delay"
     ) as mock_recover:
         resp_resume = client.post(
             f"/api/v1/k8s_clusters/{p1['id']}/_actions",

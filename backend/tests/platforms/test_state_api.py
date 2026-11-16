@@ -11,12 +11,12 @@ from unittest.mock import patch
 
 def test_platform_state_api(client: TestClient, test_project):
     with patch(
-        "mindweaver.platform_service.base.PlatformService.deploy", return_value=None
+        "citadel.platform_service.base.PlatformService.deploy", return_value=None
     ), patch(
-        "mindweaver.platform_service.base.PlatformService.decommission",
+        "citadel.platform_service.base.PlatformService.decommission",
         return_value=None,
     ), patch(
-        "mindweaver.platform_service.pgsql.PgSqlPlatformService.poll_status",
+        "citadel.platform_service.pgsql.PgSqlPlatformService.poll_status",
         return_value=None,
     ):
         # 1. Update project with K8s info

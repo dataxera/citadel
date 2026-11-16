@@ -531,7 +531,7 @@ const DynamicForm = ({
                             isFullWidth ? "md:col-span-2" : "md:col-span-1"
                         )}>
                             <label className={cn(
-                                "mw-label",
+                                "dxc-label",
                                 hasError ? "text-rose-500" : ""
                             )}>
                                 {label} {prop.required ? '*' : ''}
@@ -554,7 +554,7 @@ const DynamicForm = ({
                 <button
                     type="submit"
                     disabled={saving}
-                    className="mw-btn-primary flex-1 py-4"
+                    className="dxc-btn-primary flex-1 py-4"
                 >
                     {saving ? <RefreshCcw size={18} className="animate-spin" /> : <Save size={18} />}
                     {saving ? 'SAVING CHANGES...' : (mode === 'create' ? 'CREATE RESOURCE' : 'SAVE CHANGES')}
@@ -564,7 +564,7 @@ const DynamicForm = ({
                     <button
                         type="button"
                         onClick={onCancel}
-                        className="mw-btn-secondary px-8 py-4"
+                        className="dxc-btn-secondary px-8 py-4"
                     >
                         <X size={18} /> CANCEL
                     </button>

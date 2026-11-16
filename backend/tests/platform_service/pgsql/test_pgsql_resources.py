@@ -5,7 +5,7 @@ import pytest
 from unittest.mock import MagicMock, AsyncMock
 from fastapi import Request
 from sqlmodel import Session
-from mindweaver.platform_service.pgsql import PgSqlPlatform, PgSqlPlatformService
+from citadel.platform_service.pgsql import PgSqlPlatform, PgSqlPlatformService
 from pydantic import ValidationError
 
 

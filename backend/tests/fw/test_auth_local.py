@@ -3,8 +3,8 @@
 
 import pytest
 from fastapi.testclient import TestClient
-from mindweaver.config import settings
-from mindweaver.fw.auth import get_password_hash
+from citadel.config import settings
+from citadel.fw.auth import get_password_hash
 
 
 @pytest.fixture(autouse=True)

@@ -7,13 +7,13 @@ from fastapi import Request
 from sqlmodel import Session
 from datetime import datetime
 
-from mindweaver.platform_service.pgsql import (
+from citadel.platform_service.pgsql import (
     PgSqlPlatform,
     PgSqlPlatformService,
 )
-from mindweaver.platform_service.pgsql.actions import PgSqlBackupAction
+from citadel.platform_service.pgsql.actions import PgSqlBackupAction
 
-from mindweaver.platform_service.base import PlatformStateBase
+from citadel.platform_service.base import PlatformStateBase
 
 
 class MockState:
@@ -51,11 +51,11 @@ async def test_pgsql_backup_action_call():
     action = PgSqlBackupAction(model, svc)
 
     with patch(
-        "mindweaver.platform_service.pgsql.actions.config"
+        "citadel.platform_service.pgsql.actions.config"
     ) as mock_config, patch(
-        "mindweaver.platform_service.pgsql.actions.client"
+        "citadel.platform_service.pgsql.actions.client"
     ) as mock_client, patch(
-        "mindweaver.platform_service.pgsql.actions.tempfile.NamedTemporaryFile"
+        "citadel.platform_service.pgsql.actions.tempfile.NamedTemporaryFile"
     ) as mock_tempfile:
 
         # Setup mocks

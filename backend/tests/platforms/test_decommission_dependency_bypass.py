@@ -48,10 +48,10 @@ def setup_project_kubeconfig(client: TestClient, test_project, test_cluster):
 
 def test_airflow_decommission_dependency_inactive(client: TestClient, test_project):
     """Test that Airflow decommissioning succeeds when PostgreSQL dependency is inactive."""
-    with patch("mindweaver.platform_service.base.PlatformService._deploy_to_cluster"), \
-         patch("mindweaver.platform_service.base.PlatformService._decommission_from_cluster"), \
-         patch("mindweaver.platform_service.pgsql.service.PgSqlPlatformService.poll_status"), \
-         patch("mindweaver.platform_service.airflow.service.AirflowPlatformService.poll_status"):
+    with patch("citadel.platform_service.base.PlatformService._deploy_to_cluster"), \
+         patch("citadel.platform_service.base.PlatformService._decommission_from_cluster"), \
+         patch("citadel.platform_service.pgsql.service.PgSqlPlatformService.poll_status"), \
+         patch("citadel.platform_service.airflow.service.AirflowPlatformService.poll_status"):
 
         # 1. Create PostgreSQL dependency
         pgsql_data = {
@@ -113,10 +113,10 @@ def test_airflow_decommission_dependency_inactive(client: TestClient, test_proje
 
 def test_hms_decommission_dependency_inactive(client: TestClient, test_project):
     """Test that Hive Metastore decommissioning succeeds when PostgreSQL dependency is inactive."""
-    with patch("mindweaver.platform_service.base.PlatformService._deploy_to_cluster"), \
-         patch("mindweaver.platform_service.base.PlatformService._decommission_from_cluster"), \
-         patch("mindweaver.platform_service.pgsql.service.PgSqlPlatformService.poll_status"), \
-         patch("mindweaver.platform_service.hive_metastore.service.HiveMetastorePlatformService.poll_status"):
+    with patch("citadel.platform_service.base.PlatformService._deploy_to_cluster"), \
+         patch("citadel.platform_service.base.PlatformService._decommission_from_cluster"), \
+         patch("citadel.platform_service.pgsql.service.PgSqlPlatformService.poll_status"), \
+         patch("citadel.platform_service.hive_metastore.service.HiveMetastorePlatformService.poll_status"):
 
         # 1. Create PostgreSQL dependency
         pgsql_data = {
@@ -178,11 +178,11 @@ def test_hms_decommission_dependency_inactive(client: TestClient, test_project):
 
 def test_trino_decommission_dependency_inactive(client: TestClient, test_project):
     """Test that Trino decommissioning succeeds when Hive Metastore dependency is inactive."""
-    with patch("mindweaver.platform_service.base.PlatformService._deploy_to_cluster"), \
-         patch("mindweaver.platform_service.base.PlatformService._decommission_from_cluster"), \
-         patch("mindweaver.platform_service.pgsql.service.PgSqlPlatformService.poll_status"), \
-         patch("mindweaver.platform_service.hive_metastore.service.HiveMetastorePlatformService.poll_status"), \
-         patch("mindweaver.platform_service.trino.service.TrinoPlatformService.poll_status"):
+    with patch("citadel.platform_service.base.PlatformService._deploy_to_cluster"), \
+         patch("citadel.platform_service.base.PlatformService._decommission_from_cluster"), \
+         patch("citadel.platform_service.pgsql.service.PgSqlPlatformService.poll_status"), \
+         patch("citadel.platform_service.hive_metastore.service.HiveMetastorePlatformService.poll_status"), \
+         patch("citadel.platform_service.trino.service.TrinoPlatformService.poll_status"):
 
         # 1. Create Hive Metastore dependency
         # First we need pgsql for HMS
@@ -270,10 +270,10 @@ def test_trino_decommission_dependency_inactive(client: TestClient, test_project
 
 def test_superset_decommission_dependency_inactive(client: TestClient, test_project):
     """Test that Superset decommissioning succeeds when PostgreSQL dependency is inactive."""
-    with patch("mindweaver.platform_service.base.PlatformService._deploy_to_cluster"), \
-         patch("mindweaver.platform_service.base.PlatformService._decommission_from_cluster"), \
-         patch("mindweaver.platform_service.pgsql.service.PgSqlPlatformService.poll_status"), \
-         patch("mindweaver.platform_service.superset.service.SupersetPlatformService.poll_status"):
+    with patch("citadel.platform_service.base.PlatformService._deploy_to_cluster"), \
+         patch("citadel.platform_service.base.PlatformService._decommission_from_cluster"), \
+         patch("citadel.platform_service.pgsql.service.PgSqlPlatformService.poll_status"), \
+         patch("citadel.platform_service.superset.service.SupersetPlatformService.poll_status"):
 
         # 1. Create PostgreSQL dependency
         pgsql_data = {

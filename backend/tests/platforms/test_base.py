@@ -3,25 +3,25 @@
 
 import pytest
 from fastapi.testclient import TestClient
-from mindweaver.app import app
-from mindweaver.platform_service.base import (
+from citadel.app import app
+from citadel.platform_service.base import (
     PlatformBase,
     PlatformService,
     PlatformStateBase,
 )
-from mindweaver.service.project import Project
-from mindweaver.service.k8s_cluster import K8sClusterType
+from citadel.service.project import Project
+from citadel.service.k8s_cluster import K8sClusterType
 from typing import Annotated
 from fastapi import Depends
 
 
 # Define a concrete model for testing
 class SamplePlatformModel(PlatformBase, table=True):
-    __tablename__ = "mw_sample_platform_model"
+    __tablename__ = "dxc_sample_platform_model"
 
 
 class SamplePlatformState(PlatformStateBase, table=True):
-    __tablename__ = "mw_sample_platform_state"
+    __tablename__ = "dxc_sample_platform_state"
 
 
 # Define a concrete service for testing

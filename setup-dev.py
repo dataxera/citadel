@@ -16,7 +16,7 @@ def main():
     backend_dir = here / "backend"
     frontend_dir = here / "frontend"
 
-    print("--- Starting Mindweaver Development Environment Setup ---")
+    print("--- Starting Citadel Development Environment Setup ---")
 
     # 1. Backend: uv sync
     print("\n[1/4] Installing backend dependencies (uv sync)...")
@@ -31,7 +31,7 @@ def main():
 
     # 3. Backend: Database Migrations
     print("\n[3/4] Running database migrations...")
-    run_command(["uv", "run", "mindweaver", "db", "migrate"], cwd=backend_dir)
+    run_command(["uv", "run", "citadel", "db", "migrate"], cwd=backend_dir)
 
     # 4. Backend: Encryption Key
     print("\n[4/4] Setting up encryption key...")
@@ -39,15 +39,15 @@ def main():
     has_key = False
     if env_file.exists():
         with open(env_file, "r") as f:
-            if "MINDWEAVER_FERNET_KEY" in f.read():
+            if "CITADEL_FERNET_KEY" in f.read():
                 has_key = True
     
     if not has_key:
-        print("MINDWEAVER_FERNET_KEY not found in .env, generating...")
+        print("CITADEL_FERNET_KEY not found in .env, generating...")
         try:
             # Get key from CLI
             key_output = subprocess.check_output(
-                ["uv", "run", "mindweaver", "crypto", "generate-key"], 
+                ["uv", "run", "citadel", "crypto", "generate-key"], 
                 cwd=backend_dir, 
                 text=True
             ).strip()
@@ -64,7 +64,7 @@ def main():
             print(f"Error generating key: {e}")
             sys.exit(1)
     else:
-        print("MINDWEAVER_FERNET_KEY already exists in .env")
+        print("CITADEL_FERNET_KEY already exists in .env")
 
     print("\n--- Setup Complete! ---")
     print("You can now start the development stack with:")

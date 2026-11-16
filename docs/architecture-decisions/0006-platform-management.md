@@ -24,7 +24,7 @@ We use a state-based architecture where:
 
 ## References
 
-- [Mindweaver Constitution (Section 4)](file:///home/izhar/Projects/mindweaver/.agent/rules/constitution.md)
+- [Citadel Constitution (Section 4)](file:///home/izhar/Projects/citadel/.agent/rules/constitution.md)
 
 ---
 SPDX-FileCopyrightText: Copyright © 2026 Mohd Izhar Firdaus Bin Ismail

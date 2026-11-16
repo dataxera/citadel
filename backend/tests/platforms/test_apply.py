@@ -6,8 +6,8 @@ import os
 import tempfile
 from unittest.mock import MagicMock, patch
 from fastapi.testclient import TestClient
-from mindweaver.app import app
-from mindweaver.platform_service.base import (
+from citadel.app import app
+from citadel.platform_service.base import (
     PlatformBase,
     PlatformService,
     PlatformStateBase,
@@ -16,12 +16,12 @@ from mindweaver.platform_service.base import (
 
 # Define a concrete model for testing
 class MockApplyPlatformModel(PlatformBase, table=True):
-    __tablename__ = "mw_mock_apply_platform_model"
+    __tablename__ = "dxc_mock_apply_platform_model"
     extra_field: str = "hello"
 
 
 class MockApplyPlatformState(PlatformStateBase, table=True):
-    __tablename__ = "mw_mock_apply_platform_state"
+    __tablename__ = "dxc_mock_apply_platform_state"
 
 
 # Define a concrete service for testing
@@ -85,7 +85,7 @@ def test_platform_service_deploy(client: TestClient, test_project):
             ) as mock_new_client, patch(
                 "kubernetes.dynamic.DynamicClient"
             ) as mock_dynamic_client, patch(
-                "mindweaver.platform_service.base.client.CoreV1Api"
+                "citadel.platform_service.base.client.CoreV1Api"
             ) as mock_core_v1:
 
                 mock_dynamic_client.return_value.resources.get.return_value.namespaced = (

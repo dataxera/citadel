@@ -88,7 +88,7 @@ const HomePage = () => {
             <div className="space-y-8">
                 {/* Top-Level KPI Stats Grid */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                    <div className="mw-card p-6 flex items-center justify-between">
+                    <div className="dxc-card p-6 flex items-center justify-between">
                         <div>
                             <p className="text-sm font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Total Deployments</p>
                             <h3 className="text-3xl font-black text-slate-900 dark:text-white mt-2">{totalResourcesCount}</h3>
@@ -98,7 +98,7 @@ const HomePage = () => {
                         </div>
                     </div>
 
-                    <div className="mw-card p-6 flex items-center justify-between">
+                    <div className="dxc-card p-6 flex items-center justify-between">
                         <div>
                             <p className="text-sm font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Active Projects</p>
                             <h3 className="text-3xl font-black text-slate-900 dark:text-white mt-2">{activeProjectsCount}</h3>
@@ -120,7 +120,7 @@ const HomePage = () => {
                                 <div
                                     key={st.key}
                                     onClick={() => navigate(st.route)}
-                                    className="mw-card-interactive flex items-center justify-between p-5 border transition-all duration-200 border-slate-200 dark:border-slate-800"
+                                    className="dxc-card-interactive flex items-center justify-between p-5 border transition-all duration-200 border-slate-200 dark:border-slate-800"
                                 >
                                     <div className="flex items-center gap-4 min-w-0">
                                         <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 ${st.color}`}>
@@ -136,7 +136,7 @@ const HomePage = () => {
                                         </div>
                                     </div>
                                     <div className="flex items-center gap-2">
-                                        <span className={`mw-badge ${count > 0 ? 'mw-badge-info' : 'mw-badge-neutral'}`}>
+                                        <span className={`dxc-badge ${count > 0 ? 'dxc-badge-info' : 'dxc-badge-neutral'}`}>
                                             {count}
                                         </span>
                                     </div>

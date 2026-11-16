@@ -7,17 +7,17 @@ from fastapi.testclient import TestClient
 from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlalchemy.ext.asyncio import create_async_engine
 
-from mindweaver.config import settings
-from mindweaver.platform_service.base import PlatformService
-from mindweaver.platform_service.pgsql import (
+from citadel.config import settings
+from citadel.platform_service.base import PlatformService
+from citadel.platform_service.pgsql import (
     PgSqlPlatform,
     PgSqlPlatformService,
     PgSqlPlatformState,
 )
-from mindweaver.platform_service.pgsql.poller import PgSQLPoller
-from mindweaver.service.k8s_cluster import K8sCluster, K8sClusterStatus, K8sClusterType
-from mindweaver.service.k8s_cluster.service import K8sClusterService
-from mindweaver.service.project import Project
+from citadel.platform_service.pgsql.poller import PgSQLPoller
+from citadel.service.k8s_cluster import K8sCluster, K8sClusterStatus, K8sClusterType
+from citadel.service.k8s_cluster.service import K8sClusterService
+from citadel.service.project import Project
 
 
 class FakeRedis:
@@ -45,13 +45,13 @@ class FakeRedis:
 @pytest.mark.asyncio
 async def test_poll_coordinator_deduplicates_within_cooldown():
     """Multiple requests for the same resource within 3s only enqueue 1 poll task."""
-    from mindweaver.tasks import poll_coordinator
+    from citadel.tasks import poll_coordinator
 
     fake_redis = FakeRedis()
     mock_task = MagicMock()
 
     with patch.object(poll_coordinator, "_get_redis_client", return_value=fake_redis), patch(
-        "mindweaver.tasks.platform_status.poll_platform_status.apply_async", mock_task
+        "citadel.tasks.platform_status.poll_platform_status.apply_async", mock_task
     ):
         first = await poll_coordinator.schedule_platform_poll("PgSqlPlatformService", 42)
         second = await poll_coordinator.schedule_platform_poll("PgSqlPlatformService", 42)
@@ -74,14 +74,14 @@ async def test_poll_coordinator_deduplicates_within_cooldown():
 @pytest.mark.asyncio
 async def test_poll_coordinator_skips_when_inflight_lock_held():
     """If an in-flight lock is held, do not enqueue another poll even after cooldown."""
-    from mindweaver.tasks import poll_coordinator
+    from citadel.tasks import poll_coordinator
 
     fake_redis = FakeRedis()
     fake_redis.store["mw:poll:lock:k8s_cluster:7"] = "1"
     mock_task = MagicMock()
 
     with patch.object(poll_coordinator, "_get_redis_client", return_value=fake_redis), patch(
-        "mindweaver.tasks.k8s_cluster_status.poll_k8s_cluster_status.apply_async", mock_task
+        "citadel.tasks.k8s_cluster_status.poll_k8s_cluster_status.apply_async", mock_task
     ):
         scheduled = await poll_coordinator.schedule_k8s_cluster_poll(7)
         assert scheduled is False
@@ -93,7 +93,7 @@ def test_get_state_triggers_demand_poll(client: TestClient, test_project: dict):
     cluster_id = test_project.get("k8s_cluster_id")
     if cluster_id:
         with patch(
-            "mindweaver.service.k8s_cluster.service.schedule_k8s_cluster_poll",
+            "citadel.service.k8s_cluster.service.schedule_k8s_cluster_poll",
             new_callable=AsyncMock,
         ) as mock_cluster_poll:
             resp = client.get(f"/api/v1/k8s_clusters/{cluster_id}/_state")
@@ -101,7 +101,7 @@ def test_get_state_triggers_demand_poll(client: TestClient, test_project: dict):
             mock_cluster_poll.assert_awaited_once_with(cluster_id)
 
     # Create a PgSql platform (inactive/active)
-    with patch("mindweaver.platform_service.pgsql.PgSqlPlatformService.poll_status", new_callable=AsyncMock):
+    with patch("citadel.platform_service.pgsql.PgSqlPlatformService.poll_status", new_callable=AsyncMock):
         create_resp = client.post(
             "/api/v1/platform/pgsql",
             json={
@@ -114,7 +114,7 @@ def test_get_state_triggers_demand_poll(client: TestClient, test_project: dict):
         platform_id = create_resp.json()["data"]["id"]
 
     with patch(
-        "mindweaver.platform_service.base.schedule_platform_poll",
+        "citadel.platform_service.base.schedule_platform_poll",
         new_callable=AsyncMock,
     ) as mock_plat_poll:
         state_resp = client.get(f"/api/v1/platform/pgsql/{platform_id}/_state")

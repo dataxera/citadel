@@ -6,8 +6,8 @@ import hashlib
 import bcrypt
 from fastapi.testclient import TestClient
 from sqlmodel import select
-from mindweaver.service.project.model import Project
-from mindweaver.service.project_user.model import ProjectLocalUser
+from citadel.service.project.model import Project
+from citadel.service.project_user.model import ProjectLocalUser
 
 
 def test_project_local_user_crud(client: TestClient, test_project):
@@ -51,7 +51,7 @@ def test_project_local_user_crud(client: TestClient, test_project):
     assert "password" not in user_data
 
     # Verify hashes in database directly (bypassing API redaction)
-    from mindweaver.fw.model import get_engine
+    from citadel.fw.model import get_engine
     from sqlmodel.ext.asyncio.session import AsyncSession
     import asyncio
 

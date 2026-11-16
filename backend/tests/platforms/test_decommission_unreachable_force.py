@@ -5,14 +5,14 @@ import pytest
 from unittest.mock import patch, MagicMock, AsyncMock
 from fastapi.testclient import TestClient
 from sqlmodel import Session, create_engine, select
-from mindweaver.config import settings
-from mindweaver.service.k8s_cluster import K8sClusterStatus
-from mindweaver.platform_service.pgsql import (
+from citadel.config import settings
+from citadel.service.k8s_cluster import K8sClusterStatus
+from citadel.platform_service.pgsql import (
     PgSqlPlatform,
     PgSqlPlatformState,
     PgSqlPlatformService,
 )
-from mindweaver.platform_service.kafka import (
+from citadel.platform_service.kafka import (
     KafkaPlatform,
     KafkaPlatformState,
     KafkaPlatformService,

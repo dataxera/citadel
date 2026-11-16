@@ -4,8 +4,8 @@
 import pytest
 from unittest.mock import patch
 from fastapi.testclient import TestClient
-from mindweaver.config import settings
-from mindweaver.fw.permission import (
+from citadel.config import settings
+from citadel.fw.permission import (
     All,
     Permission,
     Read as FwRead,
@@ -19,7 +19,7 @@ from mindweaver.fw.permission import (
     check_user_permission,
     _NAME_TO_PERMISSION,
 )
-from mindweaver.fw.auth.permission import (
+from citadel.fw.auth.permission import (
     Manage,
     Read,
     List,
@@ -285,7 +285,7 @@ def test_auth_endpoints_with_custom_permissions(client: TestClient):
             return _get
 
         # User with only Create permission cannot view /me or update /me
-        with patch("mindweaver.fw.permission.get_user_permissions", side_effect=_mock_perms([Create])):
+        with patch("citadel.fw.permission.get_user_permissions", side_effect=_mock_perms([Create])):
             resp = c.get("/api/v1/auth/me", headers=user_headers)
             assert resp.status_code == 403
             assert "Permission denied" in resp.text
@@ -299,7 +299,7 @@ def test_auth_endpoints_with_custom_permissions(client: TestClient):
             assert "Permission denied" in resp.text
 
         # User with Manage can access /me (GET and PUT)
-        with patch("mindweaver.fw.permission.get_user_permissions", side_effect=_mock_perms([Manage])):
+        with patch("citadel.fw.permission.get_user_permissions", side_effect=_mock_perms([Manage])):
             resp = c.get("/api/v1/auth/me", headers=user_headers)
             assert resp.status_code == 200
 

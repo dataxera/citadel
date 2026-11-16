@@ -1,5 +1,5 @@
 [project]
-name = "mw-releaser"
+name = "dxc-releaser"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
@@ -14,7 +14,7 @@ dependencies = [
 ]
 
 [project.scripts]
-mw-releaser = "mw_releaser.cli:main"
+dxc-releaser = "dxc_releaser.cli:main"
 
 [build-system]
 requires = ["uv_build>=0.9.26,<0.10.0"]

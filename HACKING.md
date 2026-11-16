@@ -1,6 +1,6 @@
-# Hacking Mindweaver
+# Hacking Citadel
 
-Welcome to the Mindweaver development guide. This document provides technical details on how to set up your environment, follow coding standards, and navigate the project's unique architecture.
+Welcome to the Citadel development guide. This document provides technical details on how to set up your environment, follow coding standards, and navigate the project's unique architecture.
 
 ---
 
@@ -13,13 +13,13 @@ Welcome to the Mindweaver development guide. This document provides technical de
 - **Docker** & **Docker Compose**
 
 ### 2. Infrastructure
-Mindweaver relies on PostgreSQL and Redis. Start them using the root Docker Compose:
+Citadel relies on PostgreSQL and Redis. Start them using the root Docker Compose:
 ```bash
 docker-compose up -d
 ```
 
 ### 3. Setup the Application
-Mindweaver provides a unified setup script to install dependencies and initialize the database:
+Citadel provides a unified setup script to install dependencies and initialize the database:
 ```bash
 python setup-dev.py
 ```
@@ -33,22 +33,22 @@ This script will:
 ### 4. Environment Configuration
 Edit `.env` file in the `backend/` directory if you need to override defaults:
 ```env
-MINDWEAVER_FERNET_KEY=<your-generated-key>
+CITADEL_FERNET_KEY=<your-generated-key>
 ```
 *Note: Database defaults (postgres/password) are already configured for local development.*
 
 ### 5. Database Migrations
-If you make changes to the SQLModel definitions in `backend/src/mindweaver/fw/model.py` or other model files, you must generate a migration:
+If you make changes to the SQLModel definitions in `backend/src/citadel/fw/model.py` or other model files, you must generate a migration:
 
 1.  **Generate a revision**:
     ```bash
     cd backend
-    uv run mindweaver db revision -m "description of changes" --autogenerate
+    uv run dxc db revision -m "description of changes" --autogenerate
     ```
 2.  **Review the migration**: Check the newly created file in `backend/migration/versions/`.
 3.  **Apply the migration**:
     ```bash
-    uv run mindweaver db migrate
+    uv run dxc db migrate
     ```
 
 ### 6. Running the Stack
@@ -63,12 +63,12 @@ This starts the Backend (8000), Frontend (3000), Celery Scheduler, and Celery Wo
 ## 🏗️ Backend Development
 
 ### Core Patterns
-Mindweaver uses a structured CRUD framework built on **FastAPI** and **SQLModel**.
+Citadel uses a structured CRUD framework built on **FastAPI** and **SQLModel**.
 
 1.  **Models**: Use `NamedBase` (standard) or `ProjectScopedNamedBase` (multi-tenant).
 2.  **Services**: Inherit from `Service`. This provides automatic CRUD endpoints, validation, and JSON:API compliant responses.
 3.  **Hooks**: Use `@before_create`, `@after_update`, etc., in your service classes to inject custom logic.
-4.  **Platform Services**: Inherit from `PlatformService` for managing external resources (Kubernetes). These use Jinja2 templates in `backend/src/mindweaver/templates`.
+4.  **Platform Services**: Inherit from `PlatformService` for managing external resources (Kubernetes). These use Jinja2 templates in `backend/src/citadel/templates`.
 
 ### Sensitive Data
 Sensitive fields (passwords, tokens) must be handled via `SecretHandlerMixin`.
@@ -77,16 +77,16 @@ Sensitive fields (passwords, tokens) must be handled via `SecretHandlerMixin`.
 - Use `__CLEAR__` to empty a field or send a new value to re-encrypt.
 
 ### CLI reference
-- `uv run mindweaver db revision -m "description" --autogenerate`: Create a new migration.
-- `uv run mindweaver db migrate`: Apply migrations.
-- `uv run mindweaver crypto rotate-key --old-key X --new-key Y`: Rotate encryption keys for database records.
+- `uv run dxc db revision -m "description" --autogenerate`: Create a new migration.
+- `uv run dxc db migrate`: Apply migrations.
+- `uv run dxc crypto rotate-key --old-key X --new-key Y`: Rotate encryption keys for database records.
 
 ---
 
 ## 🎨 Frontend Development
 
 ### Dynamic Forms
-Mindweaver leverages **Dynamic Forms** that are reflexively built from backend metadata.
+Citadel leverages **Dynamic Forms** that are reflexively built from backend metadata.
 - Most CRUD UI is handled automatically by passing the `entityPath` to the `DynamicForm` component.
 - UX properties (like field order, labels, and spans) should be configured in the **Backend Service** via the `widgets()` method.
 
@@ -101,7 +101,7 @@ Mindweaver leverages **Dynamic Forms** that are reflexively built from backend m
 ### Backend
 Tests use `pytest` and a real PostgreSQL instance (via `pytest-postgresql`).
 ```bash
-uv run --package mindweaver pytest backend/tests
+uv run --package citadel pytest backend/tests
 ```
 - **Fixtures**: Use `crud_client` for standard testing and `project_scoped_crud_client` for multi-tenant features.
 
@@ -123,5 +123,5 @@ This builds a test-targeted Docker image and runs it.
 ---
 
 ## ❓ Troubleshooting
-- **Database Issues**: If migrations are stuck, you can reset the public schema (dev only) with `uv run mindweaver db reset` (requires `MINDWEAVER_ENABLE_DB_RESET=true`).
+- **Database Issues**: If migrations are stuck, you can reset the public schema (dev only) with `uv run dxc db reset` (requires `CITADEL_ENABLE_DB_RESET=true`).
 - **Celery**: If tasks aren't executing, ensure Redis is running and the worker is healthy in the `start-dev.py` logs.

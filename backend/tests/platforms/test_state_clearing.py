@@ -6,19 +6,19 @@ import os
 import tempfile
 from unittest.mock import MagicMock, patch
 from fastapi.testclient import TestClient
-from mindweaver.app import app
-from mindweaver.platform_service.base import (
+from citadel.app import app
+from citadel.platform_service.base import (
     PlatformBase,
     PlatformService,
     PlatformStateBase,
 )
-from mindweaver.platform_service.pgsql import (
+from citadel.platform_service.pgsql import (
     PgSqlPlatform,
     PgSqlPlatformState,
     PgSqlPlatformService,
 )
 from sqlmodel import Session, create_engine
-from mindweaver.config import settings
+from citadel.config import settings
 
 
 def test_pgsql_platform_service_state_clearing(client: TestClient, test_project):
@@ -56,7 +56,7 @@ def test_pgsql_platform_service_state_clearing(client: TestClient, test_project)
     model_id = resp.json()["data"]["id"]
 
     # 3. Setup State with some data
-    from mindweaver.crypto import encrypt_password
+    from citadel.crypto import encrypt_password
 
     engine = create_engine(settings.db_uri)
     with Session(engine) as session:
@@ -79,14 +79,14 @@ def test_pgsql_platform_service_state_clearing(client: TestClient, test_project)
     # 4. Decommission
     # Mock Kubernetes parts since we don't want actual K8s interaction
     with patch(
-        "mindweaver.platform_service.base.PlatformService._decommission_from_cluster",
+        "citadel.platform_service.base.PlatformService._decommission_from_cluster",
         return_value=None,
     ):
         with patch(
-            "mindweaver.platform_service.base.PlatformService.render_manifests",
+            "citadel.platform_service.base.PlatformService.render_manifests",
             return_value="---",
         ), patch(
-            "mindweaver.platform_service.pgsql.PgSqlPlatformService.poll_status",
+            "citadel.platform_service.pgsql.PgSqlPlatformService.poll_status",
             return_value=None,
         ):
             resp = client.post(
@@ -147,13 +147,13 @@ def test_decommission_endpoint_does_not_call_poll_status(client: TestClient, tes
         session.commit()
 
     with patch(
-        "mindweaver.platform_service.base.PlatformService._decommission_from_cluster",
+        "citadel.platform_service.base.PlatformService._decommission_from_cluster",
         return_value=None,
     ), patch(
-        "mindweaver.platform_service.base.PlatformService.render_manifests",
+        "citadel.platform_service.base.PlatformService.render_manifests",
         return_value="---",
     ), patch(
-        "mindweaver.platform_service.pgsql.PgSqlPlatformService.poll_status"
+        "citadel.platform_service.pgsql.PgSqlPlatformService.poll_status"
     ) as mock_poll:
         resp = client.post(
             f"/api/v1/platform/pgsql/{model_id}/_decommission",
@@ -179,11 +179,11 @@ def test_decommission_endpoint_does_not_call_poll_status(client: TestClient, tes
 @pytest.mark.asyncio
 async def test_poller_keeps_decommissioned_state_when_inactive(client: TestClient, test_project: dict):
     """Verifies that pollers do not overwrite status to online or healthy if platform is decommissioned/inactive."""
-    from mindweaver.platform_service.doris.poller import DorisPoller
-    from mindweaver.platform_service.doris.model import DorisPlatform, DorisPlatformState
-    from mindweaver.platform_service.doris.service import DorisPlatformService
+    from citadel.platform_service.doris.poller import DorisPoller
+    from citadel.platform_service.doris.model import DorisPlatform, DorisPlatformState
+    from citadel.platform_service.doris.service import DorisPlatformService
     from sqlmodel.ext.asyncio.session import AsyncSession
-    from mindweaver.fw.model import get_engine
+    from citadel.fw.model import get_engine
 
     engine = get_engine()
     async with AsyncSession(engine) as session:
@@ -220,13 +220,13 @@ async def test_poller_keeps_decommissioned_state_when_inactive(client: TestClien
             wraps=poller.poll
         ):
             with patch(
-                "mindweaver.platform_service.doris.poller.DorisPoller.poll",
+                "citadel.platform_service.doris.poller.DorisPoller.poll",
             ) as mock_p:
                 pass
 
         # Call poller.poll with an internal _poll returning ('online', 'Sync: Synced, Health: Healthy', {}, [], [])
         with patch(
-            "mindweaver.platform_service.doris.poller.asyncio.to_thread",
+            "citadel.platform_service.doris.poller.asyncio.to_thread",
             return_value=("online", "Sync: Synced, Health: Healthy", {}, [], []),
         ), patch.object(svc, "kubeconfig", return_value=""), patch.object(
             svc, "_resolve_namespace", return_value="default"
@@ -242,7 +242,7 @@ async def test_poller_keeps_decommissioned_state_when_inactive(client: TestClien
 @pytest.mark.asyncio
 async def test_base_state_clear_noop():
     """Verifies that BaseState.clear is a callable async no-op."""
-    from mindweaver.fw.state import BaseState
+    from citadel.fw.state import BaseState
 
     class DummyState(BaseState):
         async def get(self):
@@ -255,10 +255,10 @@ async def test_base_state_clear_noop():
 @pytest.mark.asyncio
 async def test_default_platform_state_clear(client: TestClient, test_project: dict):
     """Verifies DefaultPlatformState.clear resets base platform state attributes."""
-    from mindweaver.platform_service.base import DefaultPlatformState
-    from mindweaver.platform_service.pgsql import PgSqlPlatform, PgSqlPlatformState, PgSqlPlatformService
+    from citadel.platform_service.base import DefaultPlatformState
+    from citadel.platform_service.pgsql import PgSqlPlatform, PgSqlPlatformState, PgSqlPlatformService
     from sqlmodel.ext.asyncio.session import AsyncSession
-    from mindweaver.fw.model import get_engine
+    from citadel.fw.model import get_engine
 
     engine = get_engine()
     async with AsyncSession(engine) as session:
@@ -304,13 +304,13 @@ async def test_default_platform_state_clear(client: TestClient, test_project: di
 @pytest.mark.asyncio
 async def test_platform_service_delegates_to_state_class(client: TestClient, test_project: dict):
     """Verifies PlatformService.clear_state delegates to the state object's clear() method."""
-    from mindweaver.platform_service.kafka import (
+    from citadel.platform_service.kafka import (
         KafkaPlatform,
         KafkaPlatformState,
         KafkaPlatformService,
     )
     from sqlmodel.ext.asyncio.session import AsyncSession
-    from mindweaver.fw.model import get_engine
+    from citadel.fw.model import get_engine
 
     engine = get_engine()
     async with AsyncSession(engine) as session:
@@ -353,20 +353,20 @@ async def test_platform_service_delegates_to_state_class(client: TestClient, tes
 @pytest.mark.asyncio
 async def test_all_platform_subclass_states_clear(client: TestClient, test_project: dict):
     """Verifies that all 8 platform state subclasses clear their specific attributes."""
-    from mindweaver.platform_service.airflow.model import AirflowPlatform, AirflowPlatformState
-    from mindweaver.platform_service.airflow.service import AirflowPlatformService
-    from mindweaver.platform_service.doris.model import DorisPlatform, DorisPlatformState
-    from mindweaver.platform_service.doris.service import DorisPlatformService
-    from mindweaver.platform_service.trino.model import TrinoPlatform, TrinoPlatformState
-    from mindweaver.platform_service.trino.service import TrinoPlatformService
-    from mindweaver.platform_service.superset.model import SupersetPlatform, SupersetPlatformState
-    from mindweaver.platform_service.superset.service import SupersetPlatformService
-    from mindweaver.platform_service.hive_metastore.model import HiveMetastorePlatform, HiveMetastorePlatformState
-    from mindweaver.platform_service.hive_metastore.service import HiveMetastorePlatformService
-    from mindweaver.platform_service.nifi.model import NifiPlatform, NifiPlatformState
-    from mindweaver.platform_service.nifi.service import NifiPlatformService
+    from citadel.platform_service.airflow.model import AirflowPlatform, AirflowPlatformState
+    from citadel.platform_service.airflow.service import AirflowPlatformService
+    from citadel.platform_service.doris.model import DorisPlatform, DorisPlatformState
+    from citadel.platform_service.doris.service import DorisPlatformService
+    from citadel.platform_service.trino.model import TrinoPlatform, TrinoPlatformState
+    from citadel.platform_service.trino.service import TrinoPlatformService
+    from citadel.platform_service.superset.model import SupersetPlatform, SupersetPlatformState
+    from citadel.platform_service.superset.service import SupersetPlatformService
+    from citadel.platform_service.hive_metastore.model import HiveMetastorePlatform, HiveMetastorePlatformState
+    from citadel.platform_service.hive_metastore.service import HiveMetastorePlatformService
+    from citadel.platform_service.nifi.model import NifiPlatform, NifiPlatformState
+    from citadel.platform_service.nifi.service import NifiPlatformService
     from sqlmodel.ext.asyncio.session import AsyncSession
-    from mindweaver.fw.model import get_engine
+    from citadel.fw.model import get_engine
 
     engine = get_engine()
     async with AsyncSession(engine) as session:

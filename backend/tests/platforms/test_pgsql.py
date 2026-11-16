@@ -7,11 +7,11 @@ from unittest.mock import patch, AsyncMock, MagicMock
 from sqlalchemy.ext.asyncio import create_async_engine
 from fastapi.testclient import TestClient
 from sqlmodel.ext.asyncio.session import AsyncSession
-from mindweaver.app import app
-from mindweaver.config import settings
-from mindweaver.platform_service.pgsql import PgSqlPlatformService, PgSqlPlatform
-from mindweaver.platform_service.pgsql.model import PgSqlPlatformState
-from mindweaver.platform_service.pgsql.poller import PgSQLPoller
+from citadel.app import app
+from citadel.config import settings
+from citadel.platform_service.pgsql import PgSqlPlatformService, PgSqlPlatform
+from citadel.platform_service.pgsql.model import PgSqlPlatformState
+from citadel.platform_service.pgsql.poller import PgSQLPoller
 
 
 def test_pgsql_platform_crud(client: TestClient, test_project):
@@ -74,7 +74,7 @@ def test_pgsql_platform_crud(client: TestClient, test_project):
     ) as mock_dynamic_client, patch(
         "kubernetes.client.CoreV1Api"
     ) as mock_core_v1, patch(
-        "mindweaver.platform_service.pgsql.PgSqlPlatformService.poll_status",
+        "citadel.platform_service.pgsql.PgSqlPlatformService.poll_status",
         new_callable=AsyncMock,
     ) as mock_poll_status:
         # Mock poll_status to ensure it does not return MagicMock objects
@@ -423,7 +423,7 @@ def test_pgsql_pgbouncer_fields(client: TestClient, test_project):
 @pytest.mark.asyncio
 async def test_pgsql_image_selection(client: TestClient, test_project):
 
-    from mindweaver.platform_service.pgsql import PgSqlPlatformService, PgSqlPlatform
+    from citadel.platform_service.pgsql import PgSqlPlatformService, PgSqlPlatform
     from unittest.mock import MagicMock
 
     # 1. Test widgets

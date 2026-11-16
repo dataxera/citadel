@@ -4,8 +4,8 @@
 import pytest
 from fastapi.testclient import TestClient
 import sqlalchemy.exc as saexc
-from mindweaver.fw.service import Service
-from mindweaver.fw.exc import ModelValidationError
+from citadel.fw.service import Service
+from citadel.fw.exc import ModelValidationError
 
 
 def test_delete_referenced_resource_fails_with_422(
@@ -27,7 +27,7 @@ def test_delete_referenced_resource_fails_with_422(
     assert len(data["detail"]) > 0
     msg = data["detail"][0]["msg"]
     assert "Cannot delete: resource is still referenced by" in msg
-    assert "mw_project" in msg
+    assert "dxc_project" in msg
 
 
 def test_delete_resource_after_dependent_deleted_succeeds(
@@ -64,15 +64,15 @@ def test_handle_integrity_error_foreign_key_delete_unit():
 
     # 1. PostgreSQL error mentioning table
     orig_exc = Exception(
-        'update or delete on table "mw_pgsql_platform" violates foreign key constraint "mw_hive_metastore_platform_database_id_fkey" on table "mw_hive_metastore_platform"\n'
-        'DETAIL: Key (id)=(2) is still referenced from table "mw_hive_metastore_platform".'
+        'update or delete on table "dxc_pgsql_platform" violates foreign key constraint "dxc_hive_metastore_platform_database_id_fkey" on table "dxc_hive_metastore_platform"\n'
+        'DETAIL: Key (id)=(2) is still referenced from table "dxc_hive_metastore_platform".'
     )
     err = saexc.IntegrityError(statement="DELETE", params=[], orig=orig_exc)
 
     with pytest.raises(ModelValidationError) as exc_info:
         svc._handle_integrity_error(err, action="delete")
     assert "Cannot delete: resource is still referenced by" in str(exc_info.value.detail)
-    assert "mw_hive_metastore_platform" in str(exc_info.value.detail)
+    assert "dxc_hive_metastore_platform" in str(exc_info.value.detail)
 
     # 2. Generic SQLite delete foreign key error
     orig_sqlite = Exception("FOREIGN KEY constraint failed")

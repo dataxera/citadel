@@ -4,8 +4,8 @@
 import pytest
 from unittest.mock import MagicMock, patch
 from fastapi.testclient import TestClient
-from mindweaver.config import settings
-from mindweaver.fw.permission import (
+from citadel.config import settings
+from citadel.fw.permission import (
     All,
     Permission,
     Read as FwRead,
@@ -19,7 +19,7 @@ from mindweaver.fw.permission import (
     check_user_permission,
     _NAME_TO_PERMISSION,
 )
-from mindweaver.service.s3_storage.permission import (
+from citadel.service.s3_storage.permission import (
     Manage,
     Read,
     List,
@@ -439,7 +439,7 @@ def test_s3_storage_endpoints_with_granted_permissions(client: TestClient, test_
             return _get
 
         # 1. User with Manage permission (full control)
-        with patch("mindweaver.fw.permission.get_user_permissions", side_effect=_mock_perms([Manage])):
+        with patch("citadel.fw.permission.get_user_permissions", side_effect=_mock_perms([Manage])):
             # Can create
             resp = c.post(
                 "/api/v1/s3_storages",
@@ -516,7 +516,7 @@ def test_s3_storage_endpoints_with_granted_permissions(client: TestClient, test_
         assert r_resp.status_code == 200
         target_id = r_resp.json()["data"]["id"]
 
-        with patch("mindweaver.fw.permission.get_user_permissions", side_effect=_mock_perms([Read])):
+        with patch("citadel.fw.permission.get_user_permissions", side_effect=_mock_perms([Read])):
             # Can list
             resp = c.get(
                 "/api/v1/s3_storages",
@@ -592,7 +592,7 @@ def test_s3_storage_endpoints_with_granted_permissions(client: TestClient, test_
             assert resp.status_code == 403
 
         # 3. User with only TestConnection permission
-        with patch("mindweaver.fw.permission.get_user_permissions", side_effect=_mock_perms([TestConnection])):
+        with patch("citadel.fw.permission.get_user_permissions", side_effect=_mock_perms([TestConnection])):
             # Tester cannot create
             resp = c.post(
                 "/api/v1/s3_storages",
@@ -622,7 +622,7 @@ def test_s3_storage_endpoints_with_granted_permissions(client: TestClient, test_
                 assert resp.json()["status"] == "success"
 
         # 4. User with only FsWrite permission
-        with patch("mindweaver.fw.permission.get_user_permissions", side_effect=_mock_perms([FsWrite])):
+        with patch("citadel.fw.permission.get_user_permissions", side_effect=_mock_perms([FsWrite])):
             # FsWriter CAN post _fs (rm)
             with patch("boto3.client") as mock_boto:
                 mock_client = MagicMock()

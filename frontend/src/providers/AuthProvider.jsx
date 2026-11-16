@@ -10,7 +10,7 @@ export const AuthProvider = ({ children }) => {
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
-    const [brandName, setBrandName] = useState('Mindweaver');
+    const [brandName, setBrandName] = useState('Citadel');
     const [brandLogo, setBrandLogo] = useState('');
     const [brandBgColor, setBrandBgColor] = useState(null);
 
@@ -32,7 +32,7 @@ export const AuthProvider = ({ children }) => {
     };
 
     const checkAuth = async () => {
-        const token = localStorage.getItem('mindweaver-token');
+        const token = localStorage.getItem('citadel-token');
         if (!token) {
             setLoading(false);
             setUser(null);
@@ -44,7 +44,7 @@ export const AuthProvider = ({ children }) => {
             setUser(response.data);
         } catch (err) {
             console.error('Auth check failed:', err);
-            localStorage.removeItem('mindweaver-token');
+            localStorage.removeItem('citadel-token');
             setUser(null);
             setError(err);
         } finally {
@@ -67,7 +67,7 @@ export const AuthProvider = ({ children }) => {
         try {
             const response = await apiClient.post(`/auth/callback?code=${code}&redirect_url=${encodeURIComponent(redirectUrl)}`);
             const { access_token } = response.data;
-            localStorage.setItem('mindweaver-token', access_token);
+            localStorage.setItem('citadel-token', access_token);
             await checkAuth();
             return true;
         } catch (err) {
@@ -87,7 +87,7 @@ export const AuthProvider = ({ children }) => {
                 password,
             });
             const { access_token } = response.data;
-            localStorage.setItem('mindweaver-token', access_token);
+            localStorage.setItem('citadel-token', access_token);
             await checkAuth();
             return true;
         } catch (err) {
@@ -99,7 +99,7 @@ export const AuthProvider = ({ children }) => {
     };
 
     const logout = () => {
-        localStorage.removeItem('mindweaver-token');
+        localStorage.removeItem('citadel-token');
         setUser(null);
     };
 

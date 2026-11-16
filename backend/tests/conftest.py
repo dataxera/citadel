@@ -3,29 +3,29 @@
 
 import os
 
-os.environ["MINDWEAVER_EXPERIMENTAL_AI_AGENT"] = "true"
-os.environ["MINDWEAVER_EXPERIMENTAL_KNOWLEDGE_DB"] = "true"
-os.environ["MINDWEAVER_EXPERIMENTAL_S3_STORAGE"] = "true"
-os.environ["MINDWEAVER_EXPERIMENTAL_INGESTION"] = "true"
-os.environ["MINDWEAVER_EXPERIMENTAL_CHAT"] = "true"
-os.environ["MINDWEAVER_ENABLE_TEST_VIEWS"] = "true"
-os.environ["MINDWEAVER_ENABLE_AUTH"] = "false"
+os.environ["CITADEL_EXPERIMENTAL_AI_AGENT"] = "true"
+os.environ["CITADEL_EXPERIMENTAL_KNOWLEDGE_DB"] = "true"
+os.environ["CITADEL_EXPERIMENTAL_S3_STORAGE"] = "true"
+os.environ["CITADEL_EXPERIMENTAL_INGESTION"] = "true"
+os.environ["CITADEL_EXPERIMENTAL_CHAT"] = "true"
+os.environ["CITADEL_ENABLE_TEST_VIEWS"] = "true"
+os.environ["CITADEL_ENABLE_AUTH"] = "false"
 
 import pytest
 import pytest_postgresql
 from pytest_postgresql.executor import PostgreSQLExecutor
 from psycopg.connection import Connection
 from fastapi.testclient import TestClient
-from mindweaver.fw.service import Service
-from mindweaver.fw.model import NamedBase, clear_engine
-from mindweaver.service.base import ProjectScopedNamedBase, ProjectScopedService
+from citadel.fw.service import Service
+from citadel.fw.model import NamedBase, clear_engine
+from citadel.service.base import ProjectScopedNamedBase, ProjectScopedService
 from sqlmodel import SQLModel, create_engine, Field
-from mindweaver.config import settings
+from citadel.config import settings
 
 
-from mindweaver.app import app
-from mindweaver.service.project import ProjectService
-from mindweaver.celery_app import app as celery_app
+from citadel.app import app
+from citadel.service.project import ProjectService
+from citadel.celery_app import app as celery_app
 celery_app.conf.task_always_eager = True
 
 
@@ -126,7 +126,7 @@ def project_scoped_crud_client(
 ):
     clear_engine()
     """Create a test client with a ProjectScopedNamedBase model for CRUD testing."""
-    from mindweaver.service.project import ProjectService
+    from citadel.service.project import ProjectService
 
     settings.db_host = postgresql_proc.host
     settings.db_port = postgresql_proc.port
@@ -147,7 +147,7 @@ def test_stack():
     """Load the dedicated unit-test stack YAML into a Stack model."""
     from pathlib import Path
     import yaml
-    from mindweaver.service.stack.model import Stack
+    from citadel.service.stack.model import Stack
 
     stack_path = Path(__file__).resolve().parent / "resources" / "test-stack.yml"
     data = yaml.safe_load(stack_path.read_text())

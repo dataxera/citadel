@@ -40,108 +40,108 @@ body {
 @layer components {
 
   /* High-Density Cards */
-  .mw-card {
+  .dxc-card {
     @apply border rounded-[32px] p-6 transition-all bg-white border-slate-200 shadow-sm dark:bg-slate-900/40 dark:border-slate-800 dark:shadow-none text-base;
   }
 
-  .mw-card-interactive {
+  .dxc-card-interactive {
     @apply border rounded-[32px] p-6 transition-all bg-white border-slate-200 shadow-sm dark:bg-slate-900/40 dark:border-slate-800 dark:shadow-none cursor-pointer hover:border-blue-500/50 hover:shadow-md dark:hover:bg-slate-900/60 dark:hover:border-blue-500/30 text-base;
   }
 
   /* Semantic Badges/Pills */
-  .mw-badge {
+  .dxc-badge {
     @apply px-2 py-0.5 rounded-md font-bold border uppercase inline-flex items-center justify-center tracking-wider;
     font-size: var(--font-size-xxs);
   }
 
-  .mw-badge-success {
+  .dxc-badge-success {
     @apply px-2 py-0.5 rounded-md font-bold border uppercase inline-flex items-center justify-center tracking-wider bg-emerald-500/10 text-emerald-500 border-emerald-500/20;
     font-size: var(--font-size-xxs);
   }
 
-  .mw-badge-warning {
+  .dxc-badge-warning {
     @apply px-2 py-0.5 rounded-md font-bold border uppercase inline-flex items-center justify-center tracking-wider bg-amber-500/10 text-amber-500 border-amber-500/20;
     font-size: var(--font-size-xxs);
   }
 
-  .mw-badge-danger {
+  .dxc-badge-danger {
     @apply px-2 py-0.5 rounded-md font-bold border uppercase inline-flex items-center justify-center tracking-wider bg-rose-500/10 text-rose-500 border-rose-500/20;
     font-size: var(--font-size-xxs);
   }
 
-  .mw-badge-info {
+  .dxc-badge-info {
     @apply px-2 py-0.5 rounded-md font-bold border uppercase inline-flex items-center justify-center tracking-wider bg-blue-500/10 text-blue-500 border-blue-500/20;
     font-size: var(--font-size-xxs);
   }
 
-  .mw-badge-neutral {
+  .dxc-badge-neutral {
     @apply px-2 py-0.5 rounded-md font-bold border uppercase inline-flex items-center justify-center tracking-wider bg-slate-500/10 text-slate-400 border-slate-500/20;
     font-size: var(--font-size-xxs);
   }
 
-  .mw-list-item {
+  .dxc-list-item {
     @apply border rounded-[32px] p-4 flex items-center justify-between transition-all duration-200 bg-white border-slate-200 shadow-sm dark:bg-slate-900/40 dark:border-slate-800 dark:shadow-none text-base cursor-pointer hover:border-blue-500/50;
   }
 
   /* Forms & Inputs */
-  .mw-input {
+  .dxc-input {
     @apply w-full px-4 py-3 rounded-xl border text-base outline-none transition-all bg-slate-100 border-slate-200 text-slate-900 focus:ring-2 focus:ring-blue-500/20 dark:bg-slate-950 dark:border-slate-800 dark:text-slate-200;
   }
 
-  .mw-label {
+  .dxc-label {
     @apply font-bold uppercase tracking-widest px-1 transition-colors text-slate-500 text-base;
   }
 
   /* Standardized Buttons */
-  .mw-btn {
+  .dxc-btn {
     @apply font-bold rounded-2xl flex items-center justify-center gap-3 transition-all active:scale-[0.98] text-base;
   }
 
-  .mw-btn-primary {
+  .dxc-btn-primary {
     @apply font-bold rounded-2xl flex items-center justify-center gap-3 transition-all active:scale-[0.98] text-base bg-blue-600 text-white hover:bg-blue-500 shadow-lg shadow-blue-600/20;
   }
 
-  .mw-btn-secondary {
+  .dxc-btn-secondary {
     @apply font-bold rounded-2xl flex items-center justify-center gap-3 transition-all active:scale-[0.98] text-base border bg-white border-slate-200 text-slate-600 hover:bg-slate-50 dark:bg-slate-900/40 dark:border-slate-800 dark:text-slate-400 dark:hover:bg-slate-800;
   }
 
-  .mw-btn-danger {
+  .dxc-btn-danger {
     @apply font-bold rounded-2xl flex items-center justify-center gap-3 transition-all active:scale-[0.98] text-base bg-rose-500/10 text-rose-500 border border-rose-500/20 hover:bg-rose-500/20;
   }
 
-  .mw-btn-icon {
+  .dxc-btn-icon {
     @apply p-3 text-slate-500 hover:text-blue-500 hover:bg-blue-500/10 rounded-xl transition-all text-base;
   }
 
-  .mw-btn-icon-danger {
+  .dxc-btn-icon-danger {
     @apply p-3 text-slate-500 hover:text-rose-500 hover:bg-rose-500/10 rounded-xl transition-all text-base;
   }
 
   /* Page Structure */
-  .mw-page-header {
+  .dxc-page-header {
     @apply flex items-end justify-between border-b pb-6 border-slate-200 dark:border-slate-800/50 gap-4;
   }
 
-  .mw-search-box {
+  .dxc-search-box {
     @apply flex items-center gap-3 border rounded-xl px-4 py-2 transition-all bg-white border-slate-200 dark:bg-slate-900/50 dark:border-slate-800;
   }
 
-  .mw-panel {
+  .dxc-panel {
     @apply border rounded-2xl overflow-hidden bg-white border-slate-200 shadow-sm dark:bg-slate-900 dark:border-slate-800 dark:shadow-none;
   }
 
-  .mw-modal {
+  .dxc-modal {
     @apply border rounded-[24px] shadow-2xl relative z-10 overflow-hidden duration-300 bg-white border-slate-200 dark:bg-[#0c0e12] dark:border-slate-800;
   }
 
-  .mw-nav-item {
+  .dxc-nav-item {
     @apply w-full flex items-center rounded-lg transition-all text-lg font-medium mb-[6px];
     gap: 0.75rem !important;
     padding: 0.75rem 1rem !important;
     padding: 0.75rem 1rem !important;
   }
 
-  .mw-sidebar-section {
+  .dxc-sidebar-section {
     @apply uppercase tracking-[0.2em] text-slate-500 font-bold;
     padding-left: 1rem !important;
     padding-right: 1rem !important;
@@ -150,60 +150,60 @@ body {
     font-size: var(--font-size-base);
   }
 
-  .mw-layout-root {
+  .dxc-layout-root {
     @apply min-h-screen flex transition-colors duration-300 bg-slate-50 text-slate-900 dark:bg-[#08090b] dark:text-slate-200;
   }
 
-  .mw-btn-success {
+  .dxc-btn-success {
     @apply font-bold rounded-2xl flex items-center justify-center gap-3 transition-all active:scale-[0.98] text-base bg-emerald-600 text-white hover:bg-emerald-500 shadow-lg shadow-emerald-600/20;
   }
 
-  .mw-icon-box {
+  .dxc-icon-box {
     @apply flex items-center justify-center border rounded-2xl transition-all bg-white border-slate-200 shadow-sm dark:bg-slate-900/40 dark:border-slate-800 dark:shadow-none;
   }
 
   /* Range Slider */
-  .mw-range {
+  .dxc-range {
     @apply w-full h-2 rounded-lg appearance-none cursor-pointer outline-none transition-all;
     background: #e2e8f0;
     /* Default track color */
   }
 
-  .dark .mw-range {
+  .dark .dxc-range {
     background: #1e293b;
   }
 
   /* Slider Thumb */
-  .mw-range::-webkit-slider-thumb {
+  .dxc-range::-webkit-slider-thumb {
     @apply appearance-none w-6 h-6 rounded-full bg-blue-600 border-2 border-white dark:border-slate-950 shadow-md cursor-pointer transition-all active:scale-110;
   }
 
-  .mw-range::-moz-range-thumb {
+  .dxc-range::-moz-range-thumb {
     @apply appearance-none w-6 h-6 rounded-full bg-blue-600 border-2 border-white dark:border-slate-950 shadow-md cursor-pointer transition-all active:scale-110 border-none;
   }
 
-  .mw-range-container {
+  .dxc-range-container {
     @apply relative pt-10 pb-2;
   }
 
-  .mw-range-badge {
+  .dxc-range-badge {
     @apply absolute top-0 px-3 py-1.5 rounded-lg bg-blue-600 text-white text-base font-bold shadow-lg pointer-events-none transition-all duration-75;
     transform: translateX(-50%);
   }
 
-  .dark .mw-range-badge {
+  .dark .dxc-range-badge {
     @apply bg-slate-700;
   }
 
-  .mw-range-steps {
+  .dxc-range-steps {
     @apply absolute w-full flex justify-between px-3 top-[52px] pointer-events-none;
   }
 
-  .mw-range-step {
+  .dxc-range-step {
     @apply w-1.5 h-1.5 rounded-full bg-slate-300 dark:bg-slate-700 transition-colors;
   }
 
-  .mw-range-step-active {
+  .dxc-range-step-active {
     @apply bg-blue-500/50;
   }
 }

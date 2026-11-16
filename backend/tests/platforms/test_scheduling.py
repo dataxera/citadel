@@ -8,23 +8,23 @@ from fastapi import Request
 from fastapi.testclient import TestClient
 from pydantic import ValidationError
 
-from mindweaver.fw.model import AsyncSession
-from mindweaver.platform_service.base import PlatformDeploymentMethod
-from mindweaver.platform_service.pgsql import PgSqlPlatform, PgSqlPlatformService
-from mindweaver.platform_service.hive_metastore import (
+from citadel.fw.model import AsyncSession
+from citadel.platform_service.base import PlatformDeploymentMethod
+from citadel.platform_service.pgsql import PgSqlPlatform, PgSqlPlatformService
+from citadel.platform_service.hive_metastore import (
     HiveMetastorePlatform,
     HiveMetastorePlatformService,
 )
-from mindweaver.platform_service.trino import TrinoPlatform, TrinoPlatformService
-from mindweaver.platform_service.superset import (
+from citadel.platform_service.trino import TrinoPlatform, TrinoPlatformService
+from citadel.platform_service.superset import (
     SupersetPlatform,
     SupersetPlatformService,
 )
-from mindweaver.platform_service.airflow import AirflowPlatform, AirflowPlatformService
-from mindweaver.platform_service.kafka import KafkaPlatform, KafkaPlatformService
-from mindweaver.platform_service.nifi import NifiPlatform, NifiPlatformService
-from mindweaver.platform_service.doris import DorisPlatform, DorisPlatformService
-from mindweaver.service.k8s_cluster.model import DEFAULT_NODE_ROLES
+from citadel.platform_service.airflow import AirflowPlatform, AirflowPlatformService
+from citadel.platform_service.kafka import KafkaPlatform, KafkaPlatformService
+from citadel.platform_service.nifi import NifiPlatform, NifiPlatformService
+from citadel.platform_service.doris import DorisPlatform, DorisPlatformService
+from citadel.service.k8s_cluster.model import DEFAULT_NODE_ROLES
 
 
 def _mock_request_session():
@@ -251,11 +251,11 @@ async def test_render_manifests_includes_scheduling_for_all_services():
     )
     with (
         patch(
-            "mindweaver.platform_service.hive_metastore.service.PgSqlPlatformService.get_service",
+            "citadel.platform_service.hive_metastore.service.PgSqlPlatformService.get_service",
             AsyncMock(return_value=mock_pgsql_svc),
         ),
         patch(
-            "mindweaver.platform_service.hive_metastore.service.S3StorageService.get_service",
+            "citadel.platform_service.hive_metastore.service.S3StorageService.get_service",
             AsyncMock(return_value=mock_s3_svc),
         ),
     ):
@@ -299,7 +299,7 @@ async def test_render_manifests_includes_scheduling_for_all_services():
     with (
         patch.object(superset_svc, "project", AsyncMock(return_value=mock_project)),
         patch(
-            "mindweaver.platform_service.superset.service.PgSqlPlatformService.get_service",
+            "citadel.platform_service.superset.service.PgSqlPlatformService.get_service",
             AsyncMock(return_value=mock_pgsql_svc),
         ),
     ):
@@ -324,7 +324,7 @@ async def test_render_manifests_includes_scheduling_for_all_services():
     with (
         patch.object(airflow_svc, "project", AsyncMock(return_value=mock_project)),
         patch(
-            "mindweaver.platform_service.airflow.service.PgSqlPlatformService.get_service",
+            "citadel.platform_service.airflow.service.PgSqlPlatformService.get_service",
             AsyncMock(return_value=mock_pgsql_svc),
         ),
     ):

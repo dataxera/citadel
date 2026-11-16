@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: AGPLv3+
 
 from fastapi.testclient import TestClient
-from mindweaver.config import logger
+from citadel.config import logger
 
 
 def test_delete_confirmation_header(crud_client: TestClient):

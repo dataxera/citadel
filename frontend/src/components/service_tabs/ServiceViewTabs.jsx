@@ -54,10 +54,10 @@ const ServiceViewTabs = ({
     }
 
     return (
-        <div className={cn('mw-service-tabs space-y-6', className)}>
+        <div className={cn('dxc-service-tabs space-y-6', className)}>
             <div
                 className={cn(
-                    'mw-service-tab-bar flex items-center gap-4 border-b p-1 overflow-x-auto',
+                    'dxc-service-tab-bar flex items-center gap-4 border-b p-1 overflow-x-auto',
                     darkMode ? 'border-slate-800' : 'border-slate-200'
                 )}
                 role="tablist"
@@ -72,7 +72,7 @@ const ServiceViewTabs = ({
                             aria-selected={isActive}
                             onClick={() => setActiveTab(tab.id)}
                             className={cn(
-                                'mw-service-tab-btn px-4 py-2 text-sm font-bold uppercase tracking-widest transition-all border-b-2 whitespace-nowrap',
+                                'dxc-service-tab-btn px-4 py-2 text-sm font-bold uppercase tracking-widest transition-all border-b-2 whitespace-nowrap',
                                 isActive
                                     ? 'border-blue-500 text-blue-500'
                                     : 'border-transparent text-slate-500 hover:text-slate-900 dark:hover:text-slate-100'
@@ -84,7 +84,7 @@ const ServiceViewTabs = ({
                 })}
             </div>
 
-            <div className="mw-service-tab-content" role="tabpanel">
+            <div className="dxc-service-tab-content" role="tabpanel">
                 {activeTabObj?.render
                     ? activeTabObj.render({ activeTab, setActiveTab })
                     : activeTabObj?.content}

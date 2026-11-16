@@ -4,9 +4,9 @@
 import pytest
 from unittest.mock import patch, MagicMock
 from fastapi import Request
-from mindweaver.config import settings
-from mindweaver.fw.model import get_engine, clear_engine
-from mindweaver.fw.auth import verify_token, User
+from citadel.config import settings
+from citadel.fw.model import get_engine, clear_engine
+from citadel.fw.auth import verify_token, User
 
 
 def test_db_pool_settings_defaults():
@@ -22,8 +22,8 @@ def test_db_pool_settings_defaults():
 
 def test_celery_worker_process_init_clears_engine():
     """Verify that clear_engine is invoked on worker process initialization."""
-    from mindweaver.celery_app import clear_engine_on_worker_process_init
-    with patch("mindweaver.celery_app.clear_engine") as mock_clear:
+    from citadel.celery_app import clear_engine_on_worker_process_init
+    with patch("citadel.celery_app.clear_engine") as mock_clear:
         clear_engine_on_worker_process_init()
         mock_clear.assert_called_once()
 

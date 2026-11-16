@@ -7,9 +7,9 @@ from unittest.mock import MagicMock
 from fastapi import Request
 from sqlmodel import Session, SQLModel
 
-from mindweaver.fw.model import NamedBase
-from mindweaver.fw.service import Service
-from mindweaver.fw.action import BaseAction
+from citadel.fw.model import NamedBase
+from citadel.fw.service import Service
+from citadel.fw.action import BaseAction
 
 
 # Create dummy model

@@ -8,10 +8,10 @@ from fastapi.testclient import TestClient
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from mindweaver.fw.model import get_engine, ts_now
-from mindweaver.service.name_tracker.model import NameTracker
-from mindweaver.platform_service.pgsql.model import PgSqlPlatform
-from mindweaver.tasks.name_tracker import scan_and_clean_names
+from citadel.fw.model import get_engine, ts_now
+from citadel.service.name_tracker.model import NameTracker
+from citadel.platform_service.pgsql.model import PgSqlPlatform
+from citadel.tasks.name_tracker import scan_and_clean_names
 
 
 @pytest.fixture
@@ -121,8 +121,8 @@ async def test_scan_and_clean_names_task(client: TestClient, test_project, admin
 
 @pytest.mark.asyncio
 async def test_platform_service_fails_when_name_exists_in_tracker(client: TestClient, test_project, admin_headers):
-    from mindweaver.fw.model import get_engine, ts_now
-    from mindweaver.service.name_tracker.model import NameTracker
+    from citadel.fw.model import get_engine, ts_now
+    from citadel.service.name_tracker.model import NameTracker
     from sqlmodel.ext.asyncio.session import AsyncSession
 
     # Manually populate NameTracker with a name

@@ -4,10 +4,10 @@
 import pytest
 from unittest.mock import MagicMock, AsyncMock, patch
 from fastapi.testclient import TestClient
-from mindweaver.app import app
-from mindweaver.platform_service.airflow.service import AirflowPlatformService
-from mindweaver.platform_service.airflow.model import AirflowPlatform
-from mindweaver.crypto import encrypt_password, decrypt_password
+from citadel.app import app
+from citadel.platform_service.airflow.service import AirflowPlatformService
+from citadel.platform_service.airflow.model import AirflowPlatform
+from citadel.crypto import encrypt_password, decrypt_password
 
 
 def test_airflow_platform_crud(client: TestClient, test_project):
@@ -209,11 +209,11 @@ def test_airflow_platform_git_repo_validation(client: TestClient, test_project):
 @pytest.mark.asyncio
 async def test_airflow_template_vars_git_sync(client: TestClient, test_project):
     # Mock services/DB calls for template_vars test
-    from mindweaver.platform_service.airflow.service import AirflowPlatformService
-    from mindweaver.service.git_repo.model import GitRepo
-    from mindweaver.service.ssh_key.model import SSHKey
-    from mindweaver.platform_service.pgsql.model import PgSqlPlatform, PgSqlPlatformState
-    from mindweaver.service.project.model import Project
+    from citadel.platform_service.airflow.service import AirflowPlatformService
+    from citadel.service.git_repo.model import GitRepo
+    from citadel.service.ssh_key.model import SSHKey
+    from citadel.platform_service.pgsql.model import PgSqlPlatform, PgSqlPlatformState
+    from citadel.service.project.model import Project
 
     mock_request = MagicMock()
     mock_request.headers = {"X-Project-Id": str(test_project["id"])}
@@ -246,9 +246,9 @@ async def test_airflow_template_vars_git_sync(client: TestClient, test_project):
     mock_pgsql_svc.platform_state = AsyncMock(return_value=mock_pgsql_state)
 
     # Inject mock service getters
-    from mindweaver.platform_service.pgsql.service import PgSqlPlatformService
-    from mindweaver.service.git_repo.service import GitRepoService
-    from mindweaver.service.ssh_key.service import SSHKeyService
+    from citadel.platform_service.pgsql.service import PgSqlPlatformService
+    from citadel.service.git_repo.service import GitRepoService
+    from citadel.service.ssh_key.service import SSHKeyService
 
     # Setup Airflow model
     airflow_model = AirflowPlatform(
@@ -339,10 +339,10 @@ def test_airflow_no_oidc_fields():
 @pytest.mark.asyncio
 async def test_airflow_load_examples(test_project):
     """Test that load_examples field is rendered correctly in Airflow templates"""
-    from mindweaver.platform_service.airflow.service import AirflowPlatformService
-    from mindweaver.platform_service.airflow.model import AirflowPlatform
-    from mindweaver.platform_service.pgsql.model import PgSqlPlatform, PgSqlPlatformState
-    from mindweaver.service.project.model import Project
+    from citadel.platform_service.airflow.service import AirflowPlatformService
+    from citadel.platform_service.airflow.model import AirflowPlatform
+    from citadel.platform_service.pgsql.model import PgSqlPlatform, PgSqlPlatformState
+    from citadel.service.project.model import Project
 
     mock_request = MagicMock()
     mock_request.headers = {"X-Project-Id": str(test_project["id"])}
@@ -371,7 +371,7 @@ async def test_airflow_load_examples(test_project):
     mock_pgsql_svc.get = AsyncMock(return_value=mock_pgsql)
     mock_pgsql_svc.platform_state = AsyncMock(return_value=mock_pgsql_state)
 
-    from mindweaver.platform_service.pgsql.service import PgSqlPlatformService
+    from citadel.platform_service.pgsql.service import PgSqlPlatformService
 
     async def get_service_mock(req, sess):
         return mock_pgsql_svc
@@ -424,9 +424,9 @@ def test_airflow_redis_password_field_configuration():
 @pytest.mark.asyncio
 async def test_airflow_redis_password_persistence_in_template_vars(test_project):
     """Test that redis_password remains consistent across template_vars invocations."""
-    from mindweaver.platform_service.pgsql.model import PgSqlPlatform, PgSqlPlatformState
-    from mindweaver.platform_service.pgsql.service import PgSqlPlatformService
-    from mindweaver.service.project.model import Project
+    from citadel.platform_service.pgsql.model import PgSqlPlatform, PgSqlPlatformState
+    from citadel.platform_service.pgsql.service import PgSqlPlatformService
+    from citadel.service.project.model import Project
 
     mock_request = MagicMock()
     mock_request.headers = {"X-Project-Id": str(test_project["id"])}
@@ -480,7 +480,7 @@ async def test_airflow_redis_password_persistence_in_template_vars(test_project)
 @pytest.mark.asyncio
 async def test_airflow_images_resolved_and_rendered(test_stack_session):
     """Test that Airflow resolves and renders main, redis, statsd_exporter, and git_sync images from test_stack."""
-    from mindweaver.platform_service.pgsql.service import PgSqlPlatformService
+    from citadel.platform_service.pgsql.service import PgSqlPlatformService
 
     req = MagicMock()
     svc = AirflowPlatformService(req, test_stack_session)
@@ -520,7 +520,7 @@ async def test_airflow_images_resolved_and_rendered(test_stack_session):
     with patch.object(PgSqlPlatformService, "get_service", new=get_service_mock):
         manifest = await svc.render_manifests(airflow_model)
 
-    assert 'repository: "test.registry/mindweaver/airflow"' in manifest
+    assert 'repository: "test.registry/citadel/airflow"' in manifest
     assert 'tag: "3.99.0"' in manifest
     assert 'repository: "test.registry/redis"' in manifest
     assert 'tag: "7.99-bookworm"' in manifest
@@ -535,8 +535,8 @@ async def test_airflow_images_resolved_and_rendered(test_stack_session):
 @pytest.mark.asyncio
 async def test_airflow_poller_pod_stats():
     """Test AirflowPoller reports pod statistics for core pod types (API, Scheduler, Worker)."""
-    from mindweaver.platform_service.airflow.model import AirflowPlatformState
-    from mindweaver.platform_service.airflow.poller import AirflowPoller
+    from citadel.platform_service.airflow.model import AirflowPlatformState
+    from citadel.platform_service.airflow.poller import AirflowPoller
 
     req = MagicMock()
     session = MagicMock()
@@ -591,10 +591,10 @@ async def test_airflow_poller_pod_stats():
     mock_core_v1.list_node.return_value = MagicMock(items=[])
 
     with (
-        patch("mindweaver.platform_service.airflow.poller.config.load_incluster_config"),
-        patch("mindweaver.platform_service.airflow.poller.client.ApiClient"),
-        patch("mindweaver.platform_service.airflow.poller.client.CustomObjectsApi", return_value=mock_custom_api),
-        patch("mindweaver.platform_service.airflow.poller.client.CoreV1Api", return_value=mock_core_v1),
+        patch("citadel.platform_service.airflow.poller.config.load_incluster_config"),
+        patch("citadel.platform_service.airflow.poller.client.ApiClient"),
+        patch("citadel.platform_service.airflow.poller.client.CustomObjectsApi", return_value=mock_custom_api),
+        patch("citadel.platform_service.airflow.poller.client.CoreV1Api", return_value=mock_core_v1),
     ):
         poller = AirflowPoller(svc, model)
         await poller.poll()

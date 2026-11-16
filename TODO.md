@@ -1,4 +1,4 @@
-# Mindweaver TODO List
+# Citadel TODO List
 
 Based on the project's roadmap and constitution, here are the features that need to be developed next, organized by expected release version:
 

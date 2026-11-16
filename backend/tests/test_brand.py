@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: AGPLv3+
 
 from fastapi.testclient import TestClient
-from mindweaver.config import settings
+from citadel.config import settings
 import pytest
 from pathlib import Path
 
@@ -13,14 +13,14 @@ def test_get_brand_defaults(client: TestClient):
     with default configuration.
     """
     # Force default settings
-    settings.brand_name = "Mindweaver"
+    settings.brand_name = "Citadel"
     settings.brand_logo = "logo.svg"
     settings.brand_bgcolor = None
 
     response = client.get("/api/v1/_brand")
     assert response.status_code == 200
     data = response.json()
-    assert data["name"] == "Mindweaver"
+    assert data["name"] == "Citadel"
     assert "<svg" in data["logo"]
     assert data["bgcolor"] is None
 
@@ -34,7 +34,7 @@ def test_get_brand_overrides(client: TestClient, tmp_path):
     settings.brand_bgcolor = "#ff0000"
 
     # Create a custom temp logo.svg in the resources/assets/ folder
-    assets_dir = Path(__file__).parent.parent / "src" / "mindweaver" / "resources" / "assets"
+    assets_dir = Path(__file__).parent.parent / "src" / "citadel" / "resources" / "assets"
     custom_logo_file = assets_dir / "custom_logo.svg"
 
     try:
@@ -53,7 +53,7 @@ def test_get_brand_overrides(client: TestClient, tmp_path):
         if custom_logo_file.exists():
             custom_logo_file.unlink()
         # Reset settings
-        settings.brand_name = "Mindweaver"
+        settings.brand_name = "Citadel"
         settings.brand_logo = "logo.svg"
         settings.brand_bgcolor = None
 
@@ -76,7 +76,7 @@ def test_get_brand_logo_fallback(client: TestClient):
         assert "<svg" in data["logo"]
     finally:
         # Reset settings
-        settings.brand_name = "Mindweaver"
+        settings.brand_name = "Citadel"
         settings.brand_logo = "logo.svg"
         settings.brand_bgcolor = None
 

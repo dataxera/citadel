@@ -4,7 +4,7 @@
 import pytest
 from unittest.mock import patch, AsyncMock
 from fastapi.testclient import TestClient
-from mindweaver.platform_service.pgsql import PgSqlPlatform, PgSqlPlatformState
+from citadel.platform_service.pgsql import PgSqlPlatform, PgSqlPlatformState
 
 
 def test_pgsql_auto_deploy_on_update(client: TestClient, test_project):
@@ -41,10 +41,10 @@ def test_pgsql_auto_deploy_on_update(client: TestClient, test_project):
     model_id = resp.json()["data"]["id"]
 
     with patch(
-        "mindweaver.platform_service.pgsql.PgSqlPlatformService.deploy",
+        "citadel.platform_service.pgsql.PgSqlPlatformService.deploy",
         new_callable=AsyncMock,
     ) as mock_deploy, patch(
-        "mindweaver.platform_service.pgsql.PgSqlPlatformService.poll_status",
+        "citadel.platform_service.pgsql.PgSqlPlatformService.poll_status",
         new_callable=AsyncMock,
     ) as mock_poll_status:
 
@@ -113,10 +113,10 @@ def test_pgsql_auto_deploy_fail_raises_422(client: TestClient, test_project):
     model_id = resp.json()["data"]["id"]
 
     with patch(
-        "mindweaver.platform_service.pgsql.PgSqlPlatformService.deploy",
+        "citadel.platform_service.pgsql.PgSqlPlatformService.deploy",
         new_callable=AsyncMock,
     ), patch(
-        "mindweaver.platform_service.pgsql.PgSqlPlatformService.poll_status",
+        "citadel.platform_service.pgsql.PgSqlPlatformService.poll_status",
         new_callable=AsyncMock,
     ):
         # Set active=True
@@ -127,7 +127,7 @@ def test_pgsql_auto_deploy_fail_raises_422(client: TestClient, test_project):
         )
 
     with patch(
-        "mindweaver.platform_service.pgsql.PgSqlPlatformService.deploy",
+        "citadel.platform_service.pgsql.PgSqlPlatformService.deploy",
         side_effect=RuntimeError("K8S Error"),
     ):
         update_data = {

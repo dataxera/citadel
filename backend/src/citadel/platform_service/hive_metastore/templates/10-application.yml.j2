@@ -1,0 +1,55 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ name }}
+  namespace: argocd
+  labels:
+    {% if project_title %}
+    project: "{{ project_title }}"
+    {% endif %}
+    {% if service_title %}
+    service: "{{ service_title }}"
+    {% endif %}
+    manager: citadel
+  finalizers:
+  - resources-finalizer.argocd.argoproj.io
+spec:
+  project: {{ project_name }}
+  source:
+    repoURL: {{ chart_repo }}
+    chart: {{ chart_name }}
+    targetRevision: {{ chart_version }}
+    helm:
+      values: |
+        fullnameOverride: {{ name }}
+        replicaCount: {{ replica_count }}
+        {% if override_image %}
+        image:
+          tag: "{{ image.split(':')[-1] if ':' in image else 'latest' }}"
+          repository: "{{ image.rsplit(':', 1)[0] if ':' in image else image }}"
+        {% endif %}
+        database:
+          secretRef:
+            name: {{ name }}-db-secret
+            userKey: user
+            passwordKey: password
+            hostKey: host
+            portKey: port
+            dbnameKey: dbname
+        icebergRest:
+          enabled: {{ 'true' if iceberg_enabled else 'false' }}
+          port: 9001
+        warehouseDir: {{ warehouse_dir }}
+        {% if affinity_yaml %}
+        affinity:
+          {{ affinity_yaml | indent(10) }}
+        {% endif %}
+  destination:
+    server: 'https://kubernetes.default.svc'
+    namespace: {{ namespace }}
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+    - CreateNamespace=true

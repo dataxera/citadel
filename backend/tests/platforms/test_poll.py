@@ -6,14 +6,14 @@ from unittest.mock import patch, MagicMock
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlalchemy.ext.asyncio import create_async_engine
-from mindweaver.config import settings
-from mindweaver.platform_service.pgsql import (
+from citadel.config import settings
+from citadel.platform_service.pgsql import (
     PgSqlPlatformService,
     PgSqlPlatform,
     PgSqlPlatformState,
 )
-from mindweaver.service.project import Project
-from mindweaver.service.k8s_cluster import K8sCluster, K8sClusterType
+from citadel.service.project import Project
+from citadel.service.k8s_cluster import K8sCluster, K8sClusterType
 
 
 @pytest.mark.asyncio
@@ -42,7 +42,7 @@ async def test_pgsql_poll_status(postgresql_proc, test_project):
         session.add(cluster)
         await session.flush()
 
-        from mindweaver.service.project import Project
+        from citadel.service.project import Project
 
         db_project = await session.get(Project, project_id)
         db_project.k8s_cluster_id = cluster.id
@@ -127,7 +127,7 @@ async def test_pgsql_poll_status_cluster_unreachable(postgresql_proc, test_proje
         session.add(cluster)
         await session.flush()
 
-        from mindweaver.service.project import Project
+        from citadel.service.project import Project
         db_project = await session.get(Project, project_id)
         db_project.k8s_cluster_id = cluster.id
         session.add(db_project)

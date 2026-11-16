@@ -18,7 +18,7 @@ const PlatformListingSubtitle = ({ platform, state = {}, projects = [] }) => {
     return (
         <div className="flex items-center gap-4 flex-wrap">
             <div
-                className="mw-project-pill inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-slate-500/10 text-slate-600 dark:text-slate-300 border border-slate-500/20"
+                className="dxc-project-pill inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-slate-500/10 text-slate-600 dark:text-slate-300 border border-slate-500/20"
                 title={`Project: ${projectLabel}`}
             >
                 <Briefcase size={12} />

@@ -4,8 +4,8 @@
 import pytest
 from unittest.mock import patch
 from fastapi.testclient import TestClient
-from mindweaver.config import settings
-from mindweaver.fw.permission import (
+from citadel.config import settings
+from citadel.fw.permission import (
     All,
     Permission,
     Read as FwRead,
@@ -19,7 +19,7 @@ from mindweaver.fw.permission import (
     check_user_permission,
     _NAME_TO_PERMISSION,
 )
-from mindweaver.service.dependency_tracker.permission import (
+from citadel.service.dependency_tracker.permission import (
     Manage,
     DependencyTracker,
     Read,

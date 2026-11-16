@@ -52,7 +52,7 @@ const ListingView = ({
 
     const renderBadges = (reg) => {
         return [
-            { text: reg.username ? "AUTH" : "ANONYMOUS", variant: "mw-badge-neutral" },
+            { text: reg.username ? "AUTH" : "ANONYMOUS", variant: "dxc-badge-neutral" },
         ];
     };
 
@@ -79,7 +79,7 @@ const ListingView = ({
                             type="button"
                             onClick={() => runTestConnection(formData)}
                             disabled={testingConnection}
-                            className="mw-btn-secondary px-6 py-4"
+                            className="dxc-btn-secondary px-6 py-4"
                         >
                             {testingConnection ? <Radio className="animate-pulse" size={18} /> : <Radio size={18} />}
                             TEST CONNECTION
@@ -154,7 +154,7 @@ const ListingView = ({
                                     type="button"
                                     onClick={() => runTestConnection(formData)}
                                     disabled={testingConnection}
-                                    className="mw-btn-secondary px-6 py-4"
+                                    className="dxc-btn-secondary px-6 py-4"
                                 >
                                     {testingConnection ? <Radio className="animate-pulse" size={18} /> : <Radio size={18} />}
                                     TEST CONNECTION

@@ -5,8 +5,8 @@ import pytest
 from unittest.mock import MagicMock, AsyncMock, patch
 from fastapi import Request
 from pydantic import ValidationError
-from mindweaver.platform_service.nifi import NifiPlatform, NifiPlatformService
-from mindweaver.fw.model import AsyncSession
+from citadel.platform_service.nifi import NifiPlatform, NifiPlatformService
+from citadel.fw.model import AsyncSession
 
 @pytest.fixture
 def mock_service_dependencies():
@@ -199,7 +199,7 @@ async def test_nifi_render_manifests_with_ingress(mock_service_dependencies):
 @pytest.mark.asyncio
 async def test_nifi_poll_status(mock_service_dependencies):
     """Test that nifi_uri is derived correctly in poll_status."""
-    from mindweaver.platform_service.nifi.model import NifiPlatformState
+    from citadel.platform_service.nifi.model import NifiPlatformState
     request, session = mock_service_dependencies
     svc = NifiPlatformService(request, session)
 
@@ -221,7 +221,7 @@ async def test_nifi_poll_status(mock_service_dependencies):
         async def mock_poll(*args):
             return "online", "Healthy", {}, node_ports, cluster_nodes
 
-        with patch("mindweaver.platform_service.nifi.service.asyncio.to_thread", side_effect=mock_poll):
+        with patch("citadel.platform_service.nifi.service.asyncio.to_thread", side_effect=mock_poll):
             mock_project = MagicMock()
             mock_project.ingress_domain = "example.com"
             svc.project = AsyncMock(return_value=mock_project)
@@ -248,11 +248,11 @@ async def test_nifi_decommission(mock_service_dependencies):
     mock_kubeconfig = AsyncMock(return_value="mock-kubeconfig")
     mock_resolve_namespace = AsyncMock(return_value="test-ns")
 
-    with patch("mindweaver.platform_service.base.PlatformService.decommission", mock_super_decommission), \
+    with patch("citadel.platform_service.base.PlatformService.decommission", mock_super_decommission), \
          patch.object(svc, "kubeconfig", mock_kubeconfig), \
          patch.object(svc, "_resolve_namespace", mock_resolve_namespace), \
-         patch("mindweaver.platform_service.nifi.service.config.new_client_from_config") as mock_new_client, \
-         patch("mindweaver.platform_service.nifi.service.client.CoreV1Api") as mock_core_v1_class:
+         patch("citadel.platform_service.nifi.service.config.new_client_from_config") as mock_new_client, \
+         patch("citadel.platform_service.nifi.service.client.CoreV1Api") as mock_core_v1_class:
 
         mock_core_v1 = MagicMock()
         mock_core_v1_class.return_value = mock_core_v1
@@ -271,7 +271,7 @@ async def test_nifi_decommission(mock_service_dependencies):
 @pytest.mark.asyncio
 async def test_nifi_render_manifests_with_ldap(mock_service_dependencies):
     """Test that LDAP configuration is correctly retrieved and rendered in the NiFi manifests."""
-    from mindweaver.service.ldap_config.model import LdapConfig
+    from citadel.service.ldap_config.model import LdapConfig
     request, session = mock_service_dependencies
     svc = NifiPlatformService(request, session)
 
@@ -299,7 +299,7 @@ async def test_nifi_render_manifests_with_ldap(mock_service_dependencies):
     mock_ldap_svc = MagicMock()
     mock_ldap_svc.get = AsyncMock(return_value=mock_ldap_config)
     
-    with patch("mindweaver.service.ldap_config.service.LdapConfigService.get_service", AsyncMock(return_value=mock_ldap_svc)):
+    with patch("citadel.service.ldap_config.service.LdapConfigService.get_service", AsyncMock(return_value=mock_ldap_svc)):
         manifests = await svc.render_manifests(model)
         
         assert "ldapConfiguration:" in manifests
@@ -322,7 +322,7 @@ async def test_nifi_render_manifests_with_ldap(mock_service_dependencies):
 
 def test_nifi_auth_role_mapping_validation():
     """Test validation for auth_role_mapping in NiFi."""
-    from mindweaver.platform_service.nifi.model import NifiRoleMapping
+    from citadel.platform_service.nifi.model import NifiRoleMapping
     
     # Valid model validation
     model = NifiPlatform.model_validate(

@@ -14,20 +14,20 @@ fe = subprocess.Popen(
 )
 
 be = subprocess.Popen(
-    ["uv", "run", "mindweaver", "run", "--port", "8000", "--bind", "::"], cwd=here / "backend"
+    ["uv", "run", "citadel", "run", "--port", "8000", "--bind", "::"], cwd=here / "backend"
 )
 
 worker_env = os.environ.copy()
-worker_env["MINDWEAVER_EMBEDDED_WORKER"] = "false"
+worker_env["CITADEL_EMBEDDED_WORKER"] = "false"
 
 sched = subprocess.Popen(
-    ["uv", "run", "mindweaver", "scheduler", "--reload"],
+    ["uv", "run", "citadel", "scheduler", "--reload"],
     cwd=here / "backend",
     env=worker_env,
 )
 
 worker = subprocess.Popen(
-    ["uv", "run", "mindweaver", "worker", "--reload"],
+    ["uv", "run", "citadel", "worker", "--reload"],
     cwd=here / "backend",
     env=worker_env,
 )

@@ -4,9 +4,9 @@
 import pytest
 from sqlmodel import SQLModel, Field
 from typing import Optional
-from mindweaver.fw.service import Service
-from mindweaver.fw.registry import SERVICE_REGISTRY
-from mindweaver.fw.model import NamedBase
+from citadel.fw.service import Service
+from citadel.fw.registry import SERVICE_REGISTRY
+from citadel.fw.model import NamedBase
 from sqlalchemy_utils import JSONType
 
 
@@ -21,14 +21,14 @@ class MockTargetService(Service[MockTarget]):
 
 
 class MockModel(NamedBase):
-    project_id: int = Field(foreign_key="mw_project.id")
+    project_id: int = Field(foreign_key="dxc_project.id")
     knowledge_db_ids: list[int] = Field(
-        default=[], sa_type=JSONType(), foreign_key="mw_knowledge_db.id"
+        default=[], sa_type=JSONType(), foreign_key="dxc_knowledge_db.id"
     )
     datasource_ids: list[int] = Field(
-        default=[], sa_type=JSONType(), foreign_key="mw_datasource.id"
+        default=[], sa_type=JSONType(), foreign_key="dxc_datasource.id"
     )
-    s3_storage_id: int = Field(default=None, foreign_key="mw_s3_storage.id")
+    s3_storage_id: int = Field(default=None, foreign_key="dxc_s3_storage.id")
     custom_field: str = Field(default="test")
 
 
@@ -44,10 +44,10 @@ def test_relationship_label_generation():
 
     try:
         # Register mock services to registry
-        SERVICE_REGISTRY["mw_project"] = MockTargetService
-        SERVICE_REGISTRY["mw_datasource"] = MockTargetService
-        SERVICE_REGISTRY["mw_knowledge_db"] = MockTargetService
-        SERVICE_REGISTRY["mw_s3_storage"] = MockTargetService
+        SERVICE_REGISTRY["dxc_project"] = MockTargetService
+        SERVICE_REGISTRY["dxc_datasource"] = MockTargetService
+        SERVICE_REGISTRY["dxc_knowledge_db"] = MockTargetService
+        SERVICE_REGISTRY["dxc_s3_storage"] = MockTargetService
 
         widgets = MockService.get_widgets()
 

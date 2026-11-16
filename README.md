@@ -1,6 +1,6 @@
-# Mindweaver
+# Citadel
 
-Mindweaver is a 100% open-source data & AI orchestration platform, providing an all-in-one solution for data warehousing, data lakes, and AI platforms.
+Citadel is a 100% open-source data & AI orchestration platform, providing an all-in-one solution for data warehousing, data lakes, and AI platforms.
 
 - **Orchestration**: Currently provides orchestration capabilities to deploy key data platform components such as PostgreSQL, Trino, Airflow, Superset, Kafka, and others.
 - **Future Roadmap**:
@@ -88,9 +88,9 @@ docker compose up --profile=app up -d
 ```
 
 This will start:
-*   PostgreSQL on `localhost:5432` (User: `postgres`, Password: `password`, DB: `mindweaver`)
+*   PostgreSQL on `localhost:5432` (User: `postgres`, Password: `password`, DB: `citadel`)
 *   Redis on `localhost:6379`
-*   Mindweaver Development Proxy on `http://localhost:8080` (Nginx proxy routing to both frontend and backend)
+*   Citadel Development Proxy on `http://localhost:8080` (Nginx proxy routing to both frontend and backend)
 
 You should access the application via the development proxy at **`http://localhost:8080`** rather than connecting to the frontend port (`3000`) or backend port (`8000`) directly.
 
@@ -117,6 +117,6 @@ This will automatically:
 To run backend tests:
 
 ```bash
-uv run --package mindweaver pytest backend/tests
+uv run --package citadel pytest backend/tests
 ```
 

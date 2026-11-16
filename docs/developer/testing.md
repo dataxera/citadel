@@ -1,16 +1,16 @@
 # Testing
 
-Reliable tests are essential for maintaining the quality and stability of Mindweaver.
+Reliable tests are essential for maintaining the quality and stability of Citadel.
 
 ## Backend Testing
 
-Mindweaver uses **pytest** for backend unit and integration testing.
+Citadel uses **pytest** for backend unit and integration testing.
 
 ### Running Tests
 
 To run the entire backend test suite:
 ```bash
-uv run --package mindweaver pytest backend/tests
+uv run --package citadel pytest backend/tests
 ```
 
 ### Test Structure
@@ -33,4 +33,4 @@ Currently, the frontend relies on manual verification. When implementing new UI 
 
 ## CI/CD
 
-Mindweaver uses GitHub Actions to run tests automatically on every pull request. Ensure that your changes pass all CI checks before requesting a review.
+Citadel uses GitHub Actions to run tests automatically on every pull request. Ensure that your changes pass all CI checks before requesting a review.

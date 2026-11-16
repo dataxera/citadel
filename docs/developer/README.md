@@ -1,6 +1,6 @@
-# Mindweaver Developer Documentation
+# Citadel Developer Documentation
 
-Welcome to the Mindweaver developer guide. This documentation is intended for contributors who want to extend, enhance, or debug the platform.
+Welcome to the Citadel developer guide. This documentation is intended for contributors who want to extend, enhance, or debug the platform.
 
 ## Chapters
 

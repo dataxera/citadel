@@ -6,16 +6,16 @@
 
 ## Context
 
-MindWeaver uses class-based permission inheritance in `mindweaver.fw.permission`. To allow granular access control for each service and platform service, services require service-specific permission classes and enforcement across their CRUD endpoints and custom views. Furthermore, permissions need clean role boundaries separating full administrative management from read-only access without unnecessary intermediate layers.
+Citadel uses class-based permission inheritance in `citadel.fw.permission`. To allow granular access control for each service and platform service, services require service-specific permission classes and enforcement across their CRUD endpoints and custom views. Furthermore, permissions need clean role boundaries separating full administrative management from read-only access without unnecessary intermediate layers.
 
 ## Decision
 
 1. **Service `permission.py` Module Structure**:
    Each service defines a `permission.py` file declaring its class-based permission hierarchy:
    - **Root Management Permission (`Manage`)**:
-     The primary management permission class in each service is named `Manage` (e.g., `mindweaver.service.project.permission.Manage`). It inherits from `mindweaver.fw.permission.Permission` with `name = "<service>:manage"` and acts as the root class covering all operations (mutating, operational, and viewing).
+     The primary management permission class in each service is named `Manage` (e.g., `citadel.service.project.permission.Manage`). It inherits from `citadel.fw.permission.Permission` with `name = "<service>:manage"` and acts as the root class covering all operations (mutating, operational, and viewing).
    - **Read-Only Permission (`Read`)**:
-     `Read` inherits from `Manage` and framework `Read` (`mindweaver.fw.permission.Read`):
+     `Read` inherits from `Manage` and framework `Read` (`citadel.fw.permission.Read`):
      ```python
      class Read(Manage, FwRead):
          name: str = "<service>:read"
@@ -35,7 +35,7 @@ MindWeaver uses class-based permission inheritance in `mindweaver.fw.permission`
      Canonical class aliases (e.g., `ManageProject = Manage`, `Project = Manage`, `ProjectPermission = Manage`, `ProjectRead = Read`, etc.) are maintained for flexibility and backwards compatibility.
 
 2. **Automatic String Registration**:
-   `mindweaver.fw.permission.All.__init_subclass__` automatically registers subclasses with a `name` attribute into `_NAME_TO_PERMISSION` for uniform string resolution (e.g., `"project:manage"`, `"project:read"`).
+   `citadel.fw.permission.All.__init_subclass__` automatically registers subclasses with a `name` attribute into `_NAME_TO_PERMISSION` for uniform string resolution (e.g., `"project:manage"`, `"project:read"`).
 
 3. **Service Integration & CRUD Routing**:
    Services configure `permissions = permission` on the service class. `ServiceViewMixin.get_permission(action)` dynamically resolves the permission for standard CRUD endpoints (`list`, `view`, `create`, `update`, `delete`, `execute`), defaulting to framework base classes when unassigned.
@@ -51,9 +51,9 @@ MindWeaver uses class-based permission inheritance in `mindweaver.fw.permission`
 
 ## References
 
-- [Mindweaver Constitution (Section 3 & 4)](file:///home/izhar/Projects/mindweaver/.agents/rules/constitution.md)
-- [MindWeaver Framework Permission](file:///home/izhar/Projects/mindweaver/backend/src/mindweaver/fw/permission.py)
-- [Mindweaver Backend Permissions Skill](file:///home/izhar/Projects/mindweaver/.agents/skills/mw-backend-permission/SKILL.md)
+- [Citadel Constitution (Section 3 & 4)](file:///home/izhar/Projects/citadel/.agents/rules/constitution.md)
+- [Citadel Framework Permission](file:///home/izhar/Projects/citadel/backend/src/citadel/fw/permission.py)
+- [Citadel Backend Permissions Skill](file:///home/izhar/Projects/citadel/.agents/skills/dxc-backend-permission/SKILL.md)
 
 ---
 SPDX-FileCopyrightText: Copyright © 2026 Mohd Izhar Firdaus Bin Ismail

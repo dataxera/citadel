@@ -30,9 +30,9 @@ const RangeWidget = React.memo(({
 
     return (
         <div className="space-y-2">
-            <div className="mw-range-container">
+            <div className="dxc-range-container">
                 <div
-                    className="mw-range-badge"
+                    className="dxc-range-badge"
                     style={{ left: `${percentage}%` }}
                 >
                     {val}
@@ -46,7 +46,7 @@ const RangeWidget = React.memo(({
                     disabled={isImmutable}
                     onChange={(e) => onChange(name, parseFloat(e.target.value))}
                     className={cn(
-                        "mw-range",
+                        "dxc-range",
                         isImmutable && "cursor-not-allowed opacity-60 grayscale-[0.5]"
                     )}
                     style={{
@@ -56,13 +56,13 @@ const RangeWidget = React.memo(({
                     }}
                 />
                 {showSteps && (
-                    <div className="mw-range-steps">
+                    <div className="dxc-range-steps">
                         {steps.map((s, i) => (
                             <div
                                 key={i}
                                 className={cn(
-                                    "mw-range-step",
-                                    val >= s ? "mw-range-step-active" : ""
+                                    "dxc-range-step",
+                                    val >= s ? "dxc-range-step-active" : ""
                                 )}
                             />
                         ))}

@@ -29,7 +29,7 @@ const Header = ({ darkMode, setDarkMode, selectedProject, setSelectedProject, pr
                     activeBg={darkMode ? "bg-[#08090b]" : "bg-white"}
                     className="w-64"
                     trigger={
-                        <div className="mw-search-box flex items-center w-full">
+                        <div className="dxc-search-box flex items-center w-full">
                             <div className={cn(
                                 "p-1 rounded mr-2",
                                 !selectedProject ? 'bg-blue-500/20 text-blue-400' : 'bg-indigo-500/20 text-indigo-400'
@@ -84,7 +84,7 @@ const Header = ({ darkMode, setDarkMode, selectedProject, setSelectedProject, pr
             </div>
 
             <div className="flex items-center gap-4">
-                <div className="mw-search-box py-1">
+                <div className="dxc-search-box py-1">
                     <Search size={14} className="text-slate-500" />
                     <input
                         type="text"

@@ -244,13 +244,13 @@ const NodeConfigModal = ({
                                 }
                             }}
                             placeholder="Add role (e.g. compute, storage, ingress)"
-                            className="mw-input flex-1 text-sm"
+                            className="dxc-input flex-1 text-sm"
                         />
                         <button
                             id="add-node-role-btn"
                             type="button"
                             onClick={() => handleAddRole(newRole)}
-                            className="mw-btn-secondary px-3 py-2 text-xs flex items-center gap-1"
+                            className="dxc-btn-secondary px-3 py-2 text-xs flex items-center gap-1"
                         >
                             <Plus size={14} /> ADD ROLE
                         </button>
@@ -289,7 +289,7 @@ const NodeConfigModal = ({
                                     type="text"
                                     value={item.key}
                                     disabled
-                                    className="mw-input flex-1 text-xs font-mono opacity-80"
+                                    className="dxc-input flex-1 text-xs font-mono opacity-80"
                                 />
                                 <input
                                     type="text"
@@ -301,7 +301,7 @@ const NodeConfigModal = ({
                                         );
                                     }}
                                     placeholder="value"
-                                    className="mw-input flex-1 text-xs font-mono"
+                                    className="dxc-input flex-1 text-xs font-mono"
                                 />
                                 <button
                                     type="button"
@@ -322,7 +322,7 @@ const NodeConfigModal = ({
                             value={newKey}
                             onChange={(e) => setNewKey(e.target.value)}
                             placeholder="label key (e.g. disk-type)"
-                            className="mw-input flex-1 text-xs font-mono"
+                            className="dxc-input flex-1 text-xs font-mono"
                         />
                         <input
                             id="new-label-value-input"
@@ -330,13 +330,13 @@ const NodeConfigModal = ({
                             value={newValue}
                             onChange={(e) => setNewValue(e.target.value)}
                             placeholder="label value (e.g. nvme)"
-                            className="mw-input flex-1 text-xs font-mono"
+                            className="dxc-input flex-1 text-xs font-mono"
                         />
                         <button
                             id="add-node-label-btn"
                             type="button"
                             onClick={handleAddLabel}
-                            className="mw-btn-secondary px-3 py-2 text-xs flex items-center gap-1"
+                            className="dxc-btn-secondary px-3 py-2 text-xs flex items-center gap-1"
                         >
                             <Plus size={14} /> ADD
                         </button>
@@ -365,7 +365,7 @@ const NodeConfigModal = ({
                     <button
                         type="button"
                         onClick={onClose}
-                        className="mw-btn-secondary px-5 py-2 text-xs"
+                        className="dxc-btn-secondary px-5 py-2 text-xs"
                     >
                         CANCEL
                     </button>
@@ -373,7 +373,7 @@ const NodeConfigModal = ({
                         id="save-node-config-btn"
                         type="submit"
                         disabled={saving}
-                        className="mw-btn-primary px-5 py-2 text-xs disabled:opacity-60"
+                        className="dxc-btn-primary px-5 py-2 text-xs disabled:opacity-60"
                     >
                         {saving ? 'SAVING...' : 'APPLY TO NODE'}
                     </button>

@@ -5,11 +5,11 @@ import pytest
 from unittest.mock import MagicMock, AsyncMock, patch
 from fastapi import Request
 from pydantic import ValidationError
-from mindweaver.config import settings
-from mindweaver.crypto import encrypt_password
-from mindweaver.platform_service.doris import DorisPlatform, DorisPlatformService, DorisPlatformState
-from mindweaver.platform_service.doris.poller import DorisPoller
-from mindweaver.fw.model import AsyncSession
+from citadel.config import settings
+from citadel.crypto import encrypt_password
+from citadel.platform_service.doris import DorisPlatform, DorisPlatformService, DorisPlatformState
+from citadel.platform_service.doris.poller import DorisPoller
+from citadel.fw.model import AsyncSession
 
 # Ensure encryption key is configured for tests
 settings.fernet_key = "EFw4cCjDgHhGuZAGlwXmQhXg134ZdHjb9SeqcszWeSU="

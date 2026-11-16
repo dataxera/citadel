@@ -3,8 +3,8 @@
 
 import pytest
 from fastapi import APIRouter
-from mindweaver.fw.model import NamedBase
-from mindweaver.fw.service import Service
+from citadel.fw.model import NamedBase
+from citadel.fw.service import Service
 
 
 class CustomViewDummyModel(NamedBase, table=True):

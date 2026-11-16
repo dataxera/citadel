@@ -23,7 +23,7 @@ const ListingView = ({ context, projectsHook, onSelectProject }) => {
         proj.k8s_cluster_id ? [
             {
                 text: clusters.find(c => c.id === proj.k8s_cluster_id)?.title || `Cluster ID: ${proj.k8s_cluster_id}`,
-                variant: "mw-badge-neutral"
+                variant: "dxc-badge-neutral"
             }
         ] : []
     );

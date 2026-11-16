@@ -9,30 +9,30 @@ from alembic import context
 from sqlmodel import SQLModel
 
 # Import all models for autogenerate support
-from mindweaver.service.project.model import Project
-from mindweaver.service.stack.model import Stack
-from mindweaver.service.k8s_cluster.model import K8sClusterStatus
-from mindweaver.datasource_service import DatabaseSource
-from mindweaver.service.s3_storage.model import S3Storage
-from mindweaver.platform_service.pgsql.model import PgSqlPlatform, PgSqlPlatformState
-from mindweaver.platform_service.hive_metastore.model import HiveMetastorePlatform, HiveMetastorePlatformState
-from mindweaver.platform_service.trino.model import TrinoPlatform, TrinoPlatformState
-from mindweaver.platform_service.superset.model import SupersetPlatform, SupersetPlatformState
-from mindweaver.platform_service.airflow.model import AirflowPlatform, AirflowPlatformState
-from mindweaver.platform_service.kafka.model import KafkaPlatform, KafkaPlatformState
-from mindweaver.platform_service.nifi.model import NifiPlatform, NifiPlatformState
-from mindweaver.service.ldap_config.model import LdapConfig
-from mindweaver.fw.auth import User
-from mindweaver.service.project_user.model import ProjectLocalUser
-from mindweaver.service.name_tracker.model import NameTracker
-from mindweaver.service.ssh_key.model import SSHKey
-from mindweaver.service.git_repo.model import GitRepo
-from mindweaver.service.container_registry.model import ContainerRegistry
+from citadel.service.project.model import Project
+from citadel.service.stack.model import Stack
+from citadel.service.k8s_cluster.model import K8sClusterStatus
+from citadel.datasource_service import DatabaseSource
+from citadel.service.s3_storage.model import S3Storage
+from citadel.platform_service.pgsql.model import PgSqlPlatform, PgSqlPlatformState
+from citadel.platform_service.hive_metastore.model import HiveMetastorePlatform, HiveMetastorePlatformState
+from citadel.platform_service.trino.model import TrinoPlatform, TrinoPlatformState
+from citadel.platform_service.superset.model import SupersetPlatform, SupersetPlatformState
+from citadel.platform_service.airflow.model import AirflowPlatform, AirflowPlatformState
+from citadel.platform_service.kafka.model import KafkaPlatform, KafkaPlatformState
+from citadel.platform_service.nifi.model import NifiPlatform, NifiPlatformState
+from citadel.service.ldap_config.model import LdapConfig
+from citadel.fw.auth import User
+from citadel.service.project_user.model import ProjectLocalUser
+from citadel.service.name_tracker.model import NameTracker
+from citadel.service.ssh_key.model import SSHKey
+from citadel.service.git_repo.model import GitRepo
+from citadel.service.container_registry.model import ContainerRegistry
 
-# from mindweaver.auth.model import User # If exists
+# from citadel.auth.model import User # If exists
 
 
-from mindweaver.config import settings
+from citadel.config import settings
 
 config = context.config
 if (

@@ -1,0 +1,217 @@
+# SPDX-FileCopyrightText: Copyright © 2026 Mohd Izhar Firdaus Bin Ismail
+# SPDX-License-Identifier: AGPLv3+
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: nifikop-operator
+  namespace: argocd
+  labels:
+    {% if project_title %}
+    project: "{{ project_title }}"
+    {% endif %}
+    {% if service_title %}
+    service: "{{ service_title }}"
+    {% endif %}
+    manager: citadel
+  finalizers:
+  - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: {{ chart_repo }}
+    chart: {{ chart_name }}
+    targetRevision: {{ chart_version }}
+    helm:
+      values: |
+        namespaces:
+          - ""
+        image:
+          repository: {{ image }}
+          tag: "{{ image_tag }}"
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: nifikop
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+    - CreateNamespace=true
+    - RespectIgnoreDifferences=true
+    - ServerSideApply=true
+  ignoreDifferences:
+    - group: apps
+      kind: Deployment
+      jsonPointers:
+        - /status/terminatingReplicas
+    - group: apps
+      kind: StatefulSet
+      jsonPointers:
+        - /status/terminatingReplicas
+    - group: apps
+      kind: ReplicaSet
+      jsonPointers:
+        - /status/terminatingReplicas
+---
+# ClusterRole granting NiFiKop permissions to manage resources across all namespaces.
+# Required because namespaces:[""] (watch-all / cluster-wide) is configured,
+# but the upstream NiFiKop Helm chart only generates namespaced Role/RoleBinding.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: nifikop-cluster-role
+  labels:
+    {% if project_title %}
+    project: "{{ project_title }}"
+    {% endif %}
+    {% if service_title %}
+    service: "{{ service_title }}"
+    {% endif %}
+    manager: citadel
+rules:
+  - apiGroups: [""]
+    resources:
+      - pods
+      - services
+      - services/finalizers
+      - endpoints
+      - persistentvolumeclaims
+      - events
+      - configmaps
+      - secrets
+      - namespaces
+      - nodes
+    verbs:
+      - create
+      - delete
+      - get
+      - list
+      - patch
+      - update
+      - watch
+  - apiGroups: ["apps"]
+    resources:
+      - deployments
+      - daemonsets
+      - replicasets
+      - statefulsets
+      - deployments/finalizers
+    verbs:
+      - create
+      - delete
+      - get
+      - list
+      - patch
+      - update
+      - watch
+  - apiGroups: ["monitoring.coreos.com"]
+    resources:
+      - servicemonitors
+    verbs:
+      - get
+      - create
+  - apiGroups: ["nifi.konpyutaika.com"]
+    resources:
+      - nifiusers
+      - nifiusergroups
+      - nificlusters
+      - nifidataflows
+      - nifiregistryclients
+      - nifiparametercontexts
+      - nifinodegroupautoscalers
+      - nificonnections
+      - nifiresources
+      - nifiusers/finalizers
+      - nificlusters/finalizers
+    verbs:
+      - create
+      - delete
+      - get
+      - list
+      - patch
+      - update
+      - watch
+      - deletecollection
+  - apiGroups: ["nifi.konpyutaika.com"]
+    resources:
+      - nifiusers/status
+      - nifiusergroups/status
+      - nificlusters/status
+      - nifidataflows/status
+      - nifiregistryclients/status
+      - nifiparametercontexts/status
+      - nifinodegroupautoscalers/status
+      - nificonnections/status
+      - nifiresources/status
+    verbs:
+      - get
+      - update
+      - patch
+  - apiGroups: ["autoscaling"]
+    resources:
+      - horizontalpodautoscalers
+    verbs:
+      - create
+      - delete
+      - get
+      - list
+      - patch
+      - update
+      - watch
+  - apiGroups: ["cert-manager.io"]
+    resources:
+      - issuers
+      - clusterissuers
+      - certificates
+    verbs:
+      - create
+      - delete
+      - get
+      - list
+      - patch
+      - update
+      - watch
+  - apiGroups: ["policy"]
+    resources:
+      - poddisruptionbudgets
+    verbs:
+      - create
+      - delete
+      - get
+      - list
+      - patch
+      - update
+      - watch
+  - apiGroups: ["coordination.k8s.io"]
+    resources:
+      - leases
+    verbs:
+      - get
+      - list
+      - watch
+      - create
+      - update
+      - patch
+      - delete
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: nifikop-cluster-role-binding
+  labels:
+    {% if project_title %}
+    project: "{{ project_title }}"
+    {% endif %}
+    {% if service_title %}
+    service: "{{ service_title }}"
+    {% endif %}
+    manager: citadel
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: nifikop-cluster-role
+subjects:
+  - kind: ServiceAccount
+    name: nifikop
+    namespace: nifikop

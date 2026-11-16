@@ -4,17 +4,17 @@
 import pytest
 from unittest.mock import MagicMock, patch
 from fastapi.testclient import TestClient
-from mindweaver.service.k8s_cluster.model import K8sCluster, K8sClusterType
-from mindweaver.service.project.model import Project
-from mindweaver.service.project_user.model import ProjectLocalUser
-from mindweaver.service.ldap_config.model import LdapConfig
-from mindweaver.fw.model import get_engine
+from citadel.service.k8s_cluster.model import K8sCluster, K8sClusterType
+from citadel.service.project.model import Project
+from citadel.service.project_user.model import ProjectLocalUser
+from citadel.service.ldap_config.model import LdapConfig
+from citadel.fw.model import get_engine
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 
 @pytest.mark.asyncio
 async def test_project_deploy_gateway(client):
-    from mindweaver.service.project.actions import SyncProjectIntegrationsAction as DeployGatewayAction
+    from citadel.service.project.actions import SyncProjectIntegrationsAction as DeployGatewayAction
 
     cluster = K8sCluster(
         name="test-cluster-gw",
@@ -89,7 +89,7 @@ def test_project_deploy_gateway_action_triggers_task(client: TestClient):
     ).json()["data"]
 
     with patch(
-        "mindweaver.tasks.project_tasks.sync_project_integrations_task.delay"
+        "citadel.tasks.project_tasks.sync_project_integrations_task.delay"
     ) as mock_delay:
         resp = client.post(
             f"/api/v1/projects/{project_data['id']}/_actions",
@@ -105,7 +105,7 @@ def test_project_deploy_gateway_action_triggers_task(client: TestClient):
 
 @pytest.mark.asyncio
 async def test_project_deploy_gateway_with_nodeport(client):
-    from mindweaver.service.project.actions import SyncProjectIntegrationsAction as DeployGatewayAction
+    from citadel.service.project.actions import SyncProjectIntegrationsAction as DeployGatewayAction
 
     cluster = K8sCluster(
         name="test-cluster-gw-np",
@@ -158,7 +158,7 @@ async def test_project_deploy_gateway_with_nodeport(client):
             # But we can also check the helper directly, or verify via mocking tempfile
             
             # Let's test the helper directly to be extremely clean and robust
-            from mindweaver.service.project.actions import _render_gateway_manifests
+            from citadel.service.project.actions import _render_gateway_manifests
             manifest = _render_gateway_manifests(project, "test-proj-gw-np", 32111)
             assert "EnvoyProxy" in manifest
             assert "project-envoy-proxy-config" in manifest
@@ -173,7 +173,7 @@ async def test_project_deploy_gateway_with_nodeport(client):
 
 @pytest.mark.asyncio
 async def test_project_deploy_gateway_dynamic_nodeport_capture(client):
-    from mindweaver.service.project.actions import SyncProjectIntegrationsAction as DeployGatewayAction
+    from citadel.service.project.actions import SyncProjectIntegrationsAction as DeployGatewayAction
 
     cluster = K8sCluster(
         name="test-cluster-gw-dyn",
@@ -205,7 +205,7 @@ async def test_project_deploy_gateway_dynamic_nodeport_capture(client):
         mock_svc.request = MagicMock()
 
         with patch("asyncio.create_subprocess_exec") as mock_exec, \
-             patch("mindweaver.service.project.actions._get_existing_nodeport", return_value=32222) as mock_get_np:
+             patch("citadel.service.project.actions._get_existing_nodeport", return_value=32222) as mock_get_np:
             mock_proc = MagicMock()
             mock_proc.returncode = 0
             mock_proc.communicate = pytest.importorskip("unittest.mock").AsyncMock(

@@ -28,7 +28,7 @@ const ListingItem = ({
 }) => {
     return (
         <div
-            className={`mw-list-item group ${className}`}
+            className={`dxc-list-item group ${className}`}
             onClick={onClick}
         >
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-4 w-full">
@@ -43,7 +43,7 @@ const ListingItem = ({
                                 {title}
                             </h4>
                             {badges.map((badge, idx) => (
-                                <span key={idx} className={badge.variant || "mw-badge-neutral"}>
+                                <span key={idx} className={badge.variant || "dxc-badge-neutral"}>
                                     {badge.text}
                                 </span>
                             ))}

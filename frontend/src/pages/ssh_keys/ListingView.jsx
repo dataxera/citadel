@@ -126,7 +126,7 @@ const ListingView = ({
                             <button
                                 type="button"
                                 onClick={() => setSelectedKeyForDetails(null)}
-                                className="mw-btn-secondary px-6 py-2 text-sm"
+                                className="dxc-btn-secondary px-6 py-2 text-sm"
                             >
                                 CLOSE
                             </button>

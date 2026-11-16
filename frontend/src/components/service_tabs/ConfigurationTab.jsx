@@ -21,7 +21,7 @@ const ConfigurationTab = ({
 }) => {
     const IconComponent = icon;
     return (
-        <div className="mw-configuration-tab mw-panel animate-in fade-in slide-in-from-top-4 duration-500">
+        <div className="dxc-configuration-tab dxc-panel animate-in fade-in slide-in-from-top-4 duration-500">
             <div
                 className={cn(
                     'p-4 border-b flex items-center justify-between',

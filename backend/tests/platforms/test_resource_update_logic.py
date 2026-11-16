@@ -4,7 +4,7 @@
 import pytest
 import kubernetes
 from unittest.mock import MagicMock, patch, AsyncMock
-from mindweaver.platform_service.base import (
+from citadel.platform_service.base import (
     PlatformService,
     PlatformBase,
     PlatformStateBase,
@@ -13,11 +13,11 @@ from mindweaver.platform_service.base import (
 
 # Define a concrete model for testing
 class MockUpdatePlatformModel(PlatformBase, table=True):
-    __tablename__ = "mw_mock_update_platform_model"
+    __tablename__ = "dxc_mock_update_platform_model"
 
 
 class MockUpdatePlatformState(PlatformStateBase, table=True):
-    __tablename__ = "mw_mock_update_platform_state"
+    __tablename__ = "dxc_mock_update_platform_state"
 
 
 # Define a concrete service for testing

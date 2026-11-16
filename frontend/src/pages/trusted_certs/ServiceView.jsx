@@ -73,7 +73,7 @@ const ServiceView = ({
                 </div>
                 <button
                     onClick={() => setShowEditModal(true)}
-                    className="mw-btn-secondary px-4 py-2.5 flex items-center gap-2 text-sm"
+                    className="dxc-btn-secondary px-4 py-2.5 flex items-center gap-2 text-sm"
                 >
                     <Edit3 size={16} />
                     EDIT CERTIFICATE

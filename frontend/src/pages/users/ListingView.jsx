@@ -33,12 +33,12 @@ const ListingView = ({
     const renderBadges = (userItem) => {
         const badges = [];
         if (userItem.is_superadmin) {
-            badges.push({ text: "SUPERADMIN", variant: "mw-badge-danger" });
+            badges.push({ text: "SUPERADMIN", variant: "dxc-badge-danger" });
         }
         if (userItem.is_active) {
-            badges.push({ text: "ACTIVE", variant: "mw-badge-success" });
+            badges.push({ text: "ACTIVE", variant: "dxc-badge-success" });
         } else {
-            badges.push({ text: "INACTIVE", variant: "mw-badge-neutral" });
+            badges.push({ text: "INACTIVE", variant: "dxc-badge-neutral" });
         }
         return badges;
     };
@@ -230,14 +230,14 @@ const ListingView = ({
                         <button
                             type="button"
                             onClick={() => setChangePasswordItem(null)}
-                            className="mw-btn-secondary px-6 py-3"
+                            className="dxc-btn-secondary px-6 py-3"
                         >
                             CANCEL
                         </button>
                         <button
                             type="submit"
                             disabled={submittingPassword}
-                            className="mw-btn-primary px-6 py-3"
+                            className="dxc-btn-primary px-6 py-3"
                         >
                             {submittingPassword ? 'SAVING...' : 'CHANGE PASSWORD'}
                         </button>

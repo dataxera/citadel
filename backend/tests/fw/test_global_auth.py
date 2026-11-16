@@ -6,8 +6,8 @@ import jwt
 import time
 from fastapi.testclient import TestClient
 from unittest.mock import patch, MagicMock
-from mindweaver.config import settings
-from mindweaver.fw.auth import User
+from citadel.config import settings
+from citadel.fw.auth import User
 
 
 @pytest.fixture(autouse=True)

@@ -105,7 +105,7 @@ const GenericListingView = ({
                         const state = itemStates[item[rowKey]] || {};
                         
                         return (
-                            <div key={item[rowKey]} className="mw-list-wrapper">
+                            <div key={item[rowKey]} className="dxc-list-wrapper">
                                 <ListingItem
                                     icon={renderIcon ? renderIcon(item, state) : IconComponent}
                                     title={item.title || item.name}

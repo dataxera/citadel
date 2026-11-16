@@ -15,12 +15,12 @@ const apiClient = axios.create({
 // Add a request interceptor to attach the token
 apiClient.interceptors.request.use(
     (config) => {
-        const token = localStorage.getItem('mindweaver-token');
+        const token = localStorage.getItem('citadel-token');
         if (token) {
             config.headers.Authorization = `Bearer ${token}`;
         }
 
-        const project = localStorage.getItem('mindweaver-project');
+        const project = localStorage.getItem('citadel-project');
         if (project) {
             try {
                 const projectData = JSON.parse(project);
@@ -51,7 +51,7 @@ apiClient.interceptors.response.use(
     (error) => {
         if (error.response?.status === 401) {
             // Clear token and redirect to login if unauthorized
-            localStorage.removeItem('mindweaver-token');
+            localStorage.removeItem('citadel-token');
             if (window.location.pathname !== '/login') {
                 window.location.href = '/login';
             }

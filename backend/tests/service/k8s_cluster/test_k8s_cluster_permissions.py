@@ -4,8 +4,8 @@
 import pytest
 from unittest.mock import AsyncMock, patch
 from fastapi.testclient import TestClient
-from mindweaver.config import settings
-from mindweaver.fw.permission import (
+from citadel.config import settings
+from citadel.fw.permission import (
     All,
     Permission,
     Read as FwRead,
@@ -19,7 +19,7 @@ from mindweaver.fw.permission import (
     check_user_permission,
     _NAME_TO_PERMISSION,
 )
-from mindweaver.service.k8s_cluster.permission import (
+from citadel.service.k8s_cluster.permission import (
     Manage,
     ManageK8sCluster,
     K8sCluster,
@@ -300,7 +300,7 @@ def test_k8s_cluster_endpoints_enforce_permissions(client: TestClient):
         assert resp.status_code == 403
 
         # 7. Regular user can refresh k8s cluster status (Refresh is child of View)
-        with patch("mindweaver.service.k8s_cluster.views.K8sClusterService.poll_status", AsyncMock(return_value={"healthy": True})):
+        with patch("citadel.service.k8s_cluster.views.K8sClusterService.poll_status", AsyncMock(return_value={"healthy": True})):
             resp = c.post(
                 f"/api/v1/k8s_clusters/{cluster_id}/_refresh",
                 headers=reg_headers,
@@ -325,7 +325,7 @@ def test_k8s_cluster_endpoints_with_granted_permissions(client: TestClient):
             return _get
 
         # 1. User with Manage permission (full control)
-        with patch("mindweaver.fw.permission.get_user_permissions", side_effect=_mock_perms([Manage])):
+        with patch("citadel.fw.permission.get_user_permissions", side_effect=_mock_perms([Manage])):
             # Can create
             resp = c.post(
                 "/api/v1/k8s_clusters",
@@ -350,7 +350,7 @@ def test_k8s_cluster_endpoints_with_granted_permissions(client: TestClient):
             assert resp.status_code == 200
 
             # Can refresh status
-            with patch("mindweaver.service.k8s_cluster.views.K8sClusterService.poll_status", AsyncMock(return_value={"healthy": True})):
+            with patch("citadel.service.k8s_cluster.views.K8sClusterService.poll_status", AsyncMock(return_value={"healthy": True})):
                 resp = c.post(
                     f"/api/v1/k8s_clusters/{created_id}/_refresh",
                     headers=manager_headers,
@@ -383,7 +383,7 @@ def test_k8s_cluster_endpoints_with_granted_permissions(client: TestClient):
         assert r_resp.status_code == 200
         target_cluster_id = r_resp.json()["data"]["id"]
 
-        with patch("mindweaver.fw.permission.get_user_permissions", side_effect=_mock_perms([Read])):
+        with patch("citadel.fw.permission.get_user_permissions", side_effect=_mock_perms([Read])):
             # Can list
             resp = c.get(
                 "/api/v1/k8s_clusters",
@@ -399,7 +399,7 @@ def test_k8s_cluster_endpoints_with_granted_permissions(client: TestClient):
             assert resp.status_code == 200
 
             # Can refresh
-            with patch("mindweaver.service.k8s_cluster.views.K8sClusterService.poll_status", AsyncMock(return_value={"healthy": True})):
+            with patch("citadel.service.k8s_cluster.views.K8sClusterService.poll_status", AsyncMock(return_value={"healthy": True})):
                 resp = c.post(
                     f"/api/v1/k8s_clusters/{target_cluster_id}/_refresh",
                     headers=reader_headers,
@@ -439,7 +439,7 @@ def test_k8s_cluster_endpoints_with_granted_permissions(client: TestClient):
             assert resp.status_code == 403
 
         # 3. User with only Refresh permission
-        with patch("mindweaver.fw.permission.get_user_permissions", side_effect=_mock_perms([Refresh])):
+        with patch("citadel.fw.permission.get_user_permissions", side_effect=_mock_perms([Refresh])):
             # Refresher cannot create
             resp = c.post(
                 "/api/v1/k8s_clusters",
@@ -455,7 +455,7 @@ def test_k8s_cluster_endpoints_with_granted_permissions(client: TestClient):
             assert resp.status_code == 403
 
             # Refresher CAN refresh
-            with patch("mindweaver.service.k8s_cluster.views.K8sClusterService.poll_status", AsyncMock(return_value={"healthy": True})):
+            with patch("citadel.service.k8s_cluster.views.K8sClusterService.poll_status", AsyncMock(return_value={"healthy": True})):
                 resp = c.post(
                     f"/api/v1/k8s_clusters/{target_cluster_id}/_refresh",
                     headers=refresher_headers,

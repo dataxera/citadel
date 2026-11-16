@@ -166,15 +166,15 @@ def test_project_scoping(client: TestClient, test_cluster: dict):
 
 
 @patch(
-    "mindweaver.platform_service.base.PlatformService._deploy_to_cluster",
+    "citadel.platform_service.base.PlatformService._deploy_to_cluster",
     return_value=None,
 )
 @patch(
-    "mindweaver.platform_service.base.PlatformService._decommission_from_cluster",
+    "citadel.platform_service.base.PlatformService._decommission_from_cluster",
     return_value=None,
 )
 @patch(
-    "mindweaver.platform_service.pgsql.PgSqlPlatformService.poll_status",
+    "citadel.platform_service.pgsql.PgSqlPlatformService.poll_status",
     return_value=None,
 )
 def test_project_state(

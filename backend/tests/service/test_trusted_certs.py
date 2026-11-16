@@ -3,8 +3,8 @@
 
 import pytest
 from fastapi.testclient import TestClient
-from mindweaver.platform_service.trino.service import TrinoPlatformService
-from mindweaver.platform_service.trino.model import TrinoPlatform
+from citadel.platform_service.trino.service import TrinoPlatformService
+from citadel.platform_service.trino.model import TrinoPlatform
 
 
 @pytest.fixture
@@ -25,7 +25,7 @@ def generate_valid_cert_pem():
     )
     subject = issuer = x509.Name([
         x509.NameAttribute(NameOID.COMMON_NAME, "test-ca"),
-        x509.NameAttribute(NameOID.ORGANIZATION_NAME, "Mindweaver Test Org"),
+        x509.NameAttribute(NameOID.ORGANIZATION_NAME, "Citadel Test Org"),
     ])
     cert = x509.CertificateBuilder().subject_name(
         subject
@@ -145,7 +145,7 @@ async def test_trusted_certs_integration_template_vars(client: TestClient, test_
     assert resp.status_code == 200, resp.text
 
     # 2. Fetch via TrinoPlatformService
-    from mindweaver.fw.model import get_engine
+    from citadel.fw.model import get_engine
     from sqlmodel.ext.asyncio.session import AsyncSession
     
     engine = get_engine()
@@ -210,7 +210,7 @@ def test_trusted_cert_hooks_trigger_sync(client: TestClient, test_project):
     from unittest.mock import patch
 
     # Mock the Celery task delay method
-    with patch("mindweaver.tasks.project_tasks.sync_trusted_certs_secret_task.delay") as mock_delay:
+    with patch("citadel.tasks.project_tasks.sync_trusted_certs_secret_task.delay") as mock_delay:
         # 1. Create a certificate
         payload = {
             "name": "hook-test-ca",

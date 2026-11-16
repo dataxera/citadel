@@ -1,10 +1,11 @@
+name: citadel
 services:
   db:
     image: postgres:15
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: password
-      POSTGRES_DB: mindweaver
+      POSTGRES_DB: citadel
     ports:
       - "5432:5432"
     volumes:
@@ -32,17 +33,17 @@ services:
     build:
       context: .
       target: backend-base
-    image: mindweaver-dev:latest
-    command: sh -c "uv run mindweaver db migrate && uv run mindweaver stack import"
+    image: ghcr.io/dataxera/citadel-dev:latest
+    command: sh -c "uv run dxc db migrate && uv run dxc stack import"
     env_file:
       - ./backend/.env
     environment:
-      MINDWEAVER_DB_HOST: db
-      MINDWEAVER_DB_USER: postgres
-      MINDWEAVER_DB_PASS: password
-      MINDWEAVER_DB_NAME: mindweaver
-      MINDWEAVER_DEFAULT_ADMIN_USERNAME: "admin"
-      MINDWEAVER_DEFAULT_ADMIN_PASSWORD: "password"
+      CITADEL_DB_HOST: db
+      CITADEL_DB_USER: postgres
+      CITADEL_DB_PASS: password
+      CITADEL_DB_NAME: citadel
+      CITADEL_DEFAULT_ADMIN_USERNAME: "admin"
+      CITADEL_DEFAULT_ADMIN_PASSWORD: "password"
     volumes:
       - ./backend/src:/app/src
       - ./backend/migration:/app/migration
@@ -53,28 +54,25 @@ services:
 
   web:
     profiles: ["app"]
-    build:
-      context: .
-      target: backend-base
-    image: mindweaver-dev:latest
-    command: uv run mindweaver run --port 8000 --bind 0.0.0.0 --log-file /var/log/mindweaver.log
+    image: ghcr.io/dataxera/citadel-dev:latest
+    command: uv run dxc run --port 8000 --bind 0.0.0.0 --log-file /var/log/citadel.log
     ports:
       - "8000:8000"
     env_file:
       - ./backend/.env
     environment:
-      MINDWEAVER_DB_HOST: db
-      MINDWEAVER_DB_USER: postgres
-      MINDWEAVER_DB_PASS: password
-      MINDWEAVER_DB_NAME: mindweaver
-      MINDWEAVER_CELERY_BROKER_URL: redis://redis:6379/0
-      MINDWEAVER_CELERY_RESULT_BACKEND: redis://redis:6379/0
-      MINDWEAVER_EMBEDDED_WORKER: "false"
-      MINDWEAVER_BRAND_NAME: "Citadel"
-      MINDWEAVER_BRAND_LOGO: "citadel.svg"
-      MINDWEAVER_BRAND_BGCOLOR: "#fff"
-      MINDWEAVER_DEFAULT_ADMIN_USERNAME: "admin"
-      MINDWEAVER_DEFAULT_ADMIN_PASSWORD: "password"
+      CITADEL_DB_HOST: db
+      CITADEL_DB_USER: postgres
+      CITADEL_DB_PASS: password
+      CITADEL_DB_NAME: citadel
+      CITADEL_CELERY_BROKER_URL: redis://redis:6379/0
+      CITADEL_CELERY_RESULT_BACKEND: redis://redis:6379/0
+      CITADEL_EMBEDDED_WORKER: "false"
+      CITADEL_BRAND_NAME: "Citadel"
+      CITADEL_BRAND_LOGO: "citadel.svg"
+      CITADEL_BRAND_BGCOLOR: "#fff"
+      CITADEL_DEFAULT_ADMIN_USERNAME: "admin"
+      CITADEL_DEFAULT_ADMIN_PASSWORD: "password"
     volumes:
       - ./backend/src:/app/src
       - ./backend/migration:/app/migration
@@ -89,7 +87,7 @@ services:
 
   scheduler:
     profiles: ["app"]
-    image: mindweaver-dev:latest
+    image: ghcr.io/dataxera/citadel-dev:latest
     depends_on:
       db:
         condition: service_healthy
@@ -99,19 +97,19 @@ services:
         condition: service_completed_successfully
       web:
         condition: service_started
-    command: uv run mindweaver scheduler --reload
+    command: uv run dxc scheduler --reload
     env_file:
       - ./backend/.env
     environment:
-      MINDWEAVER_DB_HOST: db
-      MINDWEAVER_DB_USER: postgres
-      MINDWEAVER_DB_PASS: password
-      MINDWEAVER_DB_NAME: mindweaver
-      MINDWEAVER_CELERY_BROKER_URL: redis://redis:6379/0
-      MINDWEAVER_CELERY_RESULT_BACKEND: redis://redis:6379/0
-      MINDWEAVER_EMBEDDED_WORKER: "false"
-      MINDWEAVER_DEFAULT_ADMIN_USERNAME: "admin"
-      MINDWEAVER_DEFAULT_ADMIN_PASSWORD: "password"
+      CITADEL_DB_HOST: db
+      CITADEL_DB_USER: postgres
+      CITADEL_DB_PASS: password
+      CITADEL_DB_NAME: citadel
+      CITADEL_CELERY_BROKER_URL: redis://redis:6379/0
+      CITADEL_CELERY_RESULT_BACKEND: redis://redis:6379/0
+      CITADEL_EMBEDDED_WORKER: "false"
+      CITADEL_DEFAULT_ADMIN_USERNAME: "admin"
+      CITADEL_DEFAULT_ADMIN_PASSWORD: "password"
     volumes:
       - ./backend/src:/app/src
       - ./backend/migration:/app/migration
@@ -119,7 +117,7 @@ services:
 
   worker:
     profiles: ["app"]
-    image: mindweaver-dev:latest
+    image: ghcr.io/dataxera/citadel-dev:latest
     depends_on:
       db:
         condition: service_healthy
@@ -129,19 +127,19 @@ services:
         condition: service_completed_successfully
       web:
         condition: service_started
-    command: uv run mindweaver worker --reload
+    command: uv run dxc worker --reload
     env_file:
       - ./backend/.env
     environment:
-      MINDWEAVER_DB_HOST: db
-      MINDWEAVER_DB_USER: postgres
-      MINDWEAVER_DB_PASS: password
-      MINDWEAVER_DB_NAME: mindweaver
-      MINDWEAVER_CELERY_BROKER_URL: redis://redis:6379/0
-      MINDWEAVER_CELERY_RESULT_BACKEND: redis://redis:6379/0
-      MINDWEAVER_EMBEDDED_WORKER: "false"
-      MINDWEAVER_DEFAULT_ADMIN_USERNAME: "admin"
-      MINDWEAVER_DEFAULT_ADMIN_PASSWORD: "password"
+      CITADEL_DB_HOST: db
+      CITADEL_DB_USER: postgres
+      CITADEL_DB_PASS: password
+      CITADEL_DB_NAME: citadel
+      CITADEL_CELERY_BROKER_URL: redis://redis:6379/0
+      CITADEL_CELERY_RESULT_BACKEND: redis://redis:6379/0
+      CITADEL_EMBEDDED_WORKER: "false"
+      CITADEL_DEFAULT_ADMIN_USERNAME: "admin"
+      CITADEL_DEFAULT_ADMIN_PASSWORD: "password"
     volumes:
       - ./backend/src:/app/src
       - ./backend/migration:/app/migration
@@ -152,7 +150,7 @@ services:
     build:
       context: .
       target: frontend-builder
-    image: mindweaver-frontend-dev:latest
+    image: ghcr.io/dataxera/citadel-frontend-dev:latest
     command: npm run dev -- --port 3000 --host 0.0.0.0
     ports:
       - "3000:3000"

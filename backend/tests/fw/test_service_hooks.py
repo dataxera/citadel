@@ -3,7 +3,7 @@
 
 import pytest
 from unittest.mock import MagicMock, AsyncMock
-from mindweaver.fw.service import (
+from citadel.fw.service import (
     Service,
     before_create,
     after_create,
@@ -12,7 +12,7 @@ from mindweaver.fw.service import (
     before_delete,
     after_delete,
 )
-from mindweaver.fw.model import NamedBase
+from citadel.fw.model import NamedBase
 
 
 class MockModel(NamedBase, table=True):

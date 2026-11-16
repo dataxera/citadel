@@ -44,7 +44,7 @@ const ListingView = ({
     );
 
     const renderBadges = (storage) => ([
-        { text: storage.region, variant: "mw-badge-neutral" }
+        { text: storage.region, variant: "dxc-badge-neutral" }
     ]);
 
     return (
@@ -72,7 +72,7 @@ const ListingView = ({
                             type="button"
                             onClick={() => runTestConnection(formData)}
                             disabled={testingConnection}
-                            className="mw-btn-secondary px-6 py-4"
+                            className="dxc-btn-secondary px-6 py-4"
                         >
                             {testingConnection ? <Radio className="animate-pulse" size={18} /> : <Radio size={18} />}
                             TEST CONNECTION
@@ -147,7 +147,7 @@ const ListingView = ({
                                     type="button"
                                     onClick={() => runTestConnection(formData)}
                                     disabled={testingConnection}
-                                    className="mw-btn-secondary px-6 py-4"
+                                    className="dxc-btn-secondary px-6 py-4"
                                 >
                                     {testingConnection ? <Radio className="animate-pulse" size={18} /> : <Radio size={18} />}
                                     TEST CONNECTION

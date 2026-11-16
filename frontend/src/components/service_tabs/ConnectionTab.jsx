@@ -19,7 +19,7 @@ const ConnectionTab = ({
     children,
 }) => {
     return (
-        <div className="mw-connection-tab space-y-6 animate-in fade-in duration-500">
+        <div className="dxc-connection-tab space-y-6 animate-in fade-in duration-500">
             {!isActive ? (
                 <PageLayout.EmptyState
                     icon={<Zap size={40} />}
@@ -31,7 +31,7 @@ const ConnectionTab = ({
                         <button
                             type="button"
                             onClick={onDeploy}
-                            className="mw-deploy-btn mw-btn-primary px-8 py-3 flex items-center justify-center gap-2 text-base mt-6"
+                            className="dxc-deploy-btn dxc-btn-primary px-8 py-3 flex items-center justify-center gap-2 text-base mt-6"
                         >
                             <Zap size={18} /> {deployButtonText}
                         </button>

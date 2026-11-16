@@ -17,7 +17,7 @@ const ListingView = ({
     );
 
     const renderBadges = (platform, state) => {
-        return state.message ? [{ text: state.message, variant: "mw-badge-info" }] : [];
+        return state.message ? [{ text: state.message, variant: "dxc-badge-info" }] : [];
     };
 
     return (

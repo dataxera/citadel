@@ -8,10 +8,10 @@ from fastapi import Request
 from sqlmodel import Session
 from pydantic import ValidationError
 
-from mindweaver.platform_service.trino import TrinoPlatform, TrinoPlatformService, TrinoState, TrinoPlatformState
-from mindweaver.platform_service.hive_metastore import HiveMetastorePlatformState, HiveMetastorePlatform
-from mindweaver.service.s3_storage.model import S3Storage
-from mindweaver.fw.model import AsyncSession
+from citadel.platform_service.trino import TrinoPlatform, TrinoPlatformService, TrinoState, TrinoPlatformState
+from citadel.platform_service.hive_metastore import HiveMetastorePlatformState, HiveMetastorePlatform
+from citadel.service.s3_storage.model import S3Storage
+from citadel.fw.model import AsyncSession
 
 
 @pytest.fixture
@@ -155,9 +155,9 @@ async def test_trino_template_rendering(mock_service_dependencies):
     mock_result.first.return_value = mock_s3_model
     session.exec.return_value = mock_result
 
-    with patch("mindweaver.platform_service.trino.service.HiveMetastorePlatformService.get_service", AsyncMock(return_value=mock_hms_svc)), \
-         patch("mindweaver.platform_service.trino.service.DatabaseSourceService.get_service", AsyncMock(return_value=mock_ds_svc)), \
-         patch("mindweaver.platform_service.trino.service.S3StorageService.get_service", AsyncMock(return_value=mock_s3_svc)):
+    with patch("citadel.platform_service.trino.service.HiveMetastorePlatformService.get_service", AsyncMock(return_value=mock_hms_svc)), \
+         patch("citadel.platform_service.trino.service.DatabaseSourceService.get_service", AsyncMock(return_value=mock_ds_svc)), \
+         patch("citadel.platform_service.trino.service.S3StorageService.get_service", AsyncMock(return_value=mock_s3_svc)):
         
         vars = await svc.template_vars(model)
 
@@ -184,8 +184,8 @@ async def test_trino_template_rendering(mock_service_dependencies):
     assert pg_cat["properties"]["connection-password"] == "pass"
 
     # Render manifest
-    with patch("mindweaver.platform_service.trino.service.HiveMetastorePlatformService.get_service", AsyncMock(return_value=mock_hms_svc)), \
-         patch("mindweaver.platform_service.trino.service.DatabaseSourceService.get_service", AsyncMock(return_value=mock_ds_svc)):
+    with patch("citadel.platform_service.trino.service.HiveMetastorePlatformService.get_service", AsyncMock(return_value=mock_hms_svc)), \
+         patch("citadel.platform_service.trino.service.DatabaseSourceService.get_service", AsyncMock(return_value=mock_ds_svc)):
         full_manifest = await svc.render_manifests(model)
         
     try:
@@ -279,7 +279,7 @@ async def test_trino_catalog_filtering(mock_service_dependencies):
         database_source_ids=[1],
     )
 
-    with patch("mindweaver.platform_service.trino.service.DatabaseSourceService.get_service", AsyncMock(return_value=mock_ds_svc)):
+    with patch("citadel.platform_service.trino.service.DatabaseSourceService.get_service", AsyncMock(return_value=mock_ds_svc)):
         vars = await svc.template_vars(model)
 
         # Verify only mysql-ds is in catalogs
@@ -321,8 +321,8 @@ async def test_trino_mssql_catalog_rendering(mock_service_dependencies):
         database_source_ids=[1],
     )
 
-    with patch("mindweaver.platform_service.trino.service.DatabaseSourceService.get_service", AsyncMock(return_value=mock_ds_svc)), \
-         patch("mindweaver.platform_service.trino.service.decrypt_password", lambda x: x):
+    with patch("citadel.platform_service.trino.service.DatabaseSourceService.get_service", AsyncMock(return_value=mock_ds_svc)), \
+         patch("citadel.platform_service.trino.service.decrypt_password", lambda x: x):
         vars = await svc.template_vars(model)
 
     # Verify mssql-ds is mapped correctly
@@ -366,8 +366,8 @@ async def test_trino_mssql_ssl_rendering(mock_service_dependencies):
         database_source_ids=[1],
     )
 
-    with patch("mindweaver.platform_service.trino.service.DatabaseSourceService.get_service", AsyncMock(return_value=mock_ds_svc)), \
-         patch("mindweaver.platform_service.trino.service.decrypt_password", lambda x: x):
+    with patch("citadel.platform_service.trino.service.DatabaseSourceService.get_service", AsyncMock(return_value=mock_ds_svc)), \
+         patch("citadel.platform_service.trino.service.decrypt_password", lambda x: x):
         vars = await svc.template_vars(model)
 
     mssql_cat = next(c for c in vars["catalogs"] if c["catalog"] == "ssl-mssql")
@@ -406,8 +406,8 @@ async def test_trino_oracle_catalog_rendering(mock_service_dependencies):
         database_source_ids=[1],
     )
 
-    with patch("mindweaver.platform_service.trino.service.DatabaseSourceService.get_service", AsyncMock(return_value=mock_ds_svc)), \
-         patch("mindweaver.platform_service.trino.service.decrypt_password", lambda x: x):
+    with patch("citadel.platform_service.trino.service.DatabaseSourceService.get_service", AsyncMock(return_value=mock_ds_svc)), \
+         patch("citadel.platform_service.trino.service.decrypt_password", lambda x: x):
         vars = await svc.template_vars(model)
 
     oracle_cat = next(c for c in vars["catalogs"] if c["catalog"] == "odshits")
@@ -445,8 +445,8 @@ async def test_trino_oracle_catalog_rendering_sid_and_defaults(mock_service_depe
         database_source_ids=[1],
     )
 
-    with patch("mindweaver.platform_service.trino.service.DatabaseSourceService.get_service", AsyncMock(return_value=mock_ds_svc)), \
-         patch("mindweaver.platform_service.trino.service.decrypt_password", lambda x: x):
+    with patch("citadel.platform_service.trino.service.DatabaseSourceService.get_service", AsyncMock(return_value=mock_ds_svc)), \
+         patch("citadel.platform_service.trino.service.decrypt_password", lambda x: x):
         vars = await svc.template_vars(model)
 
     oracle_cat = next(c for c in vars["catalogs"] if c["catalog"] == "oracle-sid")
@@ -456,8 +456,8 @@ async def test_trino_oracle_catalog_rendering_sid_and_defaults(mock_service_depe
     assert oracle_cat["properties"]["connection-password"] == "pass"
 
 
-from mindweaver.datasource_service.database_source import DatabaseSourceService
-from mindweaver.service.ldap_config.model import LdapConfig
+from citadel.datasource_service.database_source import DatabaseSourceService
+from citadel.service.ldap_config.model import LdapConfig
 
 
 @pytest.mark.asyncio
@@ -508,9 +508,9 @@ async def test_trino_ldap_rendering(mock_service_dependencies):
     mock_project.ldap_config_id = 5
     svc.project = AsyncMock(return_value=mock_project)
 
-    with patch("mindweaver.platform_service.trino.service.LdapConfigService.get_service", AsyncMock(return_value=mock_ldap_svc)), \
-         patch("mindweaver.platform_service.trino.service.HiveMetastorePlatformService.get_service", AsyncMock(return_value=mock_hms_svc)), \
-         patch("mindweaver.platform_service.trino.service.decrypt_password", side_effect=lambda x: x):
+    with patch("citadel.platform_service.trino.service.LdapConfigService.get_service", AsyncMock(return_value=mock_ldap_svc)), \
+         patch("citadel.platform_service.trino.service.HiveMetastorePlatformService.get_service", AsyncMock(return_value=mock_hms_svc)), \
+         patch("citadel.platform_service.trino.service.decrypt_password", side_effect=lambda x: x):
         
         vars = await svc.template_vars(model)
         manifest = await svc.render_manifests(model)
@@ -566,8 +566,8 @@ async def test_trino_https_rendering(mock_service_dependencies):
     mock_project.name = "mock-project"
     svc.project = AsyncMock(return_value=mock_project)
 
-    with patch("mindweaver.platform_service.trino.service.HiveMetastorePlatformService.get_service", AsyncMock(return_value=mock_hms_svc)), \
-         patch("mindweaver.platform_service.trino.service.decrypt_password", lambda x: x):
+    with patch("citadel.platform_service.trino.service.HiveMetastorePlatformService.get_service", AsyncMock(return_value=mock_hms_svc)), \
+         patch("citadel.platform_service.trino.service.decrypt_password", lambda x: x):
         
         manifest = await svc.render_manifests(model)
 
@@ -629,7 +629,7 @@ async def test_trino_https_rendering(mock_service_dependencies):
 
     # Verify ca.crt is imported into truststore in prepare-tls initContainer
     prepare_tls_cmd = values["initContainers"]["coordinator"][0]["command"][2]
-    assert "keytool -importcert -alias mindweaver-ca -file /tls-secret/ca.crt -keystore /tls/truststore.jks" in prepare_tls_cmd
+    assert "keytool -importcert -alias citadel-ca -file /tls-secret/ca.crt -keystore /tls/truststore.jks" in prepare_tls_cmd
 
 
 @pytest.mark.asyncio
@@ -663,7 +663,7 @@ async def test_trino_poll_status_with_https_nodeport(mock_service_dependencies):
     svc.project = AsyncMock(return_value=MagicMock(ingress_domain=None))
 
     # Call poll_status
-    with patch("mindweaver.platform_service.trino.poller.asyncio.to_thread") as mock_to_thread:
+    with patch("citadel.platform_service.trino.poller.asyncio.to_thread") as mock_to_thread:
         mock_to_thread.return_value = ("online", "Healthy", {"argo": "ok"}, node_ports, cluster_nodes)
 
         await svc.poll_status(model)
@@ -697,7 +697,7 @@ async def test_trino_poll_status_with_ingress_domain(mock_service_dependencies):
 
     svc.get_preferred_catalog = AsyncMock(return_value="hive")
 
-    with patch("mindweaver.platform_service.trino.poller.asyncio.to_thread") as mock_to_thread:
+    with patch("citadel.platform_service.trino.poller.asyncio.to_thread") as mock_to_thread:
         mock_to_thread.return_value = ("online", "Healthy", {"argo": "ok"}, node_ports, cluster_nodes)
 
         await svc.poll_status(model)
@@ -739,8 +739,8 @@ async def test_trino_envoy_route_rendering(mock_service_dependencies):
     mock_hms_svc.platform_state.return_value = mock_hms_state
     mock_hms_svc._resolve_namespace.return_value = "hms-ns"
 
-    with patch("mindweaver.platform_service.trino.service.HiveMetastorePlatformService.get_service", AsyncMock(return_value=mock_hms_svc)), \
-         patch("mindweaver.platform_service.trino.service.decrypt_password", lambda x: x):
+    with patch("citadel.platform_service.trino.service.HiveMetastorePlatformService.get_service", AsyncMock(return_value=mock_hms_svc)), \
+         patch("citadel.platform_service.trino.service.decrypt_password", lambda x: x):
         
         manifest = await svc.render_manifests(model)
 
@@ -817,9 +817,9 @@ async def test_trino_catalog_custom_parameters(mock_service_dependencies):
     )
 
     with patch(
-        "mindweaver.platform_service.trino.service.DatabaseSourceService.get_service",
+        "citadel.platform_service.trino.service.DatabaseSourceService.get_service",
         AsyncMock(return_value=mock_ds_svc),
-    ), patch("mindweaver.platform_service.trino.service.decrypt_password", lambda x: x):
+    ), patch("citadel.platform_service.trino.service.decrypt_password", lambda x: x):
         vars = await svc.template_vars(model)
 
     catalog = next(c for c in vars["catalogs"] if c["catalog"] == "custom-ds")
@@ -850,10 +850,10 @@ async def test_trino_state_credentials(mock_service_dependencies):
     svc.platform_state = AsyncMock(return_value=state)
     
     # Patch decrypt_password
-    with patch("mindweaver.platform_service.trino.state.decrypt_password", side_effect=lambda x: x):
+    with patch("citadel.platform_service.trino.state.decrypt_password", side_effect=lambda x: x):
         t_state = TrinoState(model, svc)
         # Mock DefaultPlatformState.get to return a dict
-        with patch("mindweaver.platform_service.base.DefaultPlatformState.get", AsyncMock(return_value={"id": 1, "active": True})):
+        with patch("citadel.platform_service.base.DefaultPlatformState.get", AsyncMock(return_value={"id": 1, "active": True})):
             res = await t_state.get()
             
     assert res["db_user"] == "trino"
@@ -877,7 +877,7 @@ async def test_trino_state_credentials_no_admin(mock_service_dependencies):
     svc.platform_state = AsyncMock(return_value=None)
     
     t_state = TrinoState(model, svc)
-    with patch("mindweaver.platform_service.base.DefaultPlatformState.get", AsyncMock(return_value={"id": 1, "active": True})):
+    with patch("citadel.platform_service.base.DefaultPlatformState.get", AsyncMock(return_value={"id": 1, "active": True})):
         res = await t_state.get()
         
     assert res["db_user"] == "trino"
@@ -915,8 +915,8 @@ async def test_trino_jwt_rendering(mock_service_dependencies):
     mock_hms_svc.platform_state.return_value = mock_hms_state
     mock_hms_svc._resolve_namespace.return_value = "hms-ns"
 
-    with patch("mindweaver.platform_service.trino.service.HiveMetastorePlatformService.get_service", AsyncMock(return_value=mock_hms_svc)), \
-         patch("mindweaver.platform_service.trino.service.decrypt_password", lambda x: x):
+    with patch("citadel.platform_service.trino.service.HiveMetastorePlatformService.get_service", AsyncMock(return_value=mock_hms_svc)), \
+         patch("citadel.platform_service.trino.service.decrypt_password", lambda x: x):
         
         vars = await svc.template_vars(model)
         manifest = await svc.render_manifests(model)
@@ -985,8 +985,8 @@ async def test_trino_configurable_rules(mock_service_dependencies):
     mock_ds_model.parameters = {}
     mock_ds_svc.get.return_value = mock_ds_model
 
-    with patch("mindweaver.platform_service.trino.service.DatabaseSourceService.get_service", AsyncMock(return_value=mock_ds_svc)), \
-         patch("mindweaver.platform_service.trino.service.decrypt_password", lambda x: x):
+    with patch("citadel.platform_service.trino.service.DatabaseSourceService.get_service", AsyncMock(return_value=mock_ds_svc)), \
+         patch("citadel.platform_service.trino.service.decrypt_password", lambda x: x):
         vars = await svc.template_vars(model)
         
     rules = json.loads(vars["rules_json"])

@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: AGPLv3+
 
 import pytest
-from mindweaver.fw.service import (
+from citadel.fw.service import (
     Service,
     before_create,
     after_create,
@@ -11,7 +11,7 @@ from mindweaver.fw.service import (
     before_delete,
     after_delete,
 )
-from mindweaver.fw.model import NamedBase
+from citadel.fw.model import NamedBase
 
 
 class SignatureMockModel(NamedBase, table=True):

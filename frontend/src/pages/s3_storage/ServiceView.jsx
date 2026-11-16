@@ -122,7 +122,7 @@ const ServiceView = ({
                 headerActions={
                     <button
                         onClick={onBack}
-                        className="mw-btn-secondary px-4 py-2"
+                        className="dxc-btn-secondary px-4 py-2"
                     >
                         <ArrowLeft size={16} /> BACK TO LIST
                     </button>

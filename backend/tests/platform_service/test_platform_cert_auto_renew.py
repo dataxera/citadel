@@ -11,7 +11,7 @@ from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.primitives import serialization
 from cryptography.x509.oid import NameOID
 
-from mindweaver.fw.cert_manager import (
+from citadel.fw.cert_manager import (
     validate_and_reissue_certificate,
     reconcile_manifest_certificates,
     reissue_certificate,
@@ -146,7 +146,7 @@ def test_validate_and_reissue_valid_cert():
     core_api.read_namespaced_secret.side_effect = mock_read_secret
 
     with patch("kubernetes.client.CoreV1Api", return_value=core_api), \
-         patch("mindweaver.fw.cert_manager.reissue_certificate") as mock_reissue:
+         patch("citadel.fw.cert_manager.reissue_certificate") as mock_reissue:
         
         reissued = validate_and_reissue_certificate(
             k8s_client, "test-ns", "trino-tls", "trino-tls-secret", "test-ca-secret"
@@ -187,7 +187,7 @@ def test_validate_and_reissue_rotated_ca():
     core_api.read_namespaced_secret.side_effect = mock_read_secret
 
     with patch("kubernetes.client.CoreV1Api", return_value=core_api), \
-         patch("mindweaver.fw.cert_manager.reissue_certificate") as mock_reissue:
+         patch("citadel.fw.cert_manager.reissue_certificate") as mock_reissue:
         
         reissued = validate_and_reissue_certificate(
             k8s_client, "test-ns", "trino-tls", "trino-tls-secret", "test-ca-secret"
@@ -226,7 +226,7 @@ def test_validate_and_reissue_expired_cert():
     core_api.read_namespaced_secret.side_effect = mock_read_secret
 
     with patch("kubernetes.client.CoreV1Api", return_value=core_api), \
-         patch("mindweaver.fw.cert_manager.reissue_certificate") as mock_reissue:
+         patch("citadel.fw.cert_manager.reissue_certificate") as mock_reissue:
         
         reissued = validate_and_reissue_certificate(
             k8s_client, "test-ns", "trino-tls", "trino-tls-secret", "test-ca-secret"
@@ -268,7 +268,7 @@ metadata:
     }
 
     with patch("kubernetes.client.CustomObjectsApi", return_value=custom_api), \
-         patch("mindweaver.fw.cert_manager.validate_and_reissue_certificate") as mock_validate:
+         patch("citadel.fw.cert_manager.validate_and_reissue_certificate") as mock_validate:
         
         mock_validate.return_value = True
 

@@ -6,7 +6,7 @@
 
 ## Context
 
-Mindweaver's primary function is to manage and deploy data platform components on Kubernetes. We need a reliable mechanism to manage the lifecycle of these components, ensuring they match the desired state defined in metadata.
+Citadel's primary function is to manage and deploy data platform components on Kubernetes. We need a reliable mechanism to manage the lifecycle of these components, ensuring they match the desired state defined in metadata.
 
 ## Decision
 

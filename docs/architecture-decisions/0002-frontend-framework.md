@@ -6,7 +6,7 @@
 
 ## Context
 
-The Mindweaver frontend needs to provide a rich, interactive, and responsive user interface for managing data platform components. It must integrate seamlessly with the FastAPI backend.
+The Citadel frontend needs to provide a rich, interactive, and responsive user interface for managing data platform components. It must integrate seamlessly with the FastAPI backend.
 
 ## Decision
 

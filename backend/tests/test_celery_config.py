@@ -1,7 +1,7 @@
 # SPDX-FileCopyrightText: Copyright © 2026 Mohd Izhar Firdaus Bin Ismail
 # SPDX-License-Identifier: AGPLv3+
 
-from mindweaver.celery_app import app
+from citadel.celery_app import app
 
 
 def test_celery_beat_schedule_no_always_on_polling():

@@ -57,8 +57,8 @@ def test_error_404_resource_not_found(client: TestClient, test_project):
 
 from unittest.mock import patch
 
-@patch("mindweaver.app.logger.exception")
-@patch("mindweaver.fw.service.Service.get", side_effect=RuntimeError("Test traceback logging"))
+@patch("citadel.app.logger.exception")
+@patch("citadel.fw.service.Service.get", side_effect=RuntimeError("Test traceback logging"))
 def test_error_500_traceback_logged(mock_exists, mock_log_exception, client: TestClient, test_project):
     """Test that 500 internal server error logs a traceback."""
     local_client = TestClient(app=client.app, raise_server_exceptions=False)
@@ -77,8 +77,8 @@ def test_error_500_traceback_logged(mock_exists, mock_log_exception, client: Tes
 
 from fastapi import HTTPException
 
-@patch("mindweaver.app.logger.exception")
-@patch("mindweaver.fw.service.Service.get", side_effect=HTTPException(status_code=500, detail="Test HTTPException traceback"))
+@patch("citadel.app.logger.exception")
+@patch("citadel.fw.service.Service.get", side_effect=HTTPException(status_code=500, detail="Test HTTPException traceback"))
 def test_error_http_500_traceback_logged(mock_exists, mock_log_exception, client: TestClient, test_project):
     """Test that HTTPException with status >= 500 logs a traceback."""
     local_client = TestClient(app=client.app, raise_server_exceptions=False)

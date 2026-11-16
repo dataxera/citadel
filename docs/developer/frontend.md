@@ -1,6 +1,6 @@
 # Frontend Development
 
-This guide covers the development and customization of the Mindweaver frontend.
+This guide covers the development and customization of the Citadel frontend.
 
 ## Overview
 
@@ -8,7 +8,7 @@ The frontend is a React application built with **Vite** and styled with **Tailwi
 
 ## Dynamic Forms
 
-The `DynamicForm` component is the heart of Mindweaver's CRUD UI.
+The `DynamicForm` component is the heart of Citadel's CRUD UI.
 - **Automatic Rendering**: It fetches the JSON:API schema from the backend and builds the form automatically.
 - **Backend-Driven UX**: UX properties like field order, labels, and column spans are configured in the **Backend Service**'s `widgets()` method.
 
@@ -22,7 +22,7 @@ Providers abstract the API communication logic. Most entities have a correspondi
 
 ## UI Standards
 
-- **Aesthetics**: Mindweaver prioritizes a modern, premium look with harmonious color palettes and subtle animations.
+- **Aesthetics**: Citadel prioritizes a modern, premium look with harmonious color palettes and subtle animations.
 - **Responsiveness**: Ensure all new components are fully responsive.
 - **Identifiers**: Use semantic IDs and class names for all key elements to facilitate automated testing.
 

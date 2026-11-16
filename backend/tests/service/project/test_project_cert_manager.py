@@ -426,9 +426,9 @@ def test_get_issuer_ca_cert_failures(client: TestClient, test_cluster: dict, moc
 
 @pytest.mark.asyncio
 async def test_deploy_project_issuer(test_cluster: dict):
-    from mindweaver.service.project.actions import SyncProjectIntegrationsAction
-    from mindweaver.service.project.model import Project
-    from mindweaver.fw.model import get_engine
+    from citadel.service.project.actions import SyncProjectIntegrationsAction
+    from citadel.service.project.model import Project
+    from citadel.fw.model import get_engine
     from sqlmodel.ext.asyncio.session import AsyncSession
 
     project = Project(
@@ -469,10 +469,10 @@ async def test_deploy_project_issuer(test_cluster: dict):
 
 @pytest.mark.asyncio
 async def test_deploy_project_trusted_certs(test_cluster: dict):
-    from mindweaver.service.project.actions import SyncProjectIntegrationsAction
-    from mindweaver.service.project.model import Project
-    from mindweaver.service.trusted_certs.model import TrustedCert
-    from mindweaver.fw.model import get_engine
+    from citadel.service.project.actions import SyncProjectIntegrationsAction
+    from citadel.service.project.model import Project
+    from citadel.service.trusted_certs.model import TrustedCert
+    from citadel.fw.model import get_engine
     from sqlmodel.ext.asyncio.session import AsyncSession
     import base64
 
@@ -535,9 +535,9 @@ async def test_deploy_project_trusted_certs(test_cluster: dict):
 
 @pytest.mark.asyncio
 async def test_deploy_project_empty_trusted_certs(test_cluster: dict):
-    from mindweaver.service.project.actions import SyncProjectIntegrationsAction
-    from mindweaver.service.project.model import Project
-    from mindweaver.fw.model import get_engine
+    from citadel.service.project.actions import SyncProjectIntegrationsAction
+    from citadel.service.project.model import Project
+    from citadel.fw.model import get_engine
     from sqlmodel.ext.asyncio.session import AsyncSession
 
     project = Project(

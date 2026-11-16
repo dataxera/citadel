@@ -5,8 +5,8 @@ import pytest
 from unittest.mock import MagicMock, AsyncMock, patch
 from fastapi import Request
 
-from mindweaver.platform_service.trino import TrinoPlatform, TrinoPlatformService
-from mindweaver.fw.model import AsyncSession
+from citadel.platform_service.trino import TrinoPlatform, TrinoPlatformService
+from citadel.fw.model import AsyncSession
 
 @pytest.fixture
 def mock_service_dependencies():
@@ -59,8 +59,8 @@ async def test_trino_s3_region_defaults(mock_service_dependencies):
 
     mock_s3_svc = AsyncMock()
     
-    with patch("mindweaver.platform_service.trino.service.HiveMetastorePlatformService.get_service", AsyncMock(return_value=mock_hms_svc)), \
-         patch("mindweaver.platform_service.trino.service.S3StorageService.get_service", AsyncMock(return_value=mock_s3_svc)):
+    with patch("citadel.platform_service.trino.service.HiveMetastorePlatformService.get_service", AsyncMock(return_value=mock_hms_svc)), \
+         patch("citadel.platform_service.trino.service.S3StorageService.get_service", AsyncMock(return_value=mock_s3_svc)):
         
         # 1. Non-local S3 with region provided
         mock_s3_svc.get.return_value = get_mock_s3("ap-southeast-1")

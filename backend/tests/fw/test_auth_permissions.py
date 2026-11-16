@@ -3,7 +3,7 @@
 
 import pytest
 from fastapi.testclient import TestClient
-from mindweaver.config import settings
+from citadel.config import settings
 
 
 @pytest.fixture(autouse=True)

@@ -25,7 +25,7 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy backend configuration
-COPY backend/pyproject.toml backend/uv.lock ./
+COPY backend/pyproject.toml uv.lock ./
 
 # Install production dependencies
 RUN uv sync --frozen --no-dev --no-install-project

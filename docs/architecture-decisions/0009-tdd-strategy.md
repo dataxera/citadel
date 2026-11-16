@@ -21,7 +21,7 @@ We have adopted a mandatory **Test-Driven Development (TDD)** workflow for backe
 
 ## References
 
-- [Mindweaver Constitution (Section 3 & 7)](file:///home/izhar/Projects/mindweaver/.agent/rules/constitution.md)
+- [Citadel Constitution (Section 3 & 7)](file:///home/izhar/Projects/citadel/.agent/rules/constitution.md)
 
 ---
 SPDX-FileCopyrightText: Copyright © 2026 Mohd Izhar Firdaus Bin Ismail

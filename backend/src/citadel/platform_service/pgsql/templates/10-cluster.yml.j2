@@ -1,0 +1,109 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ name }}
+  namespace: argocd
+  labels:
+    {% if project_title %}
+    project: "{{ project_title }}"
+    {% endif %}
+    {% if service_title %}
+    service: "{{ service_title }}"
+    {% endif %}
+    manager: citadel
+  finalizers:
+  - resources-finalizer.argocd.argoproj.io
+spec:
+  project: {{ project_name }}
+  source:
+    repoURL: {{ chart_repo }}
+    targetRevision: {{ chart_version }}
+    chart: {{ chart_name }}
+    helm:
+      values: |
+        fullnameOverride: {{ name }}
+        cluster:
+          name: {{ name }}
+          instances: {{ instances }}
+          imageName: {{ image_name }}
+          certificates:
+            serverTLSSecret: {{ name }}-tls
+            serverCASecret: {{ name }}-tls
+          storage:
+
+            size: {{ storage_size }}
+          resources:
+            requests:
+              cpu: "{{ cpu_request | k8s_resource }}"
+              memory: "{{ mem_request | k8s_resource('Gi') }}"
+            limits:
+              cpu: "{{ cpu_limit | k8s_resource }}"
+              memory: "{{ mem_limit | k8s_resource('Gi') }}"
+          {% if backup_destination %}
+          backup:
+            barmanObjectStore:
+              destinationPath: {{ backup_destination }}
+              {% if s3_endpoint_url %}
+              endpointURL: {{ s3_endpoint_url }}
+              {% endif %}
+              {% if s3_access_key and s3_secret_key %}
+              s3Credentials:
+                accessKeyId:
+                  name: {{ name }}-s3-secret
+                  key: ACCESS_KEY_ID
+                secretAccessKey:
+                  name: {{ name }}-s3-secret
+                  key: SECRET_ACCESS_KEY
+              {% endif %}
+            retentionPolicy: {{ backup_retention_policy }}
+          {% endif %}
+          {% if enable_backup and backup_schedule %}
+          scheduledBackups:
+            - name: {{ name }}-scheduled-backup
+              schedule: "{{ backup_schedule }}"
+              backupOwnerReference: self
+              method: barmanObjectStore
+          {% endif %}
+          {% if node_affinity_yaml or pod_affinity_yaml or pod_anti_affinity_yaml %}
+          affinity:
+            {% if node_affinity_yaml %}
+            nodeAffinity:
+              {{ node_affinity_yaml | indent(14) }}
+            {% endif %}
+            {% if pod_affinity_yaml %}
+            additionalPodAffinity:
+              {{ pod_affinity_yaml | indent(14) }}
+            {% endif %}
+            {% if pod_anti_affinity_yaml %}
+            additionalPodAntiAffinity:
+              {{ pod_anti_affinity_yaml | indent(14) }}
+            {% endif %}
+          {% endif %}
+        poolers:
+          - name: rw
+            type: rw
+            poolMode: {{ pgbouncer_pool_mode }}
+            instances: 1
+            template:
+              spec:
+                {% if node_affinity_yaml %}
+                affinity:
+                  nodeAffinity:
+                    {{ node_affinity_yaml | indent(20) }}
+                {% endif %}
+                containers:
+                  - name: pgbouncer
+                    image: {{ pgbouncer_image }}
+            parameters:
+              max_client_conn: "1000"
+              default_pool_size: "{{ pgbouncer_pool_size }}"
+  destination:
+    server: 'https://kubernetes.default.svc'
+    namespace: {{ namespace }}
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+    - CreateNamespace=true
+

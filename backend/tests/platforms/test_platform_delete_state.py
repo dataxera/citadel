@@ -8,13 +8,13 @@ from unittest.mock import patch
 
 def test_platform_delete_state_denial_when_active(client: TestClient, test_project):
     with patch(
-        "mindweaver.platform_service.base.PlatformService._deploy_to_cluster",
+        "citadel.platform_service.base.PlatformService._deploy_to_cluster",
         return_value=None,
     ), patch(
-        "mindweaver.platform_service.base.PlatformService._decommission_from_cluster",
+        "citadel.platform_service.base.PlatformService._decommission_from_cluster",
         return_value=None,
     ), patch(
-        "mindweaver.platform_service.pgsql.PgSqlPlatformService.poll_status",
+        "citadel.platform_service.pgsql.PgSqlPlatformService.poll_status",
         return_value=None,
     ):
         # 1. Update project with K8s info
@@ -81,13 +81,13 @@ def test_platform_delete_state_success_after_decommission(
     client: TestClient, test_project
 ):
     with patch(
-        "mindweaver.platform_service.base.PlatformService._deploy_to_cluster",
+        "citadel.platform_service.base.PlatformService._deploy_to_cluster",
         return_value=None,
     ), patch(
-        "mindweaver.platform_service.base.PlatformService._decommission_from_cluster",
+        "citadel.platform_service.base.PlatformService._decommission_from_cluster",
         return_value=None,
     ), patch(
-        "mindweaver.platform_service.pgsql.PgSqlPlatformService.poll_status",
+        "citadel.platform_service.pgsql.PgSqlPlatformService.poll_status",
         return_value=None,
     ):
         # 1. Update project with K8s info

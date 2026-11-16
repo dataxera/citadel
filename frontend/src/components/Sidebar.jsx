@@ -137,7 +137,7 @@ const Sidebar = ({ darkMode, isCollapsed, toggleSidebar, onNavItemClick }) => {
                             to={item.to}
                             onClick={() => handleClick(item.to)}
                             className={({ isActive }) => cn(
-                                "mw-nav-item flex items-center transition-all duration-200",
+                                "dxc-nav-item flex items-center transition-all duration-200",
                                 isCollapsed ? "justify-center p-2 rounded-lg" : "px-3 py-2 rounded-lg gap-3",
                                 isActive
                                     ? 'bg-blue-600/10 text-blue-400 border border-blue-500/20'
@@ -155,7 +155,7 @@ const Sidebar = ({ darkMode, isCollapsed, toggleSidebar, onNavItemClick }) => {
                     {isCollapsed ? (
                         <div className="w-8 h-px bg-slate-200 dark:bg-slate-800" />
                     ) : (
-                        <div className="mw-sidebar-section">Environment</div>
+                        <div className="dxc-sidebar-section">Environment</div>
                     )}
                 </div>
 
@@ -165,7 +165,7 @@ const Sidebar = ({ darkMode, isCollapsed, toggleSidebar, onNavItemClick }) => {
                             to={item.to}
                             onClick={() => handleClick(item.to)}
                             className={({ isActive }) => cn(
-                                "mw-nav-item flex items-center transition-all duration-200",
+                                "dxc-nav-item flex items-center transition-all duration-200",
                                 isCollapsed ? "justify-center p-2 rounded-lg" : "px-3 py-2 rounded-lg gap-3",
                                 isActive
                                     ? 'bg-blue-600/10 text-blue-400 border border-blue-500/20'
@@ -183,7 +183,7 @@ const Sidebar = ({ darkMode, isCollapsed, toggleSidebar, onNavItemClick }) => {
                     {isCollapsed ? (
                         <div className="w-8 h-px bg-slate-200 dark:bg-slate-800" />
                     ) : (
-                        <div className="mw-sidebar-section">Connectivity</div>
+                        <div className="dxc-sidebar-section">Connectivity</div>
                     )}
                 </div>
 
@@ -193,7 +193,7 @@ const Sidebar = ({ darkMode, isCollapsed, toggleSidebar, onNavItemClick }) => {
                             to={item.to}
                             onClick={() => handleClick(item.to)}
                             className={({ isActive }) => cn(
-                                "mw-nav-item flex items-center transition-all duration-200",
+                                "dxc-nav-item flex items-center transition-all duration-200",
                                 isCollapsed ? "justify-center p-2 rounded-lg" : "px-3 py-2 rounded-lg gap-3",
                                 isActive
                                     ? 'bg-blue-600/10 text-blue-400 border border-blue-500/20'
@@ -211,7 +211,7 @@ const Sidebar = ({ darkMode, isCollapsed, toggleSidebar, onNavItemClick }) => {
                     {isCollapsed ? (
                         <div className="w-8 h-px bg-slate-200 dark:bg-slate-800" />
                     ) : (
-                        <div className="mw-sidebar-section">Data Sources</div>
+                        <div className="dxc-sidebar-section">Data Sources</div>
                     )}
                 </div>
 
@@ -221,7 +221,7 @@ const Sidebar = ({ darkMode, isCollapsed, toggleSidebar, onNavItemClick }) => {
                             to={item.to}
                             onClick={() => handleClick(item.to)}
                             className={({ isActive }) => cn(
-                                "mw-nav-item flex items-center transition-all duration-200",
+                                "dxc-nav-item flex items-center transition-all duration-200",
                                 isCollapsed ? "justify-center p-2 rounded-lg" : "px-3 py-2 rounded-lg gap-3",
                                 isActive
                                     ? 'bg-blue-600/10 text-blue-400 border border-blue-500/20'
@@ -239,7 +239,7 @@ const Sidebar = ({ darkMode, isCollapsed, toggleSidebar, onNavItemClick }) => {
                     {isCollapsed ? (
                         <div className="w-8 h-px bg-slate-200 dark:bg-slate-800" />
                     ) : (
-                        <div className="mw-sidebar-section">Infrastructure</div>
+                        <div className="dxc-sidebar-section">Infrastructure</div>
                     )}
                 </div>
 
@@ -249,7 +249,7 @@ const Sidebar = ({ darkMode, isCollapsed, toggleSidebar, onNavItemClick }) => {
                             to={item.to}
                             onClick={() => handleClick(item.to)}
                             className={({ isActive }) => cn(
-                                "mw-nav-item flex items-center transition-all duration-200",
+                                "dxc-nav-item flex items-center transition-all duration-200",
                                 isCollapsed ? "justify-center p-2 rounded-lg" : "px-3 py-2 rounded-lg gap-3",
                                 isActive
                                     ? 'bg-blue-600/10 text-blue-400 border border-blue-500/20'
@@ -269,7 +269,7 @@ const Sidebar = ({ darkMode, isCollapsed, toggleSidebar, onNavItemClick }) => {
                             {isCollapsed ? (
                                 <div className="w-8 h-px bg-slate-200 dark:bg-slate-800" />
                             ) : (
-                                <div className="mw-sidebar-section">Administration</div>
+                                <div className="dxc-sidebar-section">Administration</div>
                             )}
                         </div>
 
@@ -279,7 +279,7 @@ const Sidebar = ({ darkMode, isCollapsed, toggleSidebar, onNavItemClick }) => {
                                     to={item.to}
                                     onClick={() => handleClick(item.to)}
                                     className={({ isActive }) => cn(
-                                        "mw-nav-item flex items-center transition-all duration-200",
+                                        "dxc-nav-item flex items-center transition-all duration-200",
                                         isCollapsed ? "justify-center p-2 rounded-lg" : "px-3 py-2 rounded-lg gap-3",
                                         isActive
                                             ? 'bg-blue-600/10 text-blue-400 border border-blue-500/20'

@@ -8,11 +8,11 @@ from unittest.mock import patch
 
 def test_decommission_safety_header_required(client: TestClient, test_project):
     with patch(
-        "mindweaver.platform_service.base.PlatformService._deploy_to_cluster"
+        "citadel.platform_service.base.PlatformService._deploy_to_cluster"
     ), patch(
-        "mindweaver.platform_service.base.PlatformService._decommission_from_cluster"
+        "citadel.platform_service.base.PlatformService._decommission_from_cluster"
     ), patch(
-        "mindweaver.platform_service.pgsql.PgSqlPlatformService.poll_status"
+        "citadel.platform_service.pgsql.PgSqlPlatformService.poll_status"
     ):
 
         # 1. Update project with K8s info
@@ -88,11 +88,11 @@ def test_update_state_active_false_safety_header_required(
     client: TestClient, test_project
 ):
     with patch(
-        "mindweaver.platform_service.base.PlatformService._deploy_to_cluster"
+        "citadel.platform_service.base.PlatformService._deploy_to_cluster"
     ), patch(
-        "mindweaver.platform_service.base.PlatformService._decommission_from_cluster"
+        "citadel.platform_service.base.PlatformService._decommission_from_cluster"
     ), patch(
-        "mindweaver.platform_service.pgsql.PgSqlPlatformService.poll_status"
+        "citadel.platform_service.pgsql.PgSqlPlatformService.poll_status"
     ):
 
         # 1. Update project with K8s info

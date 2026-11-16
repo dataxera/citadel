@@ -7,11 +7,11 @@ from unittest.mock import MagicMock, AsyncMock, patch
 from fastapi import Request
 from pydantic import ValidationError
 
-from mindweaver.platform_service.superset.model import SupersetPlatform, SupersetPlatformState, SupersetRoleMapping
-from mindweaver.platform_service.superset.service import SupersetPlatformService
-from mindweaver.platform_service.pgsql import PgSqlPlatformState
-from mindweaver.fw.model import AsyncSession
-from mindweaver.service.ldap_config.model import LdapConfig
+from citadel.platform_service.superset.model import SupersetPlatform, SupersetPlatformState, SupersetRoleMapping
+from citadel.platform_service.superset.service import SupersetPlatformService
+from citadel.platform_service.pgsql import PgSqlPlatformState
+from citadel.fw.model import AsyncSession
+from citadel.service.ldap_config.model import LdapConfig
 
 
 @pytest.fixture
@@ -69,7 +69,7 @@ def test_superset_validation():
 
 def test_superset_auth_role_mapping_validation():
     """Test validation for auth_role_mapping"""
-    from mindweaver.platform_service.superset.model import SupersetRoleMapping
+    from citadel.platform_service.superset.model import SupersetRoleMapping
     # Valid role
     model = SupersetPlatform(
         name="test-superset",
@@ -88,7 +88,7 @@ def test_superset_auth_role_mapping_validation():
 
 def test_superset_auth_role_mapping_dict_assignment():
     """Test that dictionary assignment is converted to SupersetRoleMapping objects"""
-    from mindweaver.platform_service.superset.model import SupersetRoleMapping
+    from citadel.platform_service.superset.model import SupersetRoleMapping
     model = SupersetPlatform(
         name="test-superset",
         title="Test Superset",
@@ -109,7 +109,7 @@ async def test_superset_template_rendering(mock_service_dependencies):
     svc = SupersetPlatformService(request, session)
 
     # Note: Import here to ensure we patch the class used in service.py
-    from mindweaver.platform_service.superset.service import (
+    from citadel.platform_service.superset.service import (
         PgSqlPlatformService,
         LdapConfigService,
         DatabaseSourceService,
@@ -126,10 +126,10 @@ async def test_superset_template_rendering(mock_service_dependencies):
         trino_ids=[30],
         doris_ids=[40],
         auth_role_mapping=[
-            SupersetRoleMapping(entity="admin@mindweaver.io", role="Admin"),
-            SupersetRoleMapping(entity="admin@mindweaver.io", role="Alpha"),
-            SupersetRoleMapping(entity="user@mindweaver.io", role="Gamma"),
-            SupersetRoleMapping(entity="user@mindweaver.io", role="sql_lab")
+            SupersetRoleMapping(entity="admin@citadel.io", role="Admin"),
+            SupersetRoleMapping(entity="admin@citadel.io", role="Alpha"),
+            SupersetRoleMapping(entity="user@citadel.io", role="Gamma"),
+            SupersetRoleMapping(entity="user@citadel.io", role="sql_lab")
         ]
     )
 
@@ -202,12 +202,12 @@ async def test_superset_template_rendering(mock_service_dependencies):
     mock_doris_svc.platform_state = AsyncMock(return_value=mock_doris_state)
     mock_doris_svc._resolve_namespace = AsyncMock(return_value="doris-ns")
 
-    with patch("mindweaver.platform_service.superset.service.PgSqlPlatformService") as mock_pg_class, \
-         patch("mindweaver.platform_service.superset.service.LdapConfigService") as mock_ldap_class, \
-         patch("mindweaver.platform_service.superset.service.DatabaseSourceService") as mock_ds_class, \
-         patch("mindweaver.platform_service.superset.service.TrinoPlatformService") as mock_trino_class, \
-         patch("mindweaver.platform_service.superset.service.DorisPlatformService") as mock_doris_class, \
-         patch("mindweaver.platform_service.superset.service.decrypt_password", side_effect=lambda x: x):
+    with patch("citadel.platform_service.superset.service.PgSqlPlatformService") as mock_pg_class, \
+         patch("citadel.platform_service.superset.service.LdapConfigService") as mock_ldap_class, \
+         patch("citadel.platform_service.superset.service.DatabaseSourceService") as mock_ds_class, \
+         patch("citadel.platform_service.superset.service.TrinoPlatformService") as mock_trino_class, \
+         patch("citadel.platform_service.superset.service.DorisPlatformService") as mock_doris_class, \
+         patch("citadel.platform_service.superset.service.decrypt_password", side_effect=lambda x: x):
         
         mock_pg_class.get_service = AsyncMock(return_value=mock_pgsql_svc)
         mock_ldap_class.get_service = AsyncMock(return_value=mock_ldap_svc)
@@ -227,8 +227,8 @@ async def test_superset_template_rendering(mock_service_dependencies):
 
         assert vars["db_pass"] == "pass"
         assert vars["ldap"]["server_url"] == "ldap://ldap:389"
-        assert vars["auth_role_mapping"]["admin@mindweaver.io"] == ["Admin", "Alpha"]
-        assert vars["auth_role_mapping"]["user@mindweaver.io"] == ["Gamma", "sql_lab"]
+        assert vars["auth_role_mapping"]["admin@citadel.io"] == ["Admin", "Alpha"]
+        assert vars["auth_role_mapping"]["user@citadel.io"] == ["Gamma", "sql_lab"]
         assert len(vars["datasources"]) == 3
         
         ds_pg = next(ds for ds in vars["datasources"] if ds["database_name"] == "mypsql")
@@ -253,8 +253,8 @@ async def test_superset_template_rendering(mock_service_dependencies):
         
         # 1. Verify Application
         values = yaml.safe_load(app_doc["spec"]["source"]["helm"]["values"])
-        assert values["extraEnv"]["REQUESTS_CA_BUNDLE"] == "/etc/ssl/certs/mindweaver-ca.crt"
-        assert values["extraEnv"]["SSL_CERT_FILE"] == "/etc/ssl/certs/mindweaver-ca.crt"
+        assert values["extraEnv"]["REQUESTS_CA_BUNDLE"] == "/etc/ssl/certs/citadel-ca.crt"
+        assert values["extraEnv"]["SSL_CERT_FILE"] == "/etc/ssl/certs/citadel-ca.crt"
         assert values["extraVolumes"][0]["secret"]["secretName"] == "superset-test-tls"
         # Check items in volume
         items = values["extraVolumes"][0]["secret"]["items"]
@@ -263,7 +263,7 @@ async def test_superset_template_rendering(mock_service_dependencies):
         
         # Check volume mounts
         mounts = [m["mountPath"] for m in values["extraVolumeMounts"]]
-        assert "/etc/ssl/certs/mindweaver-ca.crt" in mounts
+        assert "/etc/ssl/certs/citadel-ca.crt" in mounts
         assert "/etc/superset/trino-certs/tls.crt" in mounts
         assert "/etc/superset/trino-certs/tls.key" in mounts
         assert values["supersetNode"]["connections"]["db_type"] == "postgresql+psycopg2"
@@ -285,11 +285,11 @@ async def test_superset_template_rendering(mock_service_dependencies):
         assert "CUSTOM_SECURITY_MANAGER = CustomSecurityManager" in values["configOverrides"]["security_manager"]
         assert "sql_lab_role not in user.roles" in values["configOverrides"]["security_manager"]
         assert "ALLOWED_EXTRA_AUTHENTICATIONS" in values["configOverrides"]["security_manager"]
-        assert values["image"]["repository"] == "ghcr.io/kagesenshi/mindweaver/superset"
+        assert values["image"]["repository"] == "ghcr.io/kagesenshi/citadel/superset"
         assert values["redis"]["image"]["repository"] == "bitnamilegacy/redis"
         assert "AUTH_ROLES_MAPPING" in values["configOverrides"]["role_mapping"]
-        assert '"admin@mindweaver.io": ["Admin", "Alpha"]' in values["configOverrides"]["role_mapping"]
-        assert '"user@mindweaver.io": ["Gamma", "sql_lab"]' in values["configOverrides"]["role_mapping"]
+        assert '"admin@citadel.io": ["Admin", "Alpha"]' in values["configOverrides"]["role_mapping"]
+        assert '"user@citadel.io": ["Gamma", "sql_lab"]' in values["configOverrides"]["role_mapping"]
         
 
         # 1.2 Verify with ingress_domain set
@@ -308,7 +308,7 @@ async def test_superset_template_rendering(mock_service_dependencies):
         # 1.3 Verify behavior when sqllab_enabled = False
         model.sqllab_enabled = False
         vars_no_sqllab = await svc.template_vars(model)
-        assert "sql_lab" not in vars_no_sqllab["auth_role_mapping"]["user@mindweaver.io"]
+        assert "sql_lab" not in vars_no_sqllab["auth_role_mapping"]["user@citadel.io"]
         manifest_no_sqllab = await svc.render_manifests(model)
         docs_no_sqllab = [d for d in yaml.safe_load_all(manifest_no_sqllab) if d is not None]
         app_doc_no_sqllab = next(d for d in docs_no_sqllab if d["kind"] == "Application")
@@ -329,7 +329,7 @@ async def test_superset_template_rendering(mock_service_dependencies):
         assert "extra" in trino_ds
         extra_data = yaml.safe_load(trino_ds["extra"])
         assert extra_data["engine_params"]["connect_args"]["http_scheme"] == "https"
-        assert extra_data["engine_params"]["connect_args"]["verify"] == "/etc/ssl/certs/mindweaver-ca.crt"
+        assert extra_data["engine_params"]["connect_args"]["verify"] == "/etc/ssl/certs/citadel-ca.crt"
         assert extra_data.get("allow_multi_catalog") is True
         
         assert "encrypted_extra" in trino_ds
@@ -343,10 +343,10 @@ async def test_superset_template_rendering(mock_service_dependencies):
     mock_state = MagicMock(spec=SupersetPlatformState)
     mock_state.active = True
     
-    with patch("mindweaver.platform_service.superset.service.PgSqlPlatformService"), \
-         patch("mindweaver.platform_service.superset.service.LdapConfigService"), \
-         patch("mindweaver.platform_service.superset.service.DatabaseSourceService"), \
-         patch("mindweaver.platform_service.superset.service.TrinoPlatformService"), \
+    with patch("citadel.platform_service.superset.service.PgSqlPlatformService"), \
+         patch("citadel.platform_service.superset.service.LdapConfigService"), \
+         patch("citadel.platform_service.superset.service.DatabaseSourceService"), \
+         patch("citadel.platform_service.superset.service.TrinoPlatformService"), \
          patch.object(svc, "platform_state", AsyncMock(return_value=mock_state)), \
          patch.object(svc, "kubeconfig", AsyncMock(return_value="mock-kubeconfig")), \
          patch.object(svc, "_resolve_namespace", AsyncMock(return_value="superset-ns")):
@@ -361,8 +361,8 @@ async def test_superset_template_rendering(mock_service_dependencies):
         async def mock_poll(*args):
             return "online", "Healthy", {}, node_ports, cluster_nodes_dual
             
-        with patch("mindweaver.platform_service.superset.poller.asyncio.to_thread", side_effect=mock_poll), \
-             patch("mindweaver.platform_service.superset.poller.decrypt_password", side_effect=lambda x: x):
+        with patch("citadel.platform_service.superset.poller.asyncio.to_thread", side_effect=mock_poll), \
+             patch("citadel.platform_service.superset.poller.decrypt_password", side_effect=lambda x: x):
             # Test without ingress_domain
             mock_project_no_ingress = MagicMock()
             mock_project_no_ingress.ingress_domain = None
@@ -431,7 +431,7 @@ async def test_superset_state_view(mock_service_dependencies):
     )
     
     # Mock the state in DB
-    from mindweaver.platform_service.superset.model import SupersetPlatformState
+    from citadel.platform_service.superset.model import SupersetPlatformState
     mock_state_db = SupersetPlatformState(
         platform_id=1,
         status="online",
@@ -444,7 +444,7 @@ async def test_superset_state_view(mock_service_dependencies):
     
     # Test the handler initialization (mimicking register_views logic)
     # We need to ensure the correct class is used.
-    from mindweaver.platform_service.superset import SupersetState
+    from citadel.platform_service.superset import SupersetState
     
     state_instance = SupersetState(model, svc)
     state = await state_instance.get()
@@ -461,8 +461,8 @@ def test_superset_no_oidc_fields():
 @pytest.mark.asyncio
 async def test_superset_load_examples(mock_service_dependencies):
     """Test that load_examples field is rendered correctly in Superset templates"""
-    from mindweaver.platform_service.superset.model import SupersetPlatform
-    from mindweaver.platform_service.superset.service import SupersetPlatformService
+    from citadel.platform_service.superset.model import SupersetPlatform
+    from citadel.platform_service.superset.service import SupersetPlatformService
     import yaml
 
     request, session = mock_service_dependencies
@@ -493,8 +493,8 @@ async def test_superset_load_examples(mock_service_dependencies):
     mock_pgsql_state.extra_data = {"pgbouncer_host": "my-db"}
     mock_pgsql_svc.platform_state.return_value = mock_pgsql_state
     
-    with patch("mindweaver.platform_service.superset.service.PgSqlPlatformService") as mock_pg_class, \
-         patch("mindweaver.platform_service.superset.service.decrypt_password", side_effect=lambda x: x):
+    with patch("citadel.platform_service.superset.service.PgSqlPlatformService") as mock_pg_class, \
+         patch("citadel.platform_service.superset.service.decrypt_password", side_effect=lambda x: x):
         
         mock_pg_class.get_service = AsyncMock(return_value=mock_pgsql_svc)
         
@@ -524,8 +524,8 @@ async def test_superset_load_examples(mock_service_dependencies):
         platform_pgsql_id=1,
         load_examples=False,
     )
-    with patch("mindweaver.platform_service.superset.service.PgSqlPlatformService") as mock_pg_class, \
-         patch("mindweaver.platform_service.superset.service.decrypt_password", side_effect=lambda x: x):
+    with patch("citadel.platform_service.superset.service.PgSqlPlatformService") as mock_pg_class, \
+         patch("citadel.platform_service.superset.service.decrypt_password", side_effect=lambda x: x):
         
         mock_pg_class.get_service = AsyncMock(return_value=mock_pgsql_svc)
         
@@ -603,9 +603,9 @@ async def test_superset_datasource_trino_and_optional_fields(mock_service_depend
 
     mock_ds_svc.get = AsyncMock(side_effect=get_ds)
 
-    with patch("mindweaver.platform_service.superset.service.PgSqlPlatformService") as mock_pg_class, \
-         patch("mindweaver.platform_service.superset.service.DatabaseSourceService") as mock_ds_class, \
-         patch("mindweaver.platform_service.superset.service.decrypt_password", side_effect=lambda x: x):
+    with patch("citadel.platform_service.superset.service.PgSqlPlatformService") as mock_pg_class, \
+         patch("citadel.platform_service.superset.service.DatabaseSourceService") as mock_ds_class, \
+         patch("citadel.platform_service.superset.service.decrypt_password", side_effect=lambda x: x):
 
         mock_pg_class.get_service = AsyncMock(return_value=mock_pgsql_svc)
         mock_ds_class.get_service = AsyncMock(return_value=mock_ds_svc)
@@ -687,9 +687,9 @@ async def test_superset_doris_datasource_handling(mock_service_dependencies):
     mock_doris_svc.platform_state = AsyncMock(side_effect=get_doris_state)
     mock_doris_svc._resolve_namespace = AsyncMock(return_value="doris-ns")
 
-    with patch("mindweaver.platform_service.superset.service.PgSqlPlatformService") as mock_pg_class, \
-         patch("mindweaver.platform_service.superset.service.DorisPlatformService") as mock_doris_class, \
-         patch("mindweaver.platform_service.superset.service.decrypt_password", side_effect=lambda x: x):
+    with patch("citadel.platform_service.superset.service.PgSqlPlatformService") as mock_pg_class, \
+         patch("citadel.platform_service.superset.service.DorisPlatformService") as mock_doris_class, \
+         patch("citadel.platform_service.superset.service.decrypt_password", side_effect=lambda x: x):
 
         mock_pg_class.get_service = AsyncMock(return_value=mock_pgsql_svc)
         mock_doris_class.get_service = AsyncMock(return_value=mock_doris_svc)
@@ -828,9 +828,9 @@ async def test_superset_datasource_engine_driver_mapping(mock_service_dependenci
     mock_ds_svc = MagicMock()
     mock_ds_svc.get = AsyncMock(side_effect=lambda ds_id: mock_sources[ds_id])
 
-    with patch("mindweaver.platform_service.superset.service.PgSqlPlatformService") as mock_pg_class, \
-         patch("mindweaver.platform_service.superset.service.DatabaseSourceService") as mock_ds_class, \
-         patch("mindweaver.platform_service.superset.service.decrypt_password", side_effect=lambda x: x):
+    with patch("citadel.platform_service.superset.service.PgSqlPlatformService") as mock_pg_class, \
+         patch("citadel.platform_service.superset.service.DatabaseSourceService") as mock_ds_class, \
+         patch("citadel.platform_service.superset.service.decrypt_password", side_effect=lambda x: x):
 
         mock_pg_class.get_service = AsyncMock(return_value=mock_pgsql_svc)
         mock_ds_class.get_service = AsyncMock(return_value=mock_ds_svc)
@@ -877,8 +877,8 @@ async def test_superset_redis_image_version_locked(test_stack_session):
     mock_pgsql_svc.platform_state = AsyncMock(return_value=mock_pgsql_state)
     mock_pgsql_svc._resolve_namespace = AsyncMock(return_value="ns")
 
-    with patch("mindweaver.platform_service.superset.service.PgSqlPlatformService") as mock_pg_class, \
-         patch("mindweaver.platform_service.superset.service.decrypt_password", side_effect=lambda x: x):
+    with patch("citadel.platform_service.superset.service.PgSqlPlatformService") as mock_pg_class, \
+         patch("citadel.platform_service.superset.service.decrypt_password", side_effect=lambda x: x):
         mock_pg_class.get_service = AsyncMock(return_value=mock_pgsql_svc)
 
         mock_project = MagicMock()
@@ -890,7 +890,7 @@ async def test_superset_redis_image_version_locked(test_stack_session):
 
         manifest = await svc.render_manifests(model)
 
-    assert 'repository: "test.registry/mindweaver/superset"' in manifest
+    assert 'repository: "test.registry/citadel/superset"' in manifest
     assert 'tag: "6.99.0"' in manifest
     assert "repository: test.registry/bitnamilegacy/redis" in manifest
     assert 'tag: "7.99.0"' in manifest

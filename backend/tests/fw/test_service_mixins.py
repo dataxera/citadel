@@ -5,11 +5,11 @@ import pytest
 from sqlmodel import Field, SQLModel, create_engine
 from sqlalchemy.ext.asyncio import create_async_engine
 from sqlmodel.ext.asyncio.session import AsyncSession
-from mindweaver.fw.service import Service
-from mindweaver.fw.model import NamedBase
-from mindweaver.crypto import decrypt_password
-from mindweaver.fw.hash import verify_password
-from mindweaver.config import settings
+from citadel.fw.service import Service
+from citadel.fw.model import NamedBase
+from citadel.crypto import decrypt_password
+from citadel.fw.hash import verify_password
+from citadel.config import settings
 from unittest.mock import MagicMock
 from fastapi import Request
 from pytest_postgresql.executor import PostgreSQLExecutor

@@ -20,7 +20,7 @@ const UserProfilePanel = ({ user, darkMode, isCollapsed }) => {
                 className="w-full"
                 trigger={
                     <div className={cn(
-                        "w-full mw-panel flex items-center gap-3 p-2",
+                        "w-full dxc-panel flex items-center gap-3 p-2",
                         isCollapsed && "justify-center p-0"
                     )}>
                         <div className="w-8 h-8 rounded-full bg-blue-600/20 flex items-center justify-center text-blue-400 text-lg font-bold border border-blue-500/30 shrink-0 relative z-10">

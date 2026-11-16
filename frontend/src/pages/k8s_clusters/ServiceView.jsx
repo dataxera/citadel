@@ -24,13 +24,13 @@ const CORE_INTEGRATIONS_CONFIG = [
 
 const IntegrationStatusBadge = ({ status }) => {
     const styles = {
-        online: 'mw-badge-success',
-        pending: 'mw-badge-warning',
-        offline: 'mw-badge-neutral',
-        error: 'mw-badge-danger',
+        online: 'dxc-badge-success',
+        pending: 'dxc-badge-warning',
+        offline: 'dxc-badge-neutral',
+        error: 'dxc-badge-danger',
     };
     return (
-        <span className={cn(styles[status] || 'mw-badge-neutral')}>
+        <span className={cn(styles[status] || 'dxc-badge-neutral')}>
             {(status || 'unknown').toUpperCase()}
         </span>
     );
@@ -191,9 +191,9 @@ const ServiceView = ({
     if (!clusterState) {
         return (
             <div className="space-y-8 animate-in fade-in duration-500">
-                <div className="mw-page-header">
+                <div className="dxc-page-header">
                     <div className="flex gap-4 items-center">
-                        <div className="mw-icon-box w-16 h-16 text-slate-400">
+                        <div className="dxc-icon-box w-16 h-16 text-slate-400">
                             <Monitor size={32} />
                         </div>
                         <div>
@@ -203,7 +203,7 @@ const ServiceView = ({
                     <div className="flex gap-3">
                         <button
                             onClick={onBack}
-                            className="mw-btn-secondary px-6 py-2.5"
+                            className="dxc-btn-secondary px-6 py-2.5"
                         >
                             BACK TO LIST
                         </button>
@@ -221,9 +221,9 @@ const ServiceView = ({
 
     return (
         <div className="space-y-8 animate-in fade-in duration-500">
-            <div className="mw-page-header">
+            <div className="dxc-page-header">
                 <div className="flex gap-4 items-center">
-                    <div className="mw-icon-box w-16 h-16 text-indigo-400">
+                    <div className="dxc-icon-box w-16 h-16 text-indigo-400">
                         <Monitor size={32} />
                     </div>
                     <div>
@@ -241,7 +241,7 @@ const ServiceView = ({
                     <button
                         onClick={handleRefresh}
                         disabled={isRefreshing}
-                        className="mw-btn-secondary px-6 py-2.5 flex items-center gap-2"
+                        className="dxc-btn-secondary px-6 py-2.5 flex items-center gap-2"
                     >
                         <RefreshCw size={16} className={isRefreshing ? "animate-spin" : ""} />
                         {isRefreshing ? 'REFRESHING...' : 'REFRESH'}
@@ -250,24 +250,24 @@ const ServiceView = ({
                         id="sync-core-integrations-btn"
                         onClick={() => handleInstallAction('sync_core_integrations')}
                         disabled={isSyncInProgress}
-                        className="mw-btn-secondary px-6 py-2.5 flex items-center gap-2 disabled:opacity-60"
+                        className="dxc-btn-secondary px-6 py-2.5 flex items-center gap-2 disabled:opacity-60"
                     >
                         <RefreshCw size={16} className={isSyncInProgress ? "animate-spin" : ""} />
                         {isSyncInProgress ? 'SYNCING...' : 'SYNC INTEGRATIONS'}
                     </button>
                     <button
                         onClick={onBack}
-                        className="mw-btn-secondary px-6 py-2.5"
+                        className="dxc-btn-secondary px-6 py-2.5"
                     >
                         BACK TO LIST
                     </button>
                 </div>
             </div>
 
-            <div className="mw-card p-8 space-y-8 animate-in slide-in-from-bottom duration-700">
+            <div className="dxc-card p-8 space-y-8 animate-in slide-in-from-bottom duration-700">
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-4">
-                        <div className="mw-icon-box text-blue-500">
+                        <div className="dxc-icon-box text-blue-500">
                             <Activity size={24} />
                         </div>
                         <div>
@@ -378,7 +378,7 @@ const ServiceView = ({
                                         id="configure-topology-presets-btn"
                                         type="button"
                                         onClick={handleOpenTopologyPresets}
-                                        className="mw-btn-secondary px-3 py-1.5 text-xs flex items-center gap-1.5"
+                                        className="dxc-btn-secondary px-3 py-1.5 text-xs flex items-center gap-1.5"
                                     >
                                         <Layers size={14} />
                                         TOPOLOGY PRESETS
@@ -387,7 +387,7 @@ const ServiceView = ({
                                         id="configure-rack-topology-btn"
                                         type="button"
                                         onClick={handleOpenRackTopology}
-                                        className="mw-btn-secondary px-3 py-1.5 text-xs flex items-center gap-1.5"
+                                        className="dxc-btn-secondary px-3 py-1.5 text-xs flex items-center gap-1.5"
                                     >
                                         <Network size={14} />
                                         RACK TOPOLOGY
@@ -583,7 +583,7 @@ const ServiceView = ({
                                         id="widget-sync-core-integrations-btn"
                                         onClick={() => handleInstallAction('sync_core_integrations')}
                                         disabled={isSyncInProgress}
-                                        className="mw-btn-primary py-2 px-4 text-xs flex items-center gap-2 disabled:opacity-60"
+                                        className="dxc-btn-primary py-2 px-4 text-xs flex items-center gap-2 disabled:opacity-60"
                                     >
                                         <RefreshCw size={14} className={isSyncInProgress ? "animate-spin" : ""} />
                                         {isSyncInProgress ? 'SYNCING...' : 'SYNC INTEGRATIONS'}
@@ -626,7 +626,7 @@ const ServiceView = ({
                                                     onClick={() => handleInstallAction('resume_sync_core_integrations')}
                                                     disabled={Boolean(installingActions['resume_sync_core_integrations'])}
                                                     title="Resume any interrupted sync tasks"
-                                                    className="mw-btn-secondary py-1 px-2.5 text-[11px] flex items-center gap-1 disabled:opacity-60"
+                                                    className="dxc-btn-secondary py-1 px-2.5 text-[11px] flex items-center gap-1 disabled:opacity-60"
                                                 >
                                                     <RefreshCw size={12} className={installingActions['resume_sync_core_integrations'] ? "animate-spin" : ""} />
                                                     {installingActions['resume_sync_core_integrations'] ? 'RESUMING...' : 'RESUME'}
@@ -770,7 +770,7 @@ const ServiceView = ({
                                         setCopiedLogs(true);
                                         setTimeout(() => setCopiedLogs(false), 2000);
                                     }}
-                                    className="mw-btn-secondary px-3 py-1.5 text-xs flex items-center gap-1.5"
+                                    className="dxc-btn-secondary px-3 py-1.5 text-xs flex items-center gap-1.5"
                                 >
                                     {copiedLogs ? <Check size={14} className="text-green-500" /> : <Copy size={14} />}
                                     {copiedLogs ? 'COPIED' : 'COPY LOGS'}

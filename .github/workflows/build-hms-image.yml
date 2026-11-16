@@ -55,9 +55,9 @@ jobs:
           file: images/hive-metastore/Dockerfile
           push: ${{ github.event_name == 'workflow_dispatch' && inputs.push-image == true }}
           tags: |
-            ghcr.io/${{ github.repository_owner }}/mindweaver/hive-metastore:edge
-            ghcr.io/${{ github.repository_owner }}/mindweaver/hive-metastore:${{ github.sha }}
-            ghcr.io/${{ github.repository_owner }}/mindweaver/hive-metastore:${{ env.VERSION }}-alpha.${{ env.TIMESTAMP }}
+            ghcr.io/${{ github.repository_owner }}/citadel/hive-metastore:edge
+            ghcr.io/${{ github.repository_owner }}/citadel/hive-metastore:${{ github.sha }}
+            ghcr.io/${{ github.repository_owner }}/citadel/hive-metastore:${{ env.VERSION }}-alpha.${{ env.TIMESTAMP }}
 
           cache-from: type=gha
           cache-to: type=gha,mode=max

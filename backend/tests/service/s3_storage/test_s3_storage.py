@@ -466,7 +466,7 @@ def test_s3_storage_update_with_redacted_secret(client: TestClient, test_project
     assert update_resp.status_code == 200
 
     # Verify secret is still valid using the verification endpoint
-    # Note: verification endpoint needs MINDWEAVER_ENABLE_TEST_VIEWS=true
+    # Note: verification endpoint needs CITADEL_ENABLE_TEST_VIEWS=true
     verify_resp = client.post(
         f"/api/v1/s3_storages/{storage_id}/_verify-encrypted",
         headers={"X-Project-Id": str(test_project["id"])},

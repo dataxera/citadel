@@ -8,18 +8,18 @@ from fastapi.testclient import TestClient
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from mindweaver.fw.model import get_engine
-from mindweaver.service.dependency_tracker.model import DependencyTracker
+from citadel.fw.model import get_engine
+from citadel.service.dependency_tracker.model import DependencyTracker
 
 
 @pytest.fixture(autouse=True)
 def mock_k8s_cluster_calls():
     """Mock kubernetes client and deployment calls."""
-    with patch("mindweaver.platform_service.base.PlatformService._deploy_to_cluster"), \
-         patch("mindweaver.platform_service.base.PlatformService._decommission_from_cluster"), \
-         patch("mindweaver.platform_service.pgsql.service.PgSqlPlatformService.poll_status"), \
-         patch("mindweaver.platform_service.hive_metastore.service.HiveMetastorePlatformService.poll_status"), \
-         patch("mindweaver.platform_service.trino.service.TrinoPlatformService.poll_status"):
+    with patch("citadel.platform_service.base.PlatformService._deploy_to_cluster"), \
+         patch("citadel.platform_service.base.PlatformService._decommission_from_cluster"), \
+         patch("citadel.platform_service.pgsql.service.PgSqlPlatformService.poll_status"), \
+         patch("citadel.platform_service.hive_metastore.service.HiveMetastorePlatformService.poll_status"), \
+         patch("citadel.platform_service.trino.service.TrinoPlatformService.poll_status"):
         yield
 
 

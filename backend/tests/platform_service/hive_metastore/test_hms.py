@@ -5,8 +5,8 @@ import pytest
 from unittest.mock import MagicMock, AsyncMock, patch
 from fastapi import Request
 from sqlmodel import Session
-from mindweaver.platform_service.hive_metastore import HiveMetastorePlatform, HiveMetastorePlatformService
-from mindweaver.fw.model import AsyncSession
+from citadel.platform_service.hive_metastore import HiveMetastorePlatform, HiveMetastorePlatformService
+from citadel.fw.model import AsyncSession
 from pydantic import ValidationError
 import yaml
 
@@ -129,8 +129,8 @@ async def test_hms_template_rendering(mock_service_dependencies):
     mock_result.first.return_value = mock_s3_model
     session.exec.return_value = mock_result
 
-    with patch("mindweaver.platform_service.hive_metastore.service.PgSqlPlatformService.get_service", AsyncMock(return_value=mock_pgsql_svc)), \
-         patch("mindweaver.platform_service.hive_metastore.service.S3StorageService.get_service", AsyncMock(return_value=mock_s3_svc)):
+    with patch("citadel.platform_service.hive_metastore.service.PgSqlPlatformService.get_service", AsyncMock(return_value=mock_pgsql_svc)), \
+         patch("citadel.platform_service.hive_metastore.service.S3StorageService.get_service", AsyncMock(return_value=mock_s3_svc)):
         # Get template variables
         vars = await svc.template_vars(model)
 
@@ -191,7 +191,7 @@ async def test_hms_manifest_parsing(mock_service_dependencies):
     mock_pgsql_state.db_pass = "secret-token-123"
     mock_pgsql_svc.platform_state.return_value = mock_pgsql_state
 
-    with patch("mindweaver.platform_service.hive_metastore.service.PgSqlPlatformService.get_service", AsyncMock(return_value=mock_pgsql_svc)):
+    with patch("citadel.platform_service.hive_metastore.service.PgSqlPlatformService.get_service", AsyncMock(return_value=mock_pgsql_svc)):
         # Render manifest
         full_manifest = await svc.render_manifests(model)
     
@@ -234,7 +234,7 @@ async def test_hms_fullname_override(mock_service_dependencies):
     mock_pgsql_state.db_pass = "secret"
     mock_pgsql_svc.platform_state.return_value = mock_pgsql_state
 
-    with patch("mindweaver.platform_service.hive_metastore.service.PgSqlPlatformService.get_service", AsyncMock(return_value=mock_pgsql_svc)):
+    with patch("citadel.platform_service.hive_metastore.service.PgSqlPlatformService.get_service", AsyncMock(return_value=mock_pgsql_svc)):
         # Render manifest
         manifest = await svc.render_manifests(model)
 
@@ -256,7 +256,7 @@ async def test_hms_image_tag_preserved(mock_service_dependencies):
 
     svc._resolve_namespace = AsyncMock(return_value="hms-ns")
     svc.resolve_image = AsyncMock(
-        return_value=("ghcr.io/kagesenshi/mindweaver/hive-metastore", "4.2.0-rev.6")
+        return_value=("ghcr.io/kagesenshi/citadel/hive-metastore", "4.2.0-rev.6")
     )
 
     mock_pgsql_svc = AsyncMock()
@@ -271,11 +271,11 @@ async def test_hms_image_tag_preserved(mock_service_dependencies):
     mock_pgsql_state.db_pass = "secret"
     mock_pgsql_svc.platform_state.return_value = mock_pgsql_state
 
-    with patch("mindweaver.platform_service.hive_metastore.service.PgSqlPlatformService.get_service", AsyncMock(return_value=mock_pgsql_svc)):
+    with patch("citadel.platform_service.hive_metastore.service.PgSqlPlatformService.get_service", AsyncMock(return_value=mock_pgsql_svc)):
         manifest = await svc.render_manifests(model)
 
     assert 'tag: "4.2.0-rev.6"' in manifest
-    assert 'repository: "ghcr.io/kagesenshi/mindweaver/hive-metastore"' in manifest
+    assert 'repository: "ghcr.io/kagesenshi/citadel/hive-metastore"' in manifest
     assert 'tag: "latest"' not in manifest
 
 

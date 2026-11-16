@@ -26,7 +26,7 @@ const Modal = ({ isOpen, onClose, title, children, maxWidth = "max-w-4xl" }) => 
 
             {/* Content */}
             <div
-                className={cn("mw-modal w-full", maxWidth)}
+                className={cn("dxc-modal w-full", maxWidth)}
                 onClick={(e) => e.stopPropagation()}
             >
                 <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-800">

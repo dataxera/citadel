@@ -8,11 +8,11 @@ import { NotificationProvider } from '../providers/NotificationProvider';
 
 const MainLayout = () => {
     const [darkMode, setDarkMode] = useState(() => {
-        const saved = localStorage.getItem('mindweaver-dark-mode');
+        const saved = localStorage.getItem('citadel-dark-mode');
         return saved !== null ? JSON.parse(saved) : true;
     });
     const [selectedProject, setSelectedProject] = useState(() => {
-        const saved = localStorage.getItem('mindweaver-project');
+        const saved = localStorage.getItem('citadel-project');
         try {
             return saved ? JSON.parse(saved) : null;
         } catch (e) {
@@ -23,14 +23,14 @@ const MainLayout = () => {
 
     // Add sidebar collapse state
     const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
-        const saved = localStorage.getItem('mindweaver-sidebar-collapsed');
+        const saved = localStorage.getItem('citadel-sidebar-collapsed');
         return saved !== null ? JSON.parse(saved) : false;
     });
 
     const [refreshKey, setRefreshKey] = useState(0);
 
     useEffect(() => {
-        localStorage.setItem('mindweaver-dark-mode', JSON.stringify(darkMode));
+        localStorage.setItem('citadel-dark-mode', JSON.stringify(darkMode));
         if (darkMode) {
             document.documentElement.classList.add('dark');
         } else {
@@ -39,7 +39,7 @@ const MainLayout = () => {
     }, [darkMode]);
 
     useEffect(() => {
-        localStorage.setItem('mindweaver-sidebar-collapsed', JSON.stringify(isSidebarCollapsed));
+        localStorage.setItem('citadel-sidebar-collapsed', JSON.stringify(isSidebarCollapsed));
     }, [isSidebarCollapsed]);
 
     const { projects, fetchProjects } = useProjects();
@@ -47,9 +47,9 @@ const MainLayout = () => {
     const handleProjectChange = (project) => {
         setSelectedProject(project);
         if (project) {
-            localStorage.setItem('mindweaver-project', JSON.stringify(project));
+            localStorage.setItem('citadel-project', JSON.stringify(project));
         } else {
-            localStorage.removeItem('mindweaver-project');
+            localStorage.removeItem('citadel-project');
         }
     };
 
@@ -62,7 +62,7 @@ const MainLayout = () => {
 
     return (
         <NotificationProvider>
-            <div className="mw-layout-root">
+            <div className="dxc-layout-root">
                 <Sidebar
                     darkMode={darkMode}
                     isCollapsed={isSidebarCollapsed}

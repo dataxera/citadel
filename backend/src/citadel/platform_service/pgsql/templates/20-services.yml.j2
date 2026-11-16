@@ -1,0 +1,27 @@
+# SPDX-FileCopyrightText: Copyright © 2026 Mohd Izhar Firdaus Bin Ismail
+# SPDX-License-Identifier: AGPLv3+
+
+{% if enable_loadbalancer %}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ name }}-pgbouncer-lb
+  namespace: {{ namespace }}
+  labels:
+    {% if project_title %}
+    project: "{{ project_title }}"
+    {% endif %}
+    {% if service_title %}
+    service: "{{ service_title }}"
+    {% endif %}
+    manager: citadel
+spec:
+  type: LoadBalancer
+  ports:
+  - port: 5432
+    targetPort: 5432
+    protocol: TCP
+    name: pgbouncer
+  selector:
+    cnpg.io/poolerName: {{ name }}-pooler-rw
+{% endif %}

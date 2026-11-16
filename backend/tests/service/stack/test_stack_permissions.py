@@ -4,8 +4,8 @@
 import pytest
 from unittest.mock import patch
 from fastapi.testclient import TestClient
-from mindweaver.config import settings
-from mindweaver.fw.permission import (
+from citadel.config import settings
+from citadel.fw.permission import (
     All,
     Permission,
     Read as FwRead,
@@ -19,7 +19,7 @@ from mindweaver.fw.permission import (
     check_user_permission,
     _NAME_TO_PERMISSION,
 )
-from mindweaver.service.stack.permission import (
+from citadel.service.stack.permission import (
     Manage,
     Read,
     List,
@@ -333,7 +333,7 @@ def test_stack_endpoints_with_granted_permissions(client: TestClient):
             return _get
 
         # 1. User with Manage permission (full control)
-        with patch("mindweaver.fw.permission.get_user_permissions", side_effect=_mock_perms([Manage])):
+        with patch("citadel.fw.permission.get_user_permissions", side_effect=_mock_perms([Manage])):
             # Can create
             resp = c.post(
                 "/api/v1/stacks",
@@ -380,7 +380,7 @@ def test_stack_endpoints_with_granted_permissions(client: TestClient):
         assert r_resp.status_code == 200
         target_stack_id = r_resp.json()["data"]["id"]
 
-        with patch("mindweaver.fw.permission.get_user_permissions", side_effect=_mock_perms([Read])):
+        with patch("citadel.fw.permission.get_user_permissions", side_effect=_mock_perms([Read])):
             # Can list
             resp = c.get(
                 "/api/v1/stacks",
@@ -427,7 +427,7 @@ def test_stack_endpoints_with_granted_permissions(client: TestClient):
             assert resp.status_code == 403
 
         # 3. User with only Create permission
-        with patch("mindweaver.fw.permission.get_user_permissions", side_effect=_mock_perms([Create])):
+        with patch("citadel.fw.permission.get_user_permissions", side_effect=_mock_perms([Create])):
             # Creator can create
             resp = c.post(
                 "/api/v1/stacks",

@@ -6,7 +6,7 @@
 
 ## Context
 
-Mindweaver components are distributed as container images and Helm charts. Consistent packaging and registry interaction are vital for predictable deployments.
+Citadel components are distributed as container images and Helm charts. Consistent packaging and registry interaction are vital for predictable deployments.
 
 ## Decision
 
@@ -25,7 +25,7 @@ We have established standards for building and pushing artifacts:
 
 ## References
 
-- [Mindweaver Packaging Skill](file:///home/izhar/Projects/mindweaver/.agents/skills/mindweaver-packaging/SKILL.md)
+- [Citadel Packaging Skill](file:///home/izhar/Projects/citadel/.agents/skills/citadel-packaging/SKILL.md)
 
 ---
 SPDX-FileCopyrightText: Copyright © 2026 Mohd Izhar Firdaus Bin Ismail

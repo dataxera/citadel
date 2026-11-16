@@ -1,0 +1,11 @@
+apiVersion: v2
+name: citadel
+description: A Helm chart for Citadel - Management tool for deploying data platform components on Kubernetes.
+type: application
+version: 0.1.2
+appVersion: "0.1.3"
+dependencies:
+  - name: valkey
+    version: 0.9.3
+    repository: https://valkey.io/valkey-helm/
+    condition: valkey.enabled

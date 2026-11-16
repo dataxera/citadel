@@ -8,14 +8,14 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from fastapi.testclient import TestClient
 
-from mindweaver.config import settings
-from mindweaver.service.k8s_cluster.model import DEFAULT_TOPOLOGY_LEVELS
-from mindweaver.service.k8s_cluster.permission import (
+from citadel.config import settings
+from citadel.service.k8s_cluster.model import DEFAULT_TOPOLOGY_LEVELS
+from citadel.service.k8s_cluster.permission import (
     ConfigureNodes,
     K8sClusterConfigureNodes,
     Write,
 )
-from mindweaver.service.k8s_cluster.service import (
+from citadel.service.k8s_cluster.service import (
     build_nodes_details,
     sanitize_topology_label_value,
     validate_k8s_label_key,
@@ -217,11 +217,11 @@ def test_node_labels_and_gpu_and_roles_endpoint(client: TestClient, auth_headers
 
     with (
         patch(
-            "mindweaver.service.k8s_cluster.service.K8sClusterService._get_core_v1_client",
+            "citadel.service.k8s_cluster.service.K8sClusterService._get_core_v1_client",
             return_value=mock_core,
         ),
         patch(
-            "mindweaver.service.k8s_cluster.service.K8sClusterService.poll_status",
+            "citadel.service.k8s_cluster.service.K8sClusterService.poll_status",
             new_callable=AsyncMock,
         ) as mock_poll,
     ):
@@ -266,11 +266,11 @@ def test_node_labels_amd_gpu_and_clear(client: TestClient, auth_headers: dict):
 
     with (
         patch(
-            "mindweaver.service.k8s_cluster.service.K8sClusterService._get_core_v1_client",
+            "citadel.service.k8s_cluster.service.K8sClusterService._get_core_v1_client",
             return_value=mock_core,
         ),
         patch(
-            "mindweaver.service.k8s_cluster.service.K8sClusterService.poll_status",
+            "citadel.service.k8s_cluster.service.K8sClusterService.poll_status",
             new_callable=AsyncMock,
         ),
     ):
@@ -375,11 +375,11 @@ def test_topology_get_and_update(client: TestClient, auth_headers: dict):
 
     with (
         patch(
-            "mindweaver.service.k8s_cluster.service.K8sClusterService._get_core_v1_client",
+            "citadel.service.k8s_cluster.service.K8sClusterService._get_core_v1_client",
             return_value=mock_core,
         ),
         patch(
-            "mindweaver.service.k8s_cluster.service.K8sClusterService.poll_status",
+            "citadel.service.k8s_cluster.service.K8sClusterService.poll_status",
             new_callable=AsyncMock,
         ),
     ):

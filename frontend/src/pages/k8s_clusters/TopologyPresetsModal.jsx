@@ -151,7 +151,7 @@ const TopologyPresetsModal = ({
                             value={regionInput}
                             onChange={(e) => setRegionInput(e.target.value)}
                             placeholder="Region (e.g. regionA)"
-                            className="mw-input text-xs font-mono"
+                            className="dxc-input text-xs font-mono"
                         />
                         <input
                             id="preset-zone-input"
@@ -159,7 +159,7 @@ const TopologyPresetsModal = ({
                             value={zoneInput}
                             onChange={(e) => setZoneInput(e.target.value)}
                             placeholder="Zone (e.g. zoneA)"
-                            className="mw-input text-xs font-mono"
+                            className="dxc-input text-xs font-mono"
                         />
                         <input
                             id="preset-rack-input"
@@ -167,13 +167,13 @@ const TopologyPresetsModal = ({
                             value={rackInput}
                             onChange={(e) => setRackInput(e.target.value)}
                             placeholder="Rack (e.g. dc1/row-a/rack1)"
-                            className="mw-input text-xs font-mono"
+                            className="dxc-input text-xs font-mono"
                         />
                         <button
                             id="add-topology-preset-btn"
                             type="button"
                             onClick={handleAddPreset}
-                            className="mw-btn-secondary px-3 py-2 text-xs flex items-center justify-center gap-1"
+                            className="dxc-btn-secondary px-3 py-2 text-xs flex items-center justify-center gap-1"
                         >
                             <Plus size={14} /> ADD
                         </button>
@@ -215,12 +215,12 @@ const TopologyPresetsModal = ({
                                 }
                             }}
                             placeholder="Add role preset (e.g. storage, ai-worker)"
-                            className="mw-input flex-1 text-xs"
+                            className="dxc-input flex-1 text-xs"
                         />
                         <button
                             type="button"
                             onClick={handleAddRolePreset}
-                            className="mw-btn-secondary px-3 py-2 text-xs flex items-center gap-1"
+                            className="dxc-btn-secondary px-3 py-2 text-xs flex items-center gap-1"
                         >
                             <Plus size={14} /> ADD PRESET
                         </button>
@@ -231,7 +231,7 @@ const TopologyPresetsModal = ({
                     <button
                         type="button"
                         onClick={onClose}
-                        className="mw-btn-secondary px-5 py-2 text-xs"
+                        className="dxc-btn-secondary px-5 py-2 text-xs"
                     >
                         CANCEL
                     </button>
@@ -239,7 +239,7 @@ const TopologyPresetsModal = ({
                         id="save-topology-presets-btn"
                         type="submit"
                         disabled={saving}
-                        className="mw-btn-primary px-5 py-2 text-xs disabled:opacity-60"
+                        className="dxc-btn-primary px-5 py-2 text-xs disabled:opacity-60"
                     >
                         {saving ? 'SAVING...' : 'SAVE PRESETS'}
                     </button>

@@ -14,18 +14,18 @@ import {
 
 const StatusBadge = ({ status }) => {
     const styles = {
-        running: 'mw-badge-success',
-        online: 'mw-badge-success',
-        connected: 'mw-badge-success',
-        warning: 'mw-badge-warning',
-        pending: 'mw-badge-warning',
-        stopped: 'mw-badge-neutral',
-        offline: 'mw-badge-neutral',
-        error: 'mw-badge-danger',
-        active: 'mw-badge-info',
+        running: 'dxc-badge-success',
+        online: 'dxc-badge-success',
+        connected: 'dxc-badge-success',
+        warning: 'dxc-badge-warning',
+        pending: 'dxc-badge-warning',
+        stopped: 'dxc-badge-neutral',
+        offline: 'dxc-badge-neutral',
+        error: 'dxc-badge-danger',
+        active: 'dxc-badge-info',
     };
     return (
-        <span className={cn(styles[status] || 'mw-badge-neutral')}>
+        <span className={cn(styles[status] || 'dxc-badge-neutral')}>
             {(status || 'unknown').toUpperCase()}
         </span>
     );
@@ -131,9 +131,9 @@ const PlatformServiceView = ({
 
     return (
         <div className="space-y-8 animate-in fade-in duration-500">
-            <div className="mw-page-header">
+            <div className="dxc-page-header">
                 <div className="flex gap-4 items-center min-w-0">
-                    <div className={cn("mw-icon-box w-16 h-16 shrink-0", iconClassName)}>
+                    <div className={cn("dxc-icon-box w-16 h-16 shrink-0", iconClassName)}>
                         {Icon && <Icon size={32} />}
                     </div>
                     <div className="min-w-0">
@@ -143,7 +143,7 @@ const PlatformServiceView = ({
                         </div>
                         <div className="flex flex-wrap items-center gap-3 mt-2">
                             <span
-                                className="mw-instance-pill inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold font-mono bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20 shrink-0"
+                                className="dxc-instance-pill inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold font-mono bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20 shrink-0"
                                 title={`Instance: ${instanceName}`}
                             >
                                 <Server size={12} />
@@ -151,7 +151,7 @@ const PlatformServiceView = ({
                             </span>
                             {projectLabel && (
                                 <span
-                                    className="mw-project-pill inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-500/10 text-slate-600 dark:text-slate-300 border border-slate-500/20 shrink-0"
+                                    className="dxc-project-pill inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-500/10 text-slate-600 dark:text-slate-300 border border-slate-500/20 shrink-0"
                                     title={`Project: ${projectLabel}`}
                                 >
                                     <Briefcase size={12} />
@@ -185,7 +185,7 @@ const PlatformServiceView = ({
                             darkMode={darkMode}
                             trigger={({ isOpen }) => (
                                 <button className={cn(
-                                    "mw-btn-secondary px-6 py-2.5 flex items-center gap-2 min-w-[140px]",
+                                    "dxc-btn-secondary px-6 py-2.5 flex items-center gap-2 min-w-[140px]",
                                     isOpen && "bg-slate-100 dark:bg-slate-800"
                                 )}>
                                     <Zap size={16} className="text-blue-500" />
@@ -215,14 +215,14 @@ const PlatformServiceView = ({
                     <button
                         onClick={onRefresh}
                         disabled={isRefreshing}
-                        className="mw-btn-secondary px-6 py-2.5 flex items-center gap-2"
+                        className="dxc-btn-secondary px-6 py-2.5 flex items-center gap-2"
                     >
                         <RefreshCcw size={16} className={isRefreshing ? 'animate-spin' : ''} />
                         {isRefreshing ? 'REFRESHING...' : 'REFRESH'}
                     </button>
                     <button
                         onClick={onBack}
-                        className="mw-btn-secondary px-6 py-2.5"
+                        className="dxc-btn-secondary px-6 py-2.5"
                     >
                         BACK TO LIST
                     </button>
@@ -340,7 +340,7 @@ const PlatformServiceView = ({
                             <button
                                 type="button"
                                 onClick={() => setIsStatusModalOpen(false)}
-                                className="mw-btn-secondary px-5 py-2 text-sm"
+                                className="dxc-btn-secondary px-5 py-2 text-sm"
                             >
                                 CLOSE
                             </button>

@@ -3,15 +3,15 @@ trigger: always_on
 description: Constitution for this project
 ---
 
-# Mindweaver Project Constitution
+# Citadel Project Constitution
 
-This document serves as the "constitution" for the Mindweaver project. It defines the core principles, technical standards, and development workflows that all developers and AI agents must follow to maintain consistency, security, and quality across the codebase.
+This document serves as the "constitution" for the Citadel project. It defines the core principles, technical standards, and development workflows that all developers and AI agents must follow to maintain consistency, security, and quality across the codebase.
 
 ---
 
 ## 1. Vision & Objectives
 
-Mindweaver is a management tool for deploying data platform components on Kubernetes. It provides a metadata layer to manage core data warehousing, data lake, and AI platform components.
+Citadel is a management tool for deploying data platform components on Kubernetes. It provides a metadata layer to manage core data warehousing, data lake, and AI platform components.
 
 ### Core Objectives:
 - **Component Deployment**: Automate the deployment of data platform components (PostgreSQL, Kafka, Trino, Airflow, etc.) on Kubernetes using ArgoCD.
@@ -92,7 +92,7 @@ the tests first before implementing the fixes.
 - **Deployment Status**: Platform components should use a state table inheriting from `PlatformStateBase` with `status` (bool) and `active` (bool) columns.
 - **Templates**: Kubernetes manifests should use the `.yml.j2` extension (Jinja2).
 - **Timezones**: Always use timezone-aware columns in database models.
-- **Service**: Always refer to backend/src/mindweaver/fw/service.py to know how to handle services
+- **Service**: Always refer to backend/src/citadel/fw/service.py to know how to handle services
 - **Widget Label**: In backend model widget provider, for relationship fields that name ends with "ID", use a label that does not include the "ID" text . Eg: "Project ID" should be shown as "Project", "K8S Cluster ID" should be shown as "K8S Cluster" and so on
 
 ### Code Quality & Deprecations
@@ -150,14 +150,14 @@ the tests first before implementing the fixes.
 2. **Backend implementation**:
    - Write `pytest` unit tests in `backend/tests`. Remember to create negative tests alongside normal tests.
    - Implement models and service logic.
-   - Run `uv run --package mindweaver pytest tests` to verify.
+   - Run `uv run --package citadel pytest tests` to verify.
 3. **Frontend Implementation**:
    - Create models and providers.
    - Implement pages/components.
    - Perform manual verification.
 4. **Verification**:
    - Run the full unit tests:
-     - Backend: `uv run --package mindweaver pytest`
+     - Backend: `uv run --package citadel pytest`
 
 ---
 

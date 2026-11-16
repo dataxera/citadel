@@ -4,8 +4,8 @@
 import pytest
 from unittest.mock import AsyncMock, patch
 from fastapi.testclient import TestClient
-from mindweaver.config import settings
-from mindweaver.fw.permission import (
+from citadel.config import settings
+from citadel.fw.permission import (
     All,
     Permission,
     Read as FwRead,
@@ -19,7 +19,7 @@ from mindweaver.fw.permission import (
     check_user_permission,
     _NAME_TO_PERMISSION,
 )
-from mindweaver.service.ldap_config.permission import (
+from citadel.service.ldap_config.permission import (
     Manage,
     ManageLdapConfig,
     LdapConfig,
@@ -326,7 +326,7 @@ def test_ldap_config_endpoints_with_granted_permissions(client: TestClient, test
             return _get
 
         # 1. User with Manage permission (full control)
-        with patch("mindweaver.fw.permission.get_user_permissions", side_effect=_mock_perms([Manage])):
+        with patch("citadel.fw.permission.get_user_permissions", side_effect=_mock_perms([Manage])):
             # Can create
             resp = c.post(
                 "/api/v1/ldap_configs",
@@ -392,7 +392,7 @@ def test_ldap_config_endpoints_with_granted_permissions(client: TestClient, test
         assert r_resp.status_code == 200
         target_id = r_resp.json()["data"]["id"]
 
-        with patch("mindweaver.fw.permission.get_user_permissions", side_effect=_mock_perms([Read])):
+        with patch("citadel.fw.permission.get_user_permissions", side_effect=_mock_perms([Read])):
             # Can list
             resp = c.get(
                 "/api/v1/ldap_configs",
@@ -451,7 +451,7 @@ def test_ldap_config_endpoints_with_granted_permissions(client: TestClient, test
             assert resp.status_code == 403
 
         # 3. User with only TestConnection permission
-        with patch("mindweaver.fw.permission.get_user_permissions", side_effect=_mock_perms([TestConnection])):
+        with patch("citadel.fw.permission.get_user_permissions", side_effect=_mock_perms([TestConnection])):
             # Tester cannot create
             resp = c.post(
                 "/api/v1/ldap_configs",

@@ -4,7 +4,7 @@
 import pytest
 from unittest.mock import patch
 from fastapi.testclient import TestClient
-from mindweaver.platform_service.pgsql import PgSqlPlatformService
+from citadel.platform_service.pgsql import PgSqlPlatformService
 
 
 def test_refresh_missing_greenlet_error(client: TestClient, test_project):

@@ -30,8 +30,8 @@ const AdministrativeTab = ({
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
 
     return (
-        <div className="mw-administrative-tab space-y-6 animate-in fade-in slide-in-from-top-4 duration-500">
-            <div className="mw-panel overflow-hidden border-rose-500/20">
+        <div className="dxc-administrative-tab space-y-6 animate-in fade-in slide-in-from-top-4 duration-500">
+            <div className="dxc-panel overflow-hidden border-rose-500/20">
                 <div className="p-4 border-b bg-rose-500/5 border-rose-500/10 flex items-center gap-3">
                     <AlertCircle className="text-rose-500" size={20} />
                     <h4 className="text-base font-bold tracking-wider text-rose-500 uppercase">Danger Zone</h4>
@@ -50,7 +50,7 @@ const AdministrativeTab = ({
                                 onClick={() => setIsDecommissionModalOpen(true)}
                                 disabled={!isActive}
                                 className={cn(
-                                    'mw-decommission-btn px-8 py-3 rounded-xl font-bold text-sm transition-all border shrink-0',
+                                    'dxc-decommission-btn px-8 py-3 rounded-xl font-bold text-sm transition-all border shrink-0',
                                     isActive
                                         ? 'bg-rose-500 text-white hover:bg-rose-600 border-rose-600 shadow-lg shadow-rose-500/20'
                                         : 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'
@@ -79,7 +79,7 @@ const AdministrativeTab = ({
                                 onClick={() => setIsDeleteModalOpen(true)}
                                 disabled={isActive}
                                 className={cn(
-                                    'mw-delete-btn px-8 py-3 rounded-xl font-bold text-sm transition-all border shrink-0',
+                                    'dxc-delete-btn px-8 py-3 rounded-xl font-bold text-sm transition-all border shrink-0',
                                     !isActive
                                         ? 'bg-rose-500 text-white hover:bg-rose-600 border-rose-600 shadow-lg shadow-rose-500/20'
                                         : 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'

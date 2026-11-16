@@ -6,7 +6,7 @@
 
 ## Context
 
-Mindweaver requires a robust, high-performance, and developer-friendly backend framework to manage Kubernetes-based data platform components. The framework needs to support asynchronous operations for I/O bound tasks (like interacting with Kubernetes APIs and databases) and provide strong type safety and validation.
+Citadel requires a robust, high-performance, and developer-friendly backend framework to manage Kubernetes-based data platform components. The framework needs to support asynchronous operations for I/O bound tasks (like interacting with Kubernetes APIs and databases) and provide strong type safety and validation.
 
 ## Decision
 

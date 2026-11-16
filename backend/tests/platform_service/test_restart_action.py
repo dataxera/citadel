@@ -8,14 +8,14 @@ from fastapi import Request
 from kubernetes.client.exceptions import ApiException
 from sqlmodel import Session
 
-from mindweaver.platform_service.airflow import AirflowPlatformService
-from mindweaver.platform_service.doris import DorisPlatformService
-from mindweaver.platform_service.hive_metastore import HiveMetastorePlatformService
-from mindweaver.platform_service.kafka import KafkaPlatformService
-from mindweaver.platform_service.nifi import NifiPlatformService
-from mindweaver.platform_service.pgsql import PgSqlPlatformService
-from mindweaver.platform_service.superset import SupersetPlatformService
-from mindweaver.platform_service.trino import TrinoPlatformService
+from citadel.platform_service.airflow import AirflowPlatformService
+from citadel.platform_service.doris import DorisPlatformService
+from citadel.platform_service.hive_metastore import HiveMetastorePlatformService
+from citadel.platform_service.kafka import KafkaPlatformService
+from citadel.platform_service.nifi import NifiPlatformService
+from citadel.platform_service.pgsql import PgSqlPlatformService
+from citadel.platform_service.superset import SupersetPlatformService
+from citadel.platform_service.trino import TrinoPlatformService
 
 
 @pytest.fixture
@@ -107,14 +107,14 @@ async def test_base_restart_service_restarts_argocd_and_labeled_workloads(
     mock_apps_api.list_namespaced_stateful_set.return_value = SimpleNamespace(items=[])
 
     with (
-        patch("mindweaver.platform_service.base.config.load_incluster_config"),
-        patch("mindweaver.platform_service.base.client.ApiClient"),
+        patch("citadel.platform_service.base.config.load_incluster_config"),
+        patch("citadel.platform_service.base.client.ApiClient"),
         patch(
-            "mindweaver.platform_service.base.client.CustomObjectsApi",
+            "citadel.platform_service.base.client.CustomObjectsApi",
             return_value=mock_custom_api,
         ),
         patch(
-            "mindweaver.platform_service.base.client.AppsV1Api",
+            "citadel.platform_service.base.client.AppsV1Api",
             return_value=mock_apps_api,
         ),
     ):
@@ -147,14 +147,14 @@ async def test_base_restart_service_raises_when_no_workloads_found(mock_service_
     mock_apps_api.list_namespaced_stateful_set.return_value = SimpleNamespace(items=[])
 
     with (
-        patch("mindweaver.platform_service.base.config.load_incluster_config"),
-        patch("mindweaver.platform_service.base.client.ApiClient"),
+        patch("citadel.platform_service.base.config.load_incluster_config"),
+        patch("citadel.platform_service.base.client.ApiClient"),
         patch(
-            "mindweaver.platform_service.base.client.CustomObjectsApi",
+            "citadel.platform_service.base.client.CustomObjectsApi",
             return_value=mock_custom_api,
         ),
         patch(
-            "mindweaver.platform_service.base.client.AppsV1Api",
+            "citadel.platform_service.base.client.AppsV1Api",
             return_value=mock_apps_api,
         ),
     ):
@@ -181,11 +181,11 @@ async def test_pgsql_restart_service_patches_cnpg_cluster_and_pooler(mock_servic
     with (
         patch.object(svc, "_build_k8s_client", return_value=MagicMock()),
         patch(
-            "mindweaver.platform_service.pgsql.service.client.CustomObjectsApi",
+            "citadel.platform_service.pgsql.service.client.CustomObjectsApi",
             return_value=mock_custom_api,
         ),
         patch(
-            "mindweaver.platform_service.pgsql.service.client.AppsV1Api",
+            "citadel.platform_service.pgsql.service.client.AppsV1Api",
             return_value=mock_apps_api,
         ),
     ):
@@ -222,11 +222,11 @@ async def test_kafka_restart_service_patches_strimzipodsets_and_deployments(
     with (
         patch.object(svc, "_build_k8s_client", return_value=MagicMock()),
         patch(
-            "mindweaver.platform_service.kafka.service.client.CustomObjectsApi",
+            "citadel.platform_service.kafka.service.client.CustomObjectsApi",
             return_value=mock_custom_api,
         ),
         patch(
-            "mindweaver.platform_service.kafka.service.client.AppsV1Api",
+            "citadel.platform_service.kafka.service.client.AppsV1Api",
             return_value=mock_apps_api,
         ),
     ):
@@ -261,7 +261,7 @@ async def test_doris_restart_service_patches_fe_and_be_statefulsets(mock_service
     with (
         patch.object(svc, "_build_k8s_client", return_value=MagicMock()),
         patch(
-            "mindweaver.platform_service.doris.service.client.AppsV1Api",
+            "citadel.platform_service.doris.service.client.AppsV1Api",
             return_value=mock_apps_api,
         ),
     ):

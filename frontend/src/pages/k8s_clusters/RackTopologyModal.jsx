@@ -102,7 +102,7 @@ const RackTopologyModal = ({
                                     onClose();
                                     onOpenPresets();
                                 }}
-                                className="mw-btn-secondary px-3 py-1.5 text-xs whitespace-nowrap flex items-center gap-1.5"
+                                className="dxc-btn-secondary px-3 py-1.5 text-xs whitespace-nowrap flex items-center gap-1.5"
                             >
                                 <Layers size={13} />
                                 OPEN PRESETS
@@ -151,7 +151,7 @@ const RackTopologyModal = ({
                                                                 [node.hostname]: e.target.value,
                                                             }))
                                                         }
-                                                        className="mw-input w-full text-xs font-mono"
+                                                        className="dxc-input w-full text-xs font-mono"
                                                     >
                                                         <option value="">— Unassigned —</option>
                                                         {isLegacyOrCustom && (
@@ -179,7 +179,7 @@ const RackTopologyModal = ({
                     <button
                         type="button"
                         onClick={onClose}
-                        className="mw-btn-secondary px-5 py-2 text-xs"
+                        className="dxc-btn-secondary px-5 py-2 text-xs"
                     >
                         CANCEL
                     </button>
@@ -187,7 +187,7 @@ const RackTopologyModal = ({
                         id="save-rack-topology-btn"
                         type="submit"
                         disabled={saving}
-                        className="mw-btn-primary px-5 py-2 text-xs disabled:opacity-60"
+                        className="dxc-btn-primary px-5 py-2 text-xs disabled:opacity-60"
                     >
                         {saving ? 'APPLYING...' : 'APPLY TOPOLOGY'}
                     </button>

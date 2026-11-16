@@ -4,9 +4,9 @@
 import pytest
 from typing import Optional
 from starlette.requests import Request
-from mindweaver.config import settings
-from mindweaver.fw.model import Base
-from mindweaver.fw.permission import (
+from citadel.config import settings
+from citadel.fw.model import Base
+from citadel.fw.permission import (
     Permission,
     Read,
     Write,

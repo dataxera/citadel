@@ -5,13 +5,13 @@ import pytest
 from unittest.mock import AsyncMock, MagicMock
 from sqlmodel import select
 from fastapi import Request
-from mindweaver.fw.model import AsyncSession
+from citadel.fw.model import AsyncSession
 
-from mindweaver.service.stack.model import Stack
-from mindweaver.platform_service.base import PlatformService
-from mindweaver.platform_service.trino.service import TrinoPlatformService
-from mindweaver.platform_service.trino.model import TrinoPlatform
-from mindweaver.service.project.model import Project
+from citadel.service.stack.model import Stack
+from citadel.platform_service.base import PlatformService
+from citadel.platform_service.trino.service import TrinoPlatformService
+from citadel.platform_service.trino.model import TrinoPlatform
+from citadel.service.project.model import Project
 
 
 @pytest.fixture
@@ -217,9 +217,9 @@ async def test_resolve_chart_version(mock_service_dependencies):
 @pytest.mark.asyncio
 async def test_resolve_integration_version(mock_service_dependencies):
     """Test resolve_integration_version behaves correctly for cluster integrations."""
-    from mindweaver.service.k8s_cluster.actions import InstallArgoCDAction
-    from mindweaver.service.k8s_cluster.model import K8sCluster
-    from mindweaver.service.k8s_cluster.service import K8sClusterService
+    from citadel.service.k8s_cluster.actions import InstallArgoCDAction
+    from citadel.service.k8s_cluster.model import K8sCluster
+    from citadel.service.k8s_cluster.service import K8sClusterService
     
     request, _ = mock_service_dependencies
     

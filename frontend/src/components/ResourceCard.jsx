@@ -5,21 +5,21 @@ import ResourceConfirmModal from './ResourceConfirmModal';
 
 const StatusBadge = ({ status }) => {
     const styles = {
-        running: 'mw-badge-success',
-        online: 'mw-badge-success',
-        connected: 'mw-badge-success',
-        active: 'mw-badge-success',
-        warning: 'mw-badge-warning',
-        pending: 'mw-badge-warning',
-        stopped: 'mw-badge-neutral',
-        error: 'mw-badge-danger',
-        unknown: 'mw-badge-neutral'
+        running: 'dxc-badge-success',
+        online: 'dxc-badge-success',
+        connected: 'dxc-badge-success',
+        active: 'dxc-badge-success',
+        warning: 'dxc-badge-warning',
+        pending: 'dxc-badge-warning',
+        stopped: 'dxc-badge-neutral',
+        error: 'dxc-badge-danger',
+        unknown: 'dxc-badge-neutral'
     };
 
     const normalizedStatus = (status || 'unknown').toLowerCase();
 
     return (
-        <span className={cn(styles[normalizedStatus] || 'mw-badge-neutral')}>
+        <span className={cn(styles[normalizedStatus] || 'dxc-badge-neutral')}>
             {(status || 'unknown').toUpperCase()}
         </span>
     );
@@ -45,7 +45,7 @@ const ResourceCard = ({
         <div
             onClick={onClick}
             className={cn(
-                "mw-card group flex flex-col transition-all duration-200",
+                "dxc-card group flex flex-col transition-all duration-200",
                 onClick && "cursor-pointer hover:border-blue-500/50 hover:shadow-lg hover:shadow-blue-500/5 dark:hover:shadow-blue-500/10",
                 isActive && "border-blue-500 ring-1 ring-blue-500 bg-blue-500/5 dark:bg-blue-500/10",
                 className
@@ -55,7 +55,7 @@ const ResourceCard = ({
                 <div className="flex items-center gap-4 min-w-0">
                     {icon && (
                         <div className={cn(
-                            "mw-icon-box p-3 shrink-0",
+                            "dxc-icon-box p-3 shrink-0",
                             isActive ? "text-blue-500 bg-blue-500/20" : "text-slate-500 group-hover:text-blue-500 transition-colors"
                         )}>
                             {icon}

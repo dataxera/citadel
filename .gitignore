@@ -13,7 +13,7 @@ celerybeat-*
 values*.yml
 *.swp
 # Helm
-charts/mindweaver/charts/*.tgz
+charts/citadel/charts/*.tgz
 ext_src/
 ranger-*.tgz
 backend/logs

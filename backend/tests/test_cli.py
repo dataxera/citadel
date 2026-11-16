@@ -3,7 +3,7 @@
 
 import argparse
 from unittest.mock import patch
-from mindweaver.cli import get_parser, handle_queue_flush
+from citadel.cli import get_parser, handle_queue_flush
 
 
 def test_cli_parser_queue_flush():
@@ -18,7 +18,7 @@ def test_cli_parser_queue_flush():
     assert args.handler == handle_queue_flush
 
 
-@patch("mindweaver.celery_app.app.control.purge")
+@patch("citadel.celery_app.app.control.purge")
 def test_handle_queue_flush(mock_purge):
     """Verify that handle_queue_flush invokes the celery purge method."""
     mock_purge.return_value = 42
@@ -36,7 +36,7 @@ def test_cli_parser_run_defaults():
     assert args.command == "run"
     assert args.port == 8000
     assert args.host == "127.0.0.1"
-    assert args.log_file == "logs/mindweaver.log"
+    assert args.log_file == "logs/citadel.log"
 
 
 def test_cli_parser_run_custom():
@@ -53,7 +53,7 @@ def test_cli_parser_run_custom():
 @patch("pathlib.Path.mkdir")
 def test_handle_run(mock_mkdir, mock_uvicorn_run):
     """Verify handle_run correctly updates logging configuration and calls uvicorn.run."""
-    from mindweaver.cli import handle_run, RunArgs
+    from citadel.cli import handle_run, RunArgs
     from pathlib import Path
     
     args = RunArgs()

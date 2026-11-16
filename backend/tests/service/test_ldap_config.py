@@ -7,7 +7,7 @@ from fastapi.testclient import TestClient
 
 @pytest.fixture
 def admin_headers():
-    return {}  # Auth is disabled in test mode via MINDWEAVER_ENABLE_AUTH=false
+    return {}  # Auth is disabled in test mode via CITADEL_ENABLE_AUTH=false
 
 
 @pytest.fixture

@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: AGPLv3+
 
 from fastapi.testclient import TestClient
-from mindweaver.service.s3_storage import S3StorageService
+from citadel.service.s3_storage import S3StorageService
 import pytest
 
 

@@ -5,8 +5,8 @@ import pytest
 from unittest.mock import MagicMock, AsyncMock, patch
 from fastapi import Request
 from pydantic import ValidationError
-from mindweaver.platform_service.kafka import KafkaPlatform, KafkaPlatformService
-from mindweaver.fw.model import AsyncSession
+from citadel.platform_service.kafka import KafkaPlatform, KafkaPlatformService
+from citadel.fw.model import AsyncSession
 
 
 @pytest.fixture
@@ -136,7 +136,7 @@ async def test_kafka_render_manifests(mock_service_dependencies):
     assert "name: test-kafka" in manifests
     assert "replicaCount: 3" in manifests
     assert "chart: kafka" in manifests
-    assert "ghcr.io/kagesenshi/mindweaver/charts" in manifests
+    assert "ghcr.io/kagesenshi/citadel/charts" in manifests
     assert "size: \"20Gi\"" in manifests
     assert "namespace: test-ns" in manifests
     assert "enableLoadBalancer: false" in manifests
@@ -168,7 +168,7 @@ async def test_kafka_render_manifests_image_override(mock_service_dependencies):
 @pytest.mark.asyncio
 async def test_kafka_poll_status(mock_service_dependencies):
     """Test that kafka_url is derived correctly in poll_status."""
-    from mindweaver.platform_service.kafka.model import KafkaPlatformState
+    from citadel.platform_service.kafka.model import KafkaPlatformState
     request, session = mock_service_dependencies
     svc = KafkaPlatformService(request, session)
 
@@ -190,7 +190,7 @@ async def test_kafka_poll_status(mock_service_dependencies):
         async def mock_poll(*args):
             return "online", "Healthy", {}, node_ports, cluster_nodes, "test-kafka"
 
-        with patch("mindweaver.platform_service.kafka.service.asyncio.to_thread", side_effect=mock_poll):
+        with patch("citadel.platform_service.kafka.service.asyncio.to_thread", side_effect=mock_poll):
             mock_project = MagicMock()
             mock_project.ingress_domain = None
             svc.project = AsyncMock(return_value=mock_project)
@@ -231,7 +231,7 @@ async def test_kafka_ssl_certificate_rendering(mock_service_dependencies):
 @pytest.mark.asyncio
 async def test_kafka_poll_status_with_nodeports(mock_service_dependencies):
     """Test that nodeports are populated correctly in poll_status."""
-    from mindweaver.platform_service.kafka.model import KafkaPlatformState
+    from citadel.platform_service.kafka.model import KafkaPlatformState
     request, session = mock_service_dependencies
     svc = KafkaPlatformService(request, session)
 
@@ -253,7 +253,7 @@ async def test_kafka_poll_status_with_nodeports(mock_service_dependencies):
         async def mock_poll(*args):
             return "online", "Healthy", {}, node_ports, cluster_nodes, "test-kafka-kafka-external-bootstrap"
 
-        with patch("mindweaver.platform_service.kafka.service.asyncio.to_thread", side_effect=mock_poll):
+        with patch("citadel.platform_service.kafka.service.asyncio.to_thread", side_effect=mock_poll):
             mock_project = MagicMock()
             mock_project.ingress_domain = None
             svc.project = AsyncMock(return_value=mock_project)
@@ -293,7 +293,7 @@ async def test_kafka_render_manifests_with_loadbalancer(mock_service_dependencie
 @pytest.mark.asyncio
 async def test_kafka_poll_status_with_loadbalancer(mock_service_dependencies):
     """Test that load balancer ingress IP is discovered and kafka_external_url is populated."""
-    from mindweaver.platform_service.kafka.model import KafkaPlatformState
+    from citadel.platform_service.kafka.model import KafkaPlatformState
     request, session = mock_service_dependencies
     svc = KafkaPlatformService(request, session)
 
@@ -317,7 +317,7 @@ async def test_kafka_poll_status_with_loadbalancer(mock_service_dependencies):
         async def mock_poll(*args):
             return "online", "Healthy", {"load_balancer_ips": load_balancer_ips}, node_ports, cluster_nodes, "test-kafka-kafka-bootstrap"
 
-        with patch("mindweaver.platform_service.kafka.service.asyncio.to_thread", side_effect=mock_poll):
+        with patch("citadel.platform_service.kafka.service.asyncio.to_thread", side_effect=mock_poll):
             mock_project = MagicMock()
             mock_project.ingress_domain = None
             svc.project = AsyncMock(return_value=mock_project)
@@ -375,7 +375,7 @@ async def test_kafka_default_image_and_chart_locked(test_stack_session):
     svc.project = AsyncMock(return_value=mock_project)
 
     vars = await svc.template_vars(model)
-    assert vars["image"] == "test.registry/mindweaver/kafka"
+    assert vars["image"] == "test.registry/citadel/kafka"
     assert vars["image_tag"] == "4.99.0"
     assert vars["chart_repo"] == "https://test.example.com/kafka"
     assert vars["chart_name"] == "kafka"

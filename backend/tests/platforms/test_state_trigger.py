@@ -4,8 +4,8 @@
 import pytest
 from unittest.mock import patch, MagicMock
 from fastapi.testclient import TestClient
-from mindweaver.app import app
-from mindweaver.platform_service.base import (
+from citadel.app import app
+from citadel.platform_service.base import (
     PlatformBase,
     PlatformService,
     PlatformStateBase,
@@ -14,11 +14,11 @@ from mindweaver.platform_service.base import (
 
 # Define a concrete model for testing
 class MockTriggerPlatformModel(PlatformBase, table=True):
-    __tablename__ = "mw_mock_trigger_platform_model"
+    __tablename__ = "dxc_mock_trigger_platform_model"
 
 
 class MockTriggerPlatformState(PlatformStateBase, table=True):
-    __tablename__ = "mw_mock_trigger_platform_state"
+    __tablename__ = "dxc_mock_trigger_platform_state"
 
 
 class MockTriggerPlatformService(PlatformService[MockTriggerPlatformModel]):

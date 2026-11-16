@@ -7,26 +7,26 @@ from pydantic import ValidationError
 from sqlmodel import Field, SQLModel, create_engine
 from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlalchemy.ext.asyncio import create_async_engine
-from mindweaver.platform_service.base import (
+from citadel.platform_service.base import (
     PlatformStateBase,
     PlatformBase,
     PlatformService,
 )
-from mindweaver.service.project import Project
-from mindweaver.service.k8s_cluster import K8sCluster, K8sClusterType
-from mindweaver.config import settings
+from citadel.service.project import Project
+from citadel.service.k8s_cluster import K8sCluster, K8sClusterType
+from citadel.config import settings
 from pytest_postgresql.executor import PostgreSQLExecutor
 from psycopg.connection import Connection
 
 
 # Define a concrete model for testing
 class MockPlatformState(PlatformStateBase, table=True):
-    __tablename__ = "mw_test_platform_state"
+    __tablename__ = "dxc_test_platform_state"
     platform_id: int = Field(index=True)
 
 
 class MockPlatform(PlatformBase, table=True):
-    __tablename__ = "mw_test_platform"
+    __tablename__ = "dxc_test_platform"
 
 
 class MockPlatformService(PlatformService[MockPlatform]):
@@ -180,7 +180,7 @@ def test_enforce_state_model():
     """Verify that subclassing PlatformService without state_model raises TypeError"""
 
     class MockPlatformEnforce(PlatformBase, table=True):
-        __tablename__ = "mw_test_enforce_platform"
+        __tablename__ = "dxc_test_enforce_platform"
 
     with pytest.raises(TypeError, match="must define state_model"):
 

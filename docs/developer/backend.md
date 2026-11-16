@@ -1,10 +1,10 @@
 # Backend Development
 
-This guide provides details on how to extend the Mindweaver backend.
+This guide provides details on how to extend the Citadel backend.
 
 ## The `fw` Layer
 
-The framework layer (`backend/src/mindweaver/fw/`) provides the standard infrastructure for all services.
+The framework layer (`backend/src/citadel/fw/`) provides the standard infrastructure for all services.
 
 ### Models (`model.py`)
 
@@ -20,7 +20,7 @@ A `Service` class automatically handles standard CRUD logic. To create a new ser
 3.  Register with the FastAPI app using the provided decorators.
 
 ```python
-from mindweaver.fw.service import Service, service_view
+from citadel.fw.service import Service, service_view
 
 class MyNewService(Service):
     model = MyNewModel
@@ -42,7 +42,7 @@ Platform services manage external components. They inherit from `PlatformService
 
 ### Manifest Templating
 
-Manifests are stored in `backend/src/mindweaver/templates/` as `.yml.j2` files. Use standard Jinja2 syntax to render these templates within your platform service.
+Manifests are stored in `backend/src/citadel/templates/` as `.yml.j2` files. Use standard Jinja2 syntax to render these templates within your platform service.
 
 ## Sensitive Data Handling
 
@@ -52,6 +52,6 @@ Use `SecretHandlerMixin` to manage sensitive fields.
 
 ## Database Migrations
 
-Mindweaver uses Alembic for migrations.
-- **Generate**: `uv run mindweaver db revision -m "message" --autogenerate`
-- **Apply**: `uv run mindweaver db migrate`
+Citadel uses Alembic for migrations.
+- **Generate**: `uv run dxc db revision -m "message" --autogenerate`
+- **Apply**: `uv run dxc db migrate`

@@ -22,13 +22,13 @@ const ListingView = ({
     const renderBadges = (platform, state) => {
         const badges = [];
         if (platform.replica_count) {
-            badges.push({ text: `${platform.replica_count} replica(s)`, variant: "mw-badge-info" });
+            badges.push({ text: `${platform.replica_count} replica(s)`, variant: "dxc-badge-info" });
         }
         if (platform.enable_loadbalancer) {
-            badges.push({ text: "LoadBalancer", variant: "mw-badge-accent" });
+            badges.push({ text: "LoadBalancer", variant: "dxc-badge-accent" });
         }
         if (state.message) {
-            badges.push({ text: state.message, variant: "mw-badge-info" });
+            badges.push({ text: state.message, variant: "dxc-badge-info" });
         }
         return badges;
     };

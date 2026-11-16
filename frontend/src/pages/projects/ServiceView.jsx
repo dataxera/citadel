@@ -272,7 +272,7 @@ const ServiceView = ({
 
     return (
         <div className="space-y-8 animate-in fade-in duration-500">
-            <div className="mw-page-header flex items-center justify-between">
+            <div className="dxc-page-header flex items-center justify-between">
                 <div className="flex gap-4 items-center">
                     <button
                         onClick={onBack}
@@ -280,7 +280,7 @@ const ServiceView = ({
                     >
                         <ArrowLeft size={24} />
                     </button>
-                    <div className="mw-icon-box w-16 h-16 text-indigo-400">
+                    <div className="dxc-icon-box w-16 h-16 text-indigo-400">
                         <Monitor size={32} />
                     </div>
                     <div>
@@ -320,7 +320,7 @@ const ServiceView = ({
                 <button
                     onClick={handleSyncIntegrations}
                     disabled={isSyncing || !selectedProject.ingress_domain}
-                    className="mw-btn-primary px-6 py-2.5 flex items-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
+                    className="dxc-btn-primary px-6 py-2.5 flex items-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
                     id="project-sync-integrations-btn"
                 >
                     {isSyncing ? <RefreshCw size={16} className="animate-spin" /> : <RefreshCw size={16} />}
@@ -332,7 +332,7 @@ const ServiceView = ({
                 {resourceCards.map((card, i) => {
                     const Icon = card.icon;
                     return (
-                        <div key={i} className="mw-card p-6 flex flex-col gap-4">
+                        <div key={i} className="dxc-card p-6 flex flex-col gap-4">
                             <div className="flex items-center gap-4">
                                 <div className={`p-4 rounded-xl ${card.bg} ${card.color}`}>
                                     <Icon size={24} />
@@ -349,10 +349,10 @@ const ServiceView = ({
             </div>
 
             {/* Envoy Gateway Integration */}
-            <div className="mw-card p-8 space-y-6 animate-in slide-in-from-bottom duration-700">
+            <div className="dxc-card p-8 space-y-6 animate-in slide-in-from-bottom duration-700">
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-4">
-                        <div className="mw-icon-box text-indigo-500">
+                        <div className="dxc-icon-box text-indigo-500">
                             <Activity size={24} />
                         </div>
                         <div>
@@ -368,7 +368,7 @@ const ServiceView = ({
                             </span>
                             <button
                                 onClick={handleDownloadCert}
-                                className="mw-btn-secondary px-6 py-2.5 flex items-center gap-2"
+                                className="dxc-btn-secondary px-6 py-2.5 flex items-center gap-2"
                                 id="download-haproxy-cert-btn"
                                 title="Download HAProxy SSL PEM Certificate"
                             >
@@ -445,10 +445,10 @@ ${projectState.cluster_node_ips?.map((ip, idx) => `    server node${idx + 1} ${i
 
             {/* Project Local Users Management */}
             {enableDex && (
-                <div className="mw-card p-8 space-y-8 animate-in slide-in-from-bottom duration-700">
+                <div className="dxc-card p-8 space-y-8 animate-in slide-in-from-bottom duration-700">
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-4">
-                            <div className="mw-icon-box text-indigo-500">
+                            <div className="dxc-icon-box text-indigo-500">
                                 <Users size={24} />
                             </div>
                             <div>
@@ -458,7 +458,7 @@ ${projectState.cluster_node_ips?.map((ip, idx) => `    server node${idx + 1} ${i
                         </div>
                         <button
                             onClick={() => setIsCreateOpen(true)}
-                            className="mw-btn-primary px-6 py-2.5 flex items-center gap-2"
+                            className="dxc-btn-primary px-6 py-2.5 flex items-center gap-2"
                         >
                             <UserPlus size={16} />
                             ADD LOCAL USER
@@ -571,10 +571,10 @@ ${projectState.cluster_node_ips?.map((ip, idx) => `    server node${idx + 1} ${i
                 />
             )}
             {certData && (
-                <div className="mw-card p-8 space-y-8 animate-in slide-in-from-bottom duration-700">
+                <div className="dxc-card p-8 space-y-8 animate-in slide-in-from-bottom duration-700">
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-4">
-                            <div className="mw-icon-box text-indigo-500">
+                            <div className="dxc-icon-box text-indigo-500">
                                 <Shield size={24} />
                             </div>
                             <div>
@@ -585,7 +585,7 @@ ${projectState.cluster_node_ips?.map((ip, idx) => `    server node${idx + 1} ${i
                         <button
                             onClick={handleRefreshCertManager}
                             disabled={refreshingCertManager}
-                            className="mw-btn-secondary py-1.5 px-3 text-xs flex items-center gap-2"
+                            className="dxc-btn-secondary py-1.5 px-3 text-xs flex items-center gap-2"
                             title="Refresh Certificates & Check Validity"
                             id="refresh-cert-manager-btn"
                         >
@@ -646,7 +646,7 @@ ${projectState.cluster_node_ips?.map((ip, idx) => `    server node${idx + 1} ${i
                                                 <div className="flex items-center gap-3">
                                                     <button
                                                         onClick={() => handleDownloadIssuerCert(group.issuer.name, group.issuer.kind, group.issuer.namespace)}
-                                                        className="mw-btn-secondary py-1 px-2.5 text-xs flex items-center gap-1.5"
+                                                        className="dxc-btn-secondary py-1 px-2.5 text-xs flex items-center gap-1.5"
                                                         title="Download CA Certificate"
                                                     >
                                                         <Download size={12} />
@@ -703,7 +703,7 @@ ${projectState.cluster_node_ips?.map((ip, idx) => `    server node${idx + 1} ${i
                                                                     <div className="flex items-center gap-2">
                                                                         <button
                                                                             onClick={() => handleViewCertDetails(cert)}
-                                                                            className="mw-btn-secondary py-1 px-2.5 text-xs flex items-center gap-1.5"
+                                                                            className="dxc-btn-secondary py-1 px-2.5 text-xs flex items-center gap-1.5"
                                                                             title="View Details"
                                                                             id={`view-cert-details-${cert.name}`}
                                                                         >
@@ -713,7 +713,7 @@ ${projectState.cluster_node_ips?.map((ip, idx) => `    server node${idx + 1} ${i
                                                                         <button
                                                                             onClick={() => handleRenewCert(cert)}
                                                                             disabled={renewingCertName === cert.name}
-                                                                            className="mw-btn-secondary py-1 px-2.5 text-xs flex items-center gap-1.5 disabled:opacity-50 text-indigo-500 hover:text-indigo-600 dark:text-indigo-400"
+                                                                            className="dxc-btn-secondary py-1 px-2.5 text-xs flex items-center gap-1.5 disabled:opacity-50 text-indigo-500 hover:text-indigo-600 dark:text-indigo-400"
                                                                             title="Renew Certificate"
                                                                             id={`renew-cert-${cert.name}`}
                                                                         >
@@ -773,7 +773,7 @@ ${projectState.cluster_node_ips?.map((ip, idx) => `    server node${idx + 1} ${i
                                                                 <div className="flex items-center gap-2">
                                                                     <button
                                                                         onClick={() => handleViewCertDetails(cert)}
-                                                                        className="mw-btn-secondary py-1 px-2.5 text-xs flex items-center gap-1.5"
+                                                                        className="dxc-btn-secondary py-1 px-2.5 text-xs flex items-center gap-1.5"
                                                                         title="View Details"
                                                                         id={`view-orphan-cert-details-${cert.name}`}
                                                                     >
@@ -783,7 +783,7 @@ ${projectState.cluster_node_ips?.map((ip, idx) => `    server node${idx + 1} ${i
                                                                     <button
                                                                         onClick={() => handleRenewCert(cert)}
                                                                         disabled={renewingCertName === cert.name}
-                                                                        className="mw-btn-secondary py-1 px-2.5 text-xs flex items-center gap-1.5 disabled:opacity-50 text-indigo-500 hover:text-indigo-600 dark:text-indigo-400"
+                                                                        className="dxc-btn-secondary py-1 px-2.5 text-xs flex items-center gap-1.5 disabled:opacity-50 text-indigo-500 hover:text-indigo-600 dark:text-indigo-400"
                                                                         title="Renew Certificate"
                                                                         id={`renew-orphan-cert-${cert.name}`}
                                                                     >
@@ -874,7 +874,7 @@ ${projectState.cluster_node_ips?.map((ip, idx) => `    server node${idx + 1} ${i
                                         <button
                                             onClick={() => handleRenewCert(selectedCert)}
                                             disabled={renewingCertName === selectedCert.name}
-                                            className="mw-btn-primary py-1 px-3 text-xs flex items-center gap-1.5"
+                                            className="dxc-btn-primary py-1 px-3 text-xs flex items-center gap-1.5"
                                             id="modal-renew-cert-btn"
                                             title="Renew Certificate with Project CA"
                                         >
@@ -1075,7 +1075,7 @@ ${projectState.cluster_node_ips?.map((ip, idx) => `    server node${idx + 1} ${i
                                         </button>
                                         <button
                                             onClick={() => handleCopyPem(certDetails.certificate.pem)}
-                                            className="mw-btn-secondary py-1 px-2.5 text-xs flex items-center gap-1.5"
+                                            className="dxc-btn-secondary py-1 px-2.5 text-xs flex items-center gap-1.5"
                                             title="Copy PEM Certificate"
                                         >
                                             {copiedPem ? <Check size={12} className="text-green-500" /> : <Copy size={12} />}

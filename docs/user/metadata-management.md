@@ -1,6 +1,6 @@
 # Metadata Management
 
-Mindweaver acts as a centralized repository for your data platform's metadata.
+Citadel acts as a centralized repository for your data platform's metadata.
 
 ## Data Sources
 
@@ -17,7 +17,7 @@ Manage your S3-compatible storage connections (AWS S3, MinIO, etc.) for data lak
 
 ## AI Agents and Knowledge Bases
 
-Mindweaver provides integrated support for AI orchestration:
+Citadel provides integrated support for AI orchestration:
 - **Knowledge Bases**: Define and manage sources of knowledge (e.g., S3 buckets, databases) for AI ingestion.
 - **AI Agents**: Configure agents with specific models and toolsets, leveraging Knowledge Bases for context.
 

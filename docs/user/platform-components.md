@@ -4,7 +4,7 @@ This chapter covers the deployment and management of data platform components.
 
 ## Support Components
 
-Mindweaver currently supports the orchestration of the following components:
+Citadel currently supports the orchestration of the following components:
 
 - **PostgreSQL**: Relational database for metadata and application data.
 - **Trino**: Distributed SQL query engine for big data.
@@ -14,7 +14,7 @@ Mindweaver currently supports the orchestration of the following components:
 
 ## Deploying a Component
 
-To deploy a component, follow these steps in the Mindweaver UI:
+To deploy a component, follow these steps in the Citadel UI:
 
 1. **Select Project**: Navigate to the project where you want to deploy the component.
 2. **Choose Service**: Go to the corresponding service section (e.g., "PostgreSQL").
@@ -32,4 +32,4 @@ You can monitor the status of your components directly from the dashboard.
 
 ## Decommissioning
 
-If you no longer need a component, use the **Decommission** action. This will gracefully remove the resources from the Kubernetes cluster while maintaining historical metadata in Mindweaver (unless explicitly deleted).
+If you no longer need a component, use the **Decommission** action. This will gracefully remove the resources from the Kubernetes cluster while maintaining historical metadata in Citadel (unless explicitly deleted).

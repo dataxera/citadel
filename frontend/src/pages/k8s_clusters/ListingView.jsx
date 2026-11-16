@@ -31,7 +31,7 @@ const ListingView = ({ context, clustersHook, onSelectCluster }) => {
     };
 
     const renderBadges = (cluster, state) => (
-        state.k8s_version ? [{ text: state.k8s_version, variant: "mw-badge-neutral" }] : []
+        state.k8s_version ? [{ text: state.k8s_version, variant: "dxc-badge-neutral" }] : []
     );
 
     const renderActions = (cluster, state, { onDelete }) => (
