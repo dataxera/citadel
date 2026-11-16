@@ -451,9 +451,24 @@ const ServiceView = ({
                                                         : 'Core integrations sync completed with errors'}
                                             </span>
                                         </div>
-                                        <span className="text-xs font-mono font-bold text-slate-500 dark:text-slate-400">
-                                            {completedCount}/{totalCount} ({progressPercent}%)
-                                        </span>
+                                        <div className="flex items-center gap-3">
+                                            {syncState.status === 'in_progress' && (
+                                                <button
+                                                    type="button"
+                                                    id="resume-sync-core-integrations-btn"
+                                                    onClick={() => handleInstallAction('resume_sync_core_integrations')}
+                                                    disabled={Boolean(installingActions['resume_sync_core_integrations'])}
+                                                    title="Resume any interrupted sync tasks"
+                                                    className="mw-btn-secondary py-1 px-2.5 text-[11px] flex items-center gap-1 disabled:opacity-60"
+                                                >
+                                                    <RefreshCw size={12} className={installingActions['resume_sync_core_integrations'] ? "animate-spin" : ""} />
+                                                    {installingActions['resume_sync_core_integrations'] ? 'RESUMING...' : 'RESUME'}
+                                                </button>
+                                            )}
+                                            <span className="text-xs font-mono font-bold text-slate-500 dark:text-slate-400">
+                                                {completedCount}/{totalCount} ({progressPercent}%)
+                                            </span>
+                                        </div>
                                     </div>
 
                                     <div className="h-2.5 w-full bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">

@@ -31,14 +31,23 @@ CORE_INTEGRATIONS = [
 
 def build_initial_sync_state() -> dict:
     """Build the initial persistent sync_state payload for core integrations sync."""
+    now_iso = ts_now().isoformat()
     return {
         "status": "in_progress",
-        "started_at": ts_now().isoformat(),
+        "started_at": now_iso,
+        "updated_at": now_iso,
         "completed_at": None,
         "total": len(CORE_INTEGRATIONS),
         "completed": 0,
         "tasks": {
-            key: {"label": label, "status": "pending", "message": None, "logs": None}
+            key: {
+                "label": label,
+                "status": "pending",
+                "message": None,
+                "logs": None,
+                "updated_at": now_iso,
+                "attempts": 0,
+            }
             for key, label, _ in CORE_INTEGRATIONS
         },
     }
@@ -620,6 +629,35 @@ class SyncCoreIntegrationsAction(InstallArgoCDAction):
             await action.run()
             setattr(status, installed_attr, True)
             await self.session.flush()
+
+
+@K8sClusterService.register_action("resume_sync_core_integrations")
+class ResumeSyncCoreIntegrationsAction(BaseAction):
+    """Resume an interrupted core integrations synchronization from persisted state."""
+
+    async def available(self) -> bool:
+        """Return True only when cluster is reachable and a sync is currently in_progress."""
+        stmt = select(K8sClusterStatus).where(
+            K8sClusterStatus.k8s_cluster_id == self.model.id
+        )
+        result = await self.session.exec(stmt)
+        status = result.one_or_none()
+        if not status or status.status == "offline":
+            return False
+        return (
+            isinstance(status.sync_state, dict)
+            and status.sync_state.get("status") == "in_progress"
+        )
+
+    async def __call__(self, **kwargs):
+        """Enqueue immediate recovery of incomplete core integration sync tasks."""
+        from mindweaver.tasks.k8s_cluster_status import recover_stuck_sync_tasks
+
+        recover_stuck_sync_tasks.delay(stale_seconds=0, k8s_cluster_id=self.model.id)
+        return {
+            "status": "success",
+            "message": "Core integrations synchronization resumed.",
+        }
 
 
 @K8sClusterService.register_action("install_kafka_operator")

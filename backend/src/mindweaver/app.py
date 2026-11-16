@@ -40,6 +40,7 @@ from .service.trusted_certs import router as trusted_certs_router
 import asyncio
 from .crypto import _get_fernet_instance
 from .tasks.name_tracker import scan_and_clean_names
+from .tasks.k8s_cluster_status import recover_stuck_sync_tasks
 from .fw.model import get_engine
 from sqlmodel.ext.asyncio.session import AsyncSession as SQLModelAsyncSession
 from sqlmodel import select
@@ -60,6 +61,10 @@ async def lifespan(app: fastapi.FastAPI):
     _get_fernet_instance()
 
     asyncio.create_task(scan_and_clean_names())
+    try:
+        recover_stuck_sync_tasks.delay(stale_seconds=0)
+    except Exception as e:
+        logger.warning(f"Failed to enqueue startup sync recovery task: {e}")
 
     if settings.default_admin_username and settings.default_admin_password:
         async with SQLModelAsyncSession(get_engine()) as session:

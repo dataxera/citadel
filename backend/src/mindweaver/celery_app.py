@@ -22,15 +22,22 @@ app.conf.update(
     result_serializer="json",
     timezone=settings.timezone,
     enable_utc=True,
+    task_acks_late=True,
+    task_reject_on_worker_lost=True,
+    worker_prefetch_multiplier=1,
     beat_schedule={
         "scan-and-clean-names-daily": {
             "task": "mindweaver.tasks.name_tracker.scan_and_clean_names_task",
             "schedule": 86400.0,
         },
+        "recover-stuck-k8s-sync-tasks": {
+            "task": "mindweaver.tasks.k8s_cluster_status.recover_stuck_sync_tasks",
+            "schedule": 60.0,
+        },
     },
 )
 
-from celery.signals import celeryd_init, beat_init, worker_process_init
+from celery.signals import celeryd_init, beat_init, worker_process_init, worker_ready
 from mindweaver.crypto import _get_fernet_instance
 from mindweaver.fw.model import clear_engine
 
@@ -51,6 +58,18 @@ def check_fernet_on_beat_init(**kwargs):
 def clear_engine_on_worker_process_init(**kwargs):
     """Clear database async engine upon worker process fork to prevent shared connection pool corruption."""
     clear_engine()
+
+
+@worker_ready.connect
+def recover_stuck_tasks_on_worker_ready(**kwargs):
+    """Trigger immediate recovery of interrupted background sync tasks when a worker boots."""
+    try:
+        app.send_task(
+            "mindweaver.tasks.k8s_cluster_status.recover_stuck_sync_tasks",
+            kwargs={"stale_seconds": 0},
+        )
+    except Exception:
+        pass
 
 
 if __name__ == "__main__":

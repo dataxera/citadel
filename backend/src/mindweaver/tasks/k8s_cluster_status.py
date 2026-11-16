@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: AGPLv3+
 
 import copy
+from datetime import datetime, timezone
 import traceback
 from mindweaver.celery_app import app
 from sqlalchemy.orm.attributes import flag_modified
@@ -13,6 +14,12 @@ from mindweaver.platform_service.base import PlatformService
 from mindweaver.config import logger, settings
 from .base import run_async
 from .poll_coordinator import acquire_poll_lock, release_poll_lock
+from .resiliency import (
+    acquire_task_lock,
+    is_task_locked,
+    release_task_lock,
+    run_with_lock_heartbeat,
+)
 
 
 @app.task
@@ -213,6 +220,47 @@ async def _install_envoy_gateway_task(k8s_cluster_id: int):
             )
 
 
+def _sync_lock_key(k8s_cluster_id: int, key: str) -> str:
+    """Return the distributed lock key for a cluster sync task."""
+    return f"k8s_cluster:{k8s_cluster_id}:{key}"
+
+
+def _is_timestamp_stale(updated_at_str: str | None, stale_seconds: int) -> bool:
+    """Return True if an ISO timestamp is missing or older than stale_seconds."""
+    if stale_seconds <= 0:
+        return True
+    if not updated_at_str:
+        return True
+    try:
+        dt = datetime.fromisoformat(updated_at_str)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        age = (ts_now() - dt).total_seconds()
+        return age >= stale_seconds
+    except Exception:
+        return True
+
+
+def _reconcile_sync_state_totals(sync_state: dict) -> bool:
+    """Recompute completed count and overall status for sync_state. Returns True if all tasks finished."""
+    tasks = sync_state.setdefault("tasks", {})
+    done_statuses = {"completed", "failed"}
+    completed_count = sum(1 for t in tasks.values() if t.get("status") in done_statuses)
+    total = sync_state.get("total", len(tasks))
+    sync_state["completed"] = completed_count
+    sync_state["updated_at"] = ts_now().isoformat()
+
+    all_done = total > 0 and completed_count >= total
+    if all_done:
+        has_failure = any(t.get("status") == "failed" for t in tasks.values())
+        sync_state["status"] = "error" if has_failure else "completed"
+        if not sync_state.get("completed_at"):
+            sync_state["completed_at"] = ts_now().isoformat()
+    else:
+        sync_state["status"] = "in_progress"
+    return all_done
+
+
 async def _update_sync_task_state(
     session: AsyncSession,
     k8s_cluster_id: int,
@@ -236,34 +284,28 @@ async def _update_sync_task_state(
     if not status_model:
         return False
 
+    now_iso = ts_now().isoformat()
     sync_state = copy.deepcopy(status_model.sync_state or build_initial_sync_state())
     tasks = sync_state.setdefault("tasks", {})
     if key in tasks:
         tasks[key]["status"] = task_status
         tasks[key]["message"] = message
         tasks[key]["logs"] = logs
+        tasks[key]["updated_at"] = now_iso
+        if task_status == "running":
+            tasks[key]["attempts"] = tasks[key].get("attempts", 0) + 1
 
     if installed_attr and task_status == "completed":
         setattr(status_model, installed_attr, True)
 
     if mark_remaining_failed_on_error and task_status == "failed":
         for other_key, other_info in tasks.items():
-            if other_key != key and other_info.get("status") == "pending":
+            if other_key != key and other_info.get("status") in ("pending", "running"):
                 other_info["status"] = "failed"
                 other_info["message"] = f"Skipped: {key} failed"
+                other_info["updated_at"] = now_iso
 
-    done_statuses = {"completed", "failed"}
-    completed_count = sum(1 for t in tasks.values() if t.get("status") in done_statuses)
-    total = sync_state.get("total", len(tasks))
-    sync_state["completed"] = completed_count
-
-    all_done = total > 0 and completed_count >= total
-    if all_done:
-        has_failure = any(t.get("status") == "failed" for t in tasks.values())
-        sync_state["status"] = "error" if has_failure else "completed"
-        sync_state["completed_at"] = ts_now().isoformat()
-    else:
-        sync_state["status"] = "in_progress"
+    all_done = _reconcile_sync_state_totals(sync_state)
 
     status_model.sync_state = sync_state
     flag_modified(status_model, "sync_state")
@@ -271,7 +313,7 @@ async def _update_sync_task_state(
     return all_done
 
 
-@app.task
+@app.task(acks_late=True, reject_on_worker_lost=True)
 def sync_core_integrations_task(k8s_cluster_id: int):
     """Trigger update/installation of configurations for all core integrations."""
     logger.info(f"Triggering core integrations sync for cluster {k8s_cluster_id}")
@@ -279,81 +321,131 @@ def sync_core_integrations_task(k8s_cluster_id: int):
 
 
 async def _sync_core_integrations_task(k8s_cluster_id: int):
-    """Orchestrate core integrations sync: ensure ArgoCD first, then dispatch individual integration tasks."""
+    """Orchestrate core integrations sync: ensure ArgoCD first, then dispatch incomplete integration tasks."""
     from mindweaver.service.k8s_cluster.actions import (
         CORE_INTEGRATIONS,
         InstallArgoCDAction,
     )
 
+    orch_lock_key = _sync_lock_key(k8s_cluster_id, "__orchestrator__")
+    if not await acquire_task_lock(orch_lock_key, ttl=120):
+        logger.info(
+            f"Core integrations sync orchestrator already running for cluster {k8s_cluster_id}, skipping"
+        )
+        return
+
     engine = get_engine()
-    async with AsyncSession(engine, expire_on_commit=False) as session:
+    try:
+        async with AsyncSession(engine, expire_on_commit=False) as session:
 
-        class MockRequest:
-            headers = {}
+            class MockRequest:
+                headers = {}
 
-        svc = K8sClusterService(MockRequest(), session)
-        try:
-            model = await svc.get(k8s_cluster_id)
-            stmt = select(K8sClusterStatus).where(
-                K8sClusterStatus.k8s_cluster_id == k8s_cluster_id
-            )
-            res = await session.exec(stmt)
-            status_model = res.one_or_none()
-            argocd_already_installed = bool(status_model and status_model.argocd_installed)
-
-            if not argocd_already_installed:
-                await _update_sync_task_state(
-                    session, k8s_cluster_id, "argocd", "running"
+            svc = K8sClusterService(MockRequest(), session)
+            try:
+                model = await svc.get(k8s_cluster_id)
+                stmt = select(K8sClusterStatus).where(
+                    K8sClusterStatus.k8s_cluster_id == k8s_cluster_id
                 )
-                try:
-                    action = InstallArgoCDAction(model, svc)
-                    action.session = session
-                    await action.run()
+                res = await session.exec(stmt)
+                status_model = res.one_or_none()
+                sync_state = status_model.sync_state if status_model else {}
+                if isinstance(sync_state, dict) and sync_state.get("status") in (
+                    "completed",
+                    "error",
+                ):
+                    logger.info(
+                        f"Sync already finished ({sync_state.get('status')}) for cluster {k8s_cluster_id}"
+                    )
+                    return
+
+                argocd_task_status = (
+                    sync_state.get("tasks", {}).get("argocd", {}).get("status")
+                    if isinstance(sync_state, dict)
+                    else None
+                )
+                argocd_already_done = argocd_task_status == "completed" or bool(
+                    status_model and status_model.argocd_installed
+                )
+
+                if not argocd_already_done:
+                    await _update_sync_task_state(
+                        session, k8s_cluster_id, "argocd", "running"
+                    )
+                    try:
+                        action = InstallArgoCDAction(model, svc)
+                        action.session = session
+                        await run_with_lock_heartbeat(orch_lock_key, action.run)
+                        await _update_sync_task_state(
+                            session,
+                            k8s_cluster_id,
+                            "argocd",
+                            "completed",
+                            installed_attr="argocd_installed",
+                        )
+                    except Exception as e:
+                        logger.error(
+                            f"Error installing ArgoCD during sync for cluster {k8s_cluster_id}: {e}"
+                        )
+                        await _update_sync_task_state(
+                            session,
+                            k8s_cluster_id,
+                            "argocd",
+                            "failed",
+                            message=str(e) or type(e).__name__,
+                            logs=traceback.format_exc(),
+                            mark_remaining_failed_on_error=True,
+                        )
+                        return
+                elif argocd_task_status != "completed":
                     await _update_sync_task_state(
                         session,
                         k8s_cluster_id,
                         "argocd",
                         "completed",
-                        installed_attr="argocd_installed",
+                        message="Already installed",
                     )
-                except Exception as e:
-                    logger.error(
-                        f"Error installing ArgoCD during sync for cluster {k8s_cluster_id}: {e}"
-                    )
-                    await _update_sync_task_state(
-                        session,
-                        k8s_cluster_id,
-                        "argocd",
-                        "failed",
-                        message=str(e) or type(e).__name__,
-                        logs=traceback.format_exc(),
-                        mark_remaining_failed_on_error=True,
-                    )
-                    return
-            else:
-                await _update_sync_task_state(
-                    session,
-                    k8s_cluster_id,
-                    "argocd",
-                    "completed",
-                    message="Already installed",
+
+                # Refresh status_model to read latest sync_state before dispatching remaining tasks
+                await session.refresh(status_model)
+                latest_tasks = (
+                    status_model.sync_state.get("tasks", {})
+                    if isinstance(status_model.sync_state, dict)
+                    else {}
                 )
 
-            for key, _, _ in CORE_INTEGRATIONS:
-                if key == "argocd":
-                    continue
-                sync_core_integration_task.delay(k8s_cluster_id, key)
+                dispatched = 0
+                for key, _, _ in CORE_INTEGRATIONS:
+                    if key == "argocd":
+                        continue
+                    task_status = latest_tasks.get(key, {}).get("status", "pending")
+                    if task_status in ("completed", "failed"):
+                        continue
+                    if await is_task_locked(_sync_lock_key(k8s_cluster_id, key)):
+                        continue
+                    sync_core_integration_task.delay(k8s_cluster_id, key)
+                    dispatched += 1
 
-            logger.info(
-                f"Dispatched core integration sync subtasks for cluster {k8s_cluster_id}"
-            )
-        except Exception as e:
-            logger.error(
-                f"Error orchestrating core integrations sync for cluster {k8s_cluster_id}: {e}"
-            )
+                if dispatched == 0 and isinstance(status_model.sync_state, dict):
+                    reconciled = copy.deepcopy(status_model.sync_state)
+                    if _reconcile_sync_state_totals(reconciled):
+                        status_model.sync_state = reconciled
+                        flag_modified(status_model, "sync_state")
+                        await session.commit()
+                        poll_k8s_cluster_status.delay(k8s_cluster_id)
+
+                logger.info(
+                    f"Dispatched {dispatched} core integration sync subtasks for cluster {k8s_cluster_id}"
+                )
+            except Exception as e:
+                logger.error(
+                    f"Error orchestrating core integrations sync for cluster {k8s_cluster_id}: {e}"
+                )
+    finally:
+        await release_task_lock(orch_lock_key)
 
 
-@app.task
+@app.task(acks_late=True, reject_on_worker_lost=True)
 def sync_core_integration_task(k8s_cluster_id: int, integration_key: str):
     """Execute sync for a single core integration and update cluster sync_state."""
     logger.info(
@@ -374,48 +466,191 @@ async def _sync_core_integration_task(k8s_cluster_id: int, integration_key: str)
         None,
     )
     action_cls = get_integration_action_class(integration_key)
+    lock_key = _sync_lock_key(k8s_cluster_id, integration_key)
+
+    if not await acquire_task_lock(lock_key, ttl=120):
+        logger.info(
+            f"Core integration '{integration_key}' already locked for cluster {k8s_cluster_id}, skipping"
+        )
+        return
+
+    engine = get_engine()
+    try:
+        async with AsyncSession(engine, expire_on_commit=False) as session:
+
+            class MockRequest:
+                headers = {}
+
+            svc = K8sClusterService(MockRequest(), session)
+            all_done = False
+            try:
+                stmt = select(K8sClusterStatus).where(
+                    K8sClusterStatus.k8s_cluster_id == k8s_cluster_id
+                )
+                res = await session.exec(stmt)
+                status_model = res.one_or_none()
+                if status_model and isinstance(status_model.sync_state, dict):
+                    if status_model.sync_state.get("status") in ("completed", "error"):
+                        logger.info(
+                            f"Sync already finished for cluster {k8s_cluster_id}, skipping '{integration_key}'"
+                        )
+                        return
+                    current_task_status = (
+                        status_model.sync_state.get("tasks", {})
+                        .get(integration_key, {})
+                        .get("status")
+                    )
+                    if current_task_status == "completed":
+                        logger.info(
+                            f"Integration '{integration_key}' already completed for cluster {k8s_cluster_id}, skipping"
+                        )
+                        return
+
+                model = await svc.get(k8s_cluster_id)
+                await _update_sync_task_state(
+                    session, k8s_cluster_id, integration_key, "running"
+                )
+                action = action_cls(model, svc)
+                action.session = session
+                await run_with_lock_heartbeat(lock_key, action.run)
+                all_done = await _update_sync_task_state(
+                    session,
+                    k8s_cluster_id,
+                    integration_key,
+                    "completed",
+                    installed_attr=installed_attr,
+                )
+                logger.info(
+                    f"Successfully synced '{integration_key}' for cluster {k8s_cluster_id}"
+                )
+            except Exception as e:
+                logger.error(
+                    f"Error syncing '{integration_key}' for cluster {k8s_cluster_id}: {e}"
+                )
+                all_done = await _update_sync_task_state(
+                    session,
+                    k8s_cluster_id,
+                    integration_key,
+                    "failed",
+                    message=str(e) or type(e).__name__,
+                    logs=traceback.format_exc(),
+                )
+
+            if all_done:
+                poll_k8s_cluster_status.delay(k8s_cluster_id)
+    finally:
+        await release_task_lock(lock_key)
+
+
+@app.task(acks_late=True, reject_on_worker_lost=True)
+def recover_stuck_sync_tasks(
+    stale_seconds: int = 60, k8s_cluster_id: int | None = None
+):
+    """Recover and resume any k8s cluster core integration syncs stuck in 'in_progress'."""
+    run_async(
+        _recover_stuck_sync_tasks(
+            stale_seconds=stale_seconds, k8s_cluster_id=k8s_cluster_id
+        )
+    )
+
+
+async def _recover_stuck_sync_tasks(
+    stale_seconds: int = 60, k8s_cluster_id: int | None = None
+):
+    """Inspect persisted sync_state rows and re-dispatch incomplete, unlocked tasks."""
+    from mindweaver.service.k8s_cluster.actions import CORE_INTEGRATIONS
 
     engine = get_engine()
     async with AsyncSession(engine, expire_on_commit=False) as session:
+        stmt = select(K8sClusterStatus)
+        if k8s_cluster_id is not None:
+            stmt = stmt.where(K8sClusterStatus.k8s_cluster_id == k8s_cluster_id)
+        res = await session.exec(stmt)
+        status_rows = res.all()
 
-        class MockRequest:
-            headers = {}
+        for status_model in status_rows:
+            sync_state = status_model.sync_state
+            if not isinstance(sync_state, dict) or sync_state.get("status") != "in_progress":
+                continue
 
-        svc = K8sClusterService(MockRequest(), session)
-        all_done = False
-        try:
-            model = await svc.get(k8s_cluster_id)
-            await _update_sync_task_state(
-                session, k8s_cluster_id, integration_key, "running"
-            )
-            action = action_cls(model, svc)
-            action.session = session
-            await action.run()
-            all_done = await _update_sync_task_state(
-                session,
-                k8s_cluster_id,
-                integration_key,
-                "completed",
-                installed_attr=installed_attr,
-            )
-            logger.info(
-                f"Successfully synced '{integration_key}' for cluster {k8s_cluster_id}"
-            )
-        except Exception as e:
-            logger.error(
-                f"Error syncing '{integration_key}' for cluster {k8s_cluster_id}: {e}"
-            )
-            all_done = await _update_sync_task_state(
-                session,
-                k8s_cluster_id,
-                integration_key,
-                "failed",
-                message=str(e) or type(e).__name__,
-                logs=traceback.format_exc(),
-            )
+            cid = status_model.k8s_cluster_id
+            tasks = sync_state.get("tasks", {})
+            argocd_info = tasks.get("argocd", {})
+            argocd_status = argocd_info.get("status", "pending")
 
-        if all_done:
-            poll_k8s_cluster_status.delay(k8s_cluster_id)
+            # 1. If ArgoCD failed, ensure remaining pending/running tasks are marked failed and finalize
+            if argocd_status == "failed":
+                await _update_sync_task_state(
+                    session,
+                    cid,
+                    "argocd",
+                    "failed",
+                    message=argocd_info.get("message"),
+                    logs=argocd_info.get("logs"),
+                    mark_remaining_failed_on_error=True,
+                )
+                continue
+
+            # 2. If ArgoCD is not completed yet, resume via orchestrator task if unlocked & stale
+            if argocd_status != "completed":
+                orch_locked = await is_task_locked(_sync_lock_key(cid, "__orchestrator__"))
+                argo_locked = await is_task_locked(_sync_lock_key(cid, "argocd"))
+                if (
+                    not orch_locked
+                    and not argo_locked
+                    and _is_timestamp_stale(argocd_info.get("updated_at"), stale_seconds)
+                ):
+                    updated = copy.deepcopy(sync_state)
+                    updated.setdefault("tasks", {}).setdefault("argocd", {})[
+                        "updated_at"
+                    ] = ts_now().isoformat()
+                    status_model.sync_state = updated
+                    flag_modified(status_model, "sync_state")
+                    await session.commit()
+                    logger.info(
+                        f"Resuming interrupted ArgoCD/core sync orchestrator for cluster {cid}"
+                    )
+                    sync_core_integrations_task.delay(cid)
+                continue
+
+            # 3. ArgoCD is completed: reconcile if all tasks are already finished
+            updated = copy.deepcopy(sync_state)
+            if _reconcile_sync_state_totals(updated):
+                status_model.sync_state = updated
+                flag_modified(status_model, "sync_state")
+                await session.commit()
+                logger.info(f"Reconciled completed sync_state for cluster {cid}")
+                poll_k8s_cluster_status.delay(cid)
+                continue
+
+            # 4. Otherwise dispatch any incomplete, unlocked, stale tasks
+            now_iso = ts_now().isoformat()
+            keys_to_dispatch: list[str] = []
+            for key, _, _ in CORE_INTEGRATIONS:
+                if key == "argocd":
+                    continue
+                t_info = updated.get("tasks", {}).get(key)
+                if not t_info:
+                    continue
+                if t_info.get("status") in ("completed", "failed"):
+                    continue
+                if await is_task_locked(_sync_lock_key(cid, key)):
+                    continue
+                if not _is_timestamp_stale(t_info.get("updated_at"), stale_seconds):
+                    continue
+                t_info["updated_at"] = now_iso
+                keys_to_dispatch.append(key)
+
+            if keys_to_dispatch:
+                updated["updated_at"] = now_iso
+                status_model.sync_state = updated
+                flag_modified(status_model, "sync_state")
+                await session.commit()
+                for key in keys_to_dispatch:
+                    logger.info(
+                        f"Resuming interrupted sync subtask '{key}' for cluster {cid}"
+                    )
+                    sync_core_integration_task.delay(cid, key)
 
 
 @app.task

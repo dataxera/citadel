@@ -1353,6 +1353,307 @@ def test_poll_k8s_cluster_integrations_status(client: TestClient, mock_k8s):
     assert "Degraded" in int_status["doris_operator"]["message"]
 
 
+@pytest.mark.asyncio
+async def test_sync_core_integrations_resume_skips_completed_tasks(client: TestClient):
+    """Recovery resumes interrupted sync by dispatching only incomplete, unlocked tasks."""
+    from datetime import timedelta
+    from sqlmodel import select
+    from sqlmodel.ext.asyncio.session import AsyncSession
+    from sqlalchemy.orm.attributes import flag_modified
+    from mindweaver.fw.model import get_engine, ts_now
+    from mindweaver.service.k8s_cluster.model import K8sClusterStatus
+    from mindweaver.tasks.k8s_cluster_status import _recover_stuck_sync_tasks
+    from mindweaver.tasks.resiliency import clear_memory_locks
+
+    clear_memory_locks()
+
+    p1 = client.post(
+        "/api/v1/k8s_clusters",
+        json={
+            "name": "sync-resume-skip",
+            "title": "Sync Resume Skip",
+            "type": "in-cluster",
+        },
+    ).json()["data"]
+
+    with patch("mindweaver.tasks.k8s_cluster_status.sync_core_integrations_task.delay"):
+        client.post(
+            f"/api/v1/k8s_clusters/{p1['id']}/_actions",
+            json={"action": "sync_core_integrations"},
+        )
+
+    stale_ts = (ts_now() - timedelta(minutes=5)).isoformat()
+    async with AsyncSession(get_engine()) as session:
+        res = await session.exec(
+            select(K8sClusterStatus).where(K8sClusterStatus.k8s_cluster_id == p1["id"])
+        )
+        st = res.one()
+        st.argocd_installed = True
+        st.sync_state["tasks"]["argocd"]["status"] = "completed"
+        st.sync_state["tasks"]["cert_manager"]["status"] = "completed"
+        st.sync_state["tasks"]["cnpg"]["status"] = "running"
+        st.sync_state["tasks"]["cnpg"]["updated_at"] = stale_ts
+        st.sync_state["completed"] = 2
+        flag_modified(st, "sync_state")
+        await session.commit()
+
+    with patch(
+        "mindweaver.tasks.k8s_cluster_status.sync_core_integration_task.delay"
+    ) as mock_sub_delay, patch(
+        "mindweaver.tasks.k8s_cluster_status.sync_core_integrations_task.delay"
+    ) as mock_orch_delay:
+        await _recover_stuck_sync_tasks(stale_seconds=0)
+
+        mock_orch_delay.assert_not_called()
+        called_keys = [c.args[1] for c in mock_sub_delay.call_args_list]
+        assert "argocd" not in called_keys
+        assert "cert_manager" not in called_keys
+        assert called_keys == [
+            "cnpg",
+            "envoy_gateway",
+            "kafka_operator",
+            "nifikop",
+            "doris_operator",
+        ]
+
+
+@pytest.mark.asyncio
+async def test_sync_core_integrations_resume_restarts_interrupted_argocd(client: TestClient):
+    """If ArgoCD was interrupted mid-install, recovery re-dispatches the orchestrator task."""
+    from mindweaver.tasks.k8s_cluster_status import _recover_stuck_sync_tasks
+    from mindweaver.tasks.resiliency import clear_memory_locks
+
+    clear_memory_locks()
+
+    p1 = client.post(
+        "/api/v1/k8s_clusters",
+        json={
+            "name": "sync-resume-argo",
+            "title": "Sync Resume Argo",
+            "type": "in-cluster",
+        },
+    ).json()["data"]
+
+    with patch("mindweaver.tasks.k8s_cluster_status.sync_core_integrations_task.delay"):
+        client.post(
+            f"/api/v1/k8s_clusters/{p1['id']}/_actions",
+            json={"action": "sync_core_integrations"},
+        )
+
+    with patch(
+        "mindweaver.tasks.k8s_cluster_status.sync_core_integrations_task.delay"
+    ) as mock_orch_delay, patch(
+        "mindweaver.tasks.k8s_cluster_status.sync_core_integration_task.delay"
+    ) as mock_sub_delay:
+        await _recover_stuck_sync_tasks(stale_seconds=0)
+        mock_orch_delay.assert_called_once_with(p1["id"])
+        mock_sub_delay.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_sync_core_integrations_resume_skips_actively_locked_task(client: TestClient):
+    """Recovery must not duplicate a task whose lock is actively held by a live worker."""
+    from sqlmodel import select
+    from sqlmodel.ext.asyncio.session import AsyncSession
+    from sqlalchemy.orm.attributes import flag_modified
+    from mindweaver.fw.model import get_engine
+    from mindweaver.service.k8s_cluster.model import K8sClusterStatus
+    from mindweaver.tasks.k8s_cluster_status import _recover_stuck_sync_tasks
+    from mindweaver.tasks.resiliency import (
+        acquire_task_lock,
+        clear_memory_locks,
+        release_task_lock,
+    )
+
+    clear_memory_locks()
+
+    p1 = client.post(
+        "/api/v1/k8s_clusters",
+        json={
+            "name": "sync-resume-locked",
+            "title": "Sync Resume Locked",
+            "type": "in-cluster",
+        },
+    ).json()["data"]
+
+    with patch("mindweaver.tasks.k8s_cluster_status.sync_core_integrations_task.delay"):
+        client.post(
+            f"/api/v1/k8s_clusters/{p1['id']}/_actions",
+            json={"action": "sync_core_integrations"},
+        )
+
+    async with AsyncSession(get_engine()) as session:
+        res = await session.exec(
+            select(K8sClusterStatus).where(K8sClusterStatus.k8s_cluster_id == p1["id"])
+        )
+        st = res.one()
+        st.argocd_installed = True
+        st.sync_state["tasks"]["argocd"]["status"] = "completed"
+        st.sync_state["tasks"]["cnpg"]["status"] = "running"
+        flag_modified(st, "sync_state")
+        await session.commit()
+
+    lock_key = f"k8s_cluster:{p1['id']}:cnpg"
+    assert await acquire_task_lock(lock_key, ttl=60)
+    try:
+        with patch(
+            "mindweaver.tasks.k8s_cluster_status.sync_core_integration_task.delay"
+        ) as mock_sub_delay:
+            await _recover_stuck_sync_tasks(stale_seconds=0)
+            called_keys = [c.args[1] for c in mock_sub_delay.call_args_list]
+            assert "cnpg" not in called_keys
+            assert "cert_manager" in called_keys
+    finally:
+        await release_task_lock(lock_key)
+
+
+@pytest.mark.asyncio
+async def test_sync_core_integration_task_skips_already_completed_or_locked(client: TestClient):
+    """Duplicate delivery of an already-completed or locked subtask must be a no-op."""
+    from unittest.mock import AsyncMock
+    from sqlmodel import select
+    from sqlmodel.ext.asyncio.session import AsyncSession
+    from sqlalchemy.orm.attributes import flag_modified
+    from mindweaver.fw.model import get_engine
+    from mindweaver.service.k8s_cluster.model import K8sClusterStatus
+    from mindweaver.tasks.k8s_cluster_status import _sync_core_integration_task
+    from mindweaver.tasks.resiliency import (
+        acquire_task_lock,
+        clear_memory_locks,
+        release_task_lock,
+    )
+
+    clear_memory_locks()
+
+    p1 = client.post(
+        "/api/v1/k8s_clusters",
+        json={
+            "name": "sync-idempotent",
+            "title": "Sync Idempotent",
+            "type": "in-cluster",
+        },
+    ).json()["data"]
+
+    with patch("mindweaver.tasks.k8s_cluster_status.sync_core_integrations_task.delay"):
+        client.post(
+            f"/api/v1/k8s_clusters/{p1['id']}/_actions",
+            json={"action": "sync_core_integrations"},
+        )
+
+    async with AsyncSession(get_engine()) as session:
+        res = await session.exec(
+            select(K8sClusterStatus).where(K8sClusterStatus.k8s_cluster_id == p1["id"])
+        )
+        st = res.one()
+        st.sync_state["tasks"]["cert_manager"]["status"] = "completed"
+        flag_modified(st, "sync_state")
+        await session.commit()
+
+    with patch(
+        "mindweaver.service.k8s_cluster.actions.InstallCertManagerAction.run",
+        new_callable=AsyncMock,
+    ) as mock_cm_run:
+        await _sync_core_integration_task(p1["id"], "cert_manager")
+        mock_cm_run.assert_not_awaited()
+
+    lock_key = f"k8s_cluster:{p1['id']}:cnpg"
+    assert await acquire_task_lock(lock_key, ttl=60)
+    try:
+        with patch(
+            "mindweaver.service.k8s_cluster.actions.InstallCNPGAction.run",
+            new_callable=AsyncMock,
+        ) as mock_cnpg_run:
+            await _sync_core_integration_task(p1["id"], "cnpg")
+            mock_cnpg_run.assert_not_awaited()
+    finally:
+        await release_task_lock(lock_key)
+
+
+@pytest.mark.asyncio
+async def test_sync_core_integrations_resume_reconciles_all_done_state(client: TestClient):
+    """If all tasks are done but top-level status remained in_progress, recovery finalizes it."""
+    from sqlmodel import select
+    from sqlmodel.ext.asyncio.session import AsyncSession
+    from sqlalchemy.orm.attributes import flag_modified
+    from mindweaver.fw.model import get_engine
+    from mindweaver.service.k8s_cluster.model import K8sClusterStatus
+    from mindweaver.tasks.k8s_cluster_status import _recover_stuck_sync_tasks
+    from mindweaver.tasks.resiliency import clear_memory_locks
+
+    clear_memory_locks()
+
+    p1 = client.post(
+        "/api/v1/k8s_clusters",
+        json={
+            "name": "sync-reconcile",
+            "title": "Sync Reconcile",
+            "type": "in-cluster",
+        },
+    ).json()["data"]
+
+    with patch("mindweaver.tasks.k8s_cluster_status.sync_core_integrations_task.delay"):
+        client.post(
+            f"/api/v1/k8s_clusters/{p1['id']}/_actions",
+            json={"action": "sync_core_integrations"},
+        )
+
+    async with AsyncSession(get_engine()) as session:
+        res = await session.exec(
+            select(K8sClusterStatus).where(K8sClusterStatus.k8s_cluster_id == p1["id"])
+        )
+        st = res.one()
+        for task_info in st.sync_state["tasks"].values():
+            task_info["status"] = "completed"
+        flag_modified(st, "sync_state")
+        await session.commit()
+
+    with patch("mindweaver.tasks.k8s_cluster_status.poll_k8s_cluster_status.delay") as mock_poll:
+        await _recover_stuck_sync_tasks(stale_seconds=0)
+        mock_poll.assert_called_once_with(p1["id"])
+
+    state = client.get(f"/api/v1/k8s_clusters/{p1['id']}/_state").json()["sync_state"]
+    assert state["status"] == "completed"
+    assert state["completed"] == 7
+    assert state["completed_at"] is not None
+
+
+def test_resume_sync_core_integrations_action(client: TestClient):
+    """resume_sync_core_integrations action is available only when sync is in_progress."""
+    p1 = client.post(
+        "/api/v1/k8s_clusters",
+        json={
+            "name": "sync-resume-action",
+            "title": "Sync Resume Action",
+            "type": "in-cluster",
+        },
+    ).json()["data"]
+
+    # Initially not in_progress -> action should fail
+    resp_unavail = client.post(
+        f"/api/v1/k8s_clusters/{p1['id']}/_actions",
+        json={"action": "resume_sync_core_integrations"},
+    )
+    assert resp_unavail.status_code != 200
+
+    with patch("mindweaver.tasks.k8s_cluster_status.sync_core_integrations_task.delay"):
+        resp_start = client.post(
+            f"/api/v1/k8s_clusters/{p1['id']}/_actions",
+            json={"action": "sync_core_integrations"},
+        )
+        assert resp_start.status_code == 200
+
+    with patch(
+        "mindweaver.tasks.k8s_cluster_status.recover_stuck_sync_tasks.delay"
+    ) as mock_recover:
+        resp_resume = client.post(
+            f"/api/v1/k8s_clusters/{p1['id']}/_actions",
+            json={"action": "resume_sync_core_integrations"},
+        )
+        assert resp_resume.status_code == 200
+        mock_recover.assert_called_once_with(stale_seconds=0, k8s_cluster_id=p1["id"])
+
+
+
 
 
 
