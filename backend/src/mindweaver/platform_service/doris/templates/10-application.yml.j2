@@ -29,6 +29,10 @@ spec:
           authSecretName: {{ name }}-admin-secret
         feSpec:
           replicas: {{ fe_replicas }}
+          {% if affinity_yaml %}
+          affinity:
+            {{ affinity_yaml | indent(12) }}
+          {% endif %}
           image:
             repository: "{{ fe_image }}"
             tag: "{{ fe_image_tag }}"
@@ -49,6 +53,10 @@ spec:
               storageClassName: ""
         beSpec:
           replicas: {{ be_replicas }}
+          {% if affinity_yaml %}
+          affinity:
+            {{ affinity_yaml | indent(12) }}
+          {% endif %}
           image:
             repository: "{{ be_image }}"
             tag: "{{ be_image_tag }}"

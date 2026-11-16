@@ -64,6 +64,21 @@ spec:
               backupOwnerReference: self
               method: barmanObjectStore
           {% endif %}
+          {% if node_affinity_yaml or pod_affinity_yaml or pod_anti_affinity_yaml %}
+          affinity:
+            {% if node_affinity_yaml %}
+            nodeAffinity:
+              {{ node_affinity_yaml | indent(14) }}
+            {% endif %}
+            {% if pod_affinity_yaml %}
+            additionalPodAffinity:
+              {{ pod_affinity_yaml | indent(14) }}
+            {% endif %}
+            {% if pod_anti_affinity_yaml %}
+            additionalPodAntiAffinity:
+              {{ pod_anti_affinity_yaml | indent(14) }}
+            {% endif %}
+          {% endif %}
         poolers:
           - name: rw
             type: rw
@@ -71,6 +86,11 @@ spec:
             instances: 1
             template:
               spec:
+                {% if node_affinity_yaml %}
+                affinity:
+                  nodeAffinity:
+                    {{ node_affinity_yaml | indent(20) }}
+                {% endif %}
                 containers:
                   - name: pgbouncer
                     image: {{ pgbouncer_image }}

@@ -20,3 +20,9 @@ spec:
         type: persistent-claim
         size: {{ .Values.controller.persistence.size }}
         deleteClaim: true
+  {{- with .Values.controller.affinity }}
+  template:
+    pod:
+      affinity:
+        {{- toYaml . | nindent 8 }}
+  {{- end }}

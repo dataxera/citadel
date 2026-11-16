@@ -48,6 +48,7 @@ class AirflowPlatformService(PlatformService[AirflowPlatform]):
     @classmethod
     def widgets(cls) -> dict[str, Any]:
         return {
+            **super().widgets(),
             "redis_enabled": {
                 "order": 8,
                 "label": "Deploy Redis Broker",
@@ -139,6 +140,7 @@ class AirflowPlatformService(PlatformService[AirflowPlatform]):
 
     async def template_vars(self, model: AirflowPlatform) -> dict:
         vars = model.model_dump()
+        self.populate_scheduling_vars(model, vars, pod_labels={"release": model.name})
         resolved_img, resolved_tag = await self.resolve_image(
             model, "airflow", "ghcr.io/kagesenshi/mindweaver/airflow:3.2.2-rev.5"
         )

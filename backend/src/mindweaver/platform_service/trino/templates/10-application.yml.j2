@@ -78,6 +78,10 @@ spec:
             {% endif %}
 
         coordinator:
+          {% if affinity_yaml %}
+          affinity:
+            {{ affinity_yaml | indent(12) }}
+          {% endif %}
           additionalExposedPorts:
             https:
               servicePort: 8443
@@ -214,6 +218,10 @@ spec:
             {% endif %}
 
         worker:
+          {% if affinity_yaml %}
+          affinity:
+            {{ affinity_yaml | indent(12) }}
+          {% endif %}
           additionalJVMConfig:
             - "-Dlog.enable-console=true"
             - "-Djavax.net.ssl.trustStore=/etc/trino/tls/truststore.jks"

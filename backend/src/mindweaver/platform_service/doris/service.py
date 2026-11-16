@@ -42,6 +42,7 @@ class DorisPlatformService(PlatformService[DorisPlatform]):
     def widgets(cls) -> dict[str, Any]:
         """Returns the DynamicForm widgets configuration for UI fields."""
         return {
+            **super().widgets(),
             "fe_replicas": {
                 "order": 5,
                 "type": "range",

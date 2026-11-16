@@ -48,6 +48,7 @@ class SupersetPlatformService(PlatformService[SupersetPlatform]):
     @classmethod
     def widgets(cls) -> dict[str, Any]:
         return {
+            **super().widgets(),
             "override_image": {
                 "order": 6,
                 "label": "Override Image",
@@ -134,6 +135,7 @@ class SupersetPlatformService(PlatformService[SupersetPlatform]):
 
     async def template_vars(self, model: SupersetPlatform) -> dict:
         vars = model.model_dump()
+        self.populate_scheduling_vars(model, vars, pod_labels={"release": model.name})
         resolved_img, resolved_tag = await self.resolve_image(
             model, "superset", "ghcr.io/kagesenshi/mindweaver/superset:6.1.0-rev.1"
         )

@@ -31,6 +31,10 @@ spec:
         fullnameOverride: {{ name }}
         controller:
           replicaCount: {{ replica_count }}
+          {% if affinity_yaml %}
+          affinity:
+            {{ affinity_yaml | indent(12) }}
+          {% endif %}
           resourcesPreset: none
           resources:
             requests:

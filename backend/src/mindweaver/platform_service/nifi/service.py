@@ -36,6 +36,7 @@ class NifiPlatformService(PlatformService[NifiPlatform]):
     def widgets(cls) -> dict[str, Any]:
         """Returns the DynamicForm widgets configuration for UI fields."""
         return {
+            **super().widgets(),
             "storage_size": {"order": 7, "label": "Storage Size"},
             "auth_role_mapping": {
                 "order": 8,
@@ -90,6 +91,7 @@ class NifiPlatformService(PlatformService[NifiPlatform]):
     async def template_vars(self, model: NifiPlatform) -> dict:
         """Resolves template variables required to render Helm/K8s manifests."""
         vars = model.model_dump()
+        self.populate_scheduling_vars(model, vars, pod_labels={"nifi_cr": model.name})
         vars["image"], vars["image_tag"] = await self.resolve_image(
             model, "nifi", "apache/nifi", "2.9.0"
         )

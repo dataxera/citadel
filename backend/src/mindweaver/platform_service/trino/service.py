@@ -62,6 +62,7 @@ class TrinoPlatformService(PlatformService[TrinoPlatform]):
     @classmethod
     def widgets(cls) -> dict[str, Any]:
         return {
+            **super().widgets(),
             "process_forwarded": {
                 "order": 9,
                 "label": "Process X-Forwarded Headers",

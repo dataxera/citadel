@@ -38,6 +38,18 @@ spec:
             default-group:
               isNode: true
               serviceAccountName: {{ name }}
+              {% if node_affinity_yaml %}
+              nodeAffinity:
+                {{ node_affinity_yaml | indent(16) }}
+              {% endif %}
+              {% if pod_affinity_yaml %}
+              podAffinity:
+                {{ pod_affinity_yaml | indent(16) }}
+              {% endif %}
+              {% if pod_anti_affinity_yaml %}
+              podAntiAffinity:
+                {{ pod_anti_affinity_yaml | indent(16) }}
+              {% endif %}
               storageConfigs:
                 - name: data
                   mountPath: "/opt/nifi/nifi-current/data"

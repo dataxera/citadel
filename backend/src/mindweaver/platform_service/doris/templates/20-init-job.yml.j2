@@ -29,6 +29,11 @@ spec:
         manager: mindweaver
     spec:
       restartPolicy: OnFailure
+      {% if node_affinity_yaml %}
+      affinity:
+        nodeAffinity:
+          {{ node_affinity_yaml | indent(10) }}
+      {% endif %}
       containers:
         - name: init-auth
           image: "{{ fe_image }}:{{ fe_image_tag }}"

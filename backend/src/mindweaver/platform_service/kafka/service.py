@@ -36,6 +36,7 @@ class KafkaPlatformService(PlatformService[KafkaPlatform]):
     def widgets(cls) -> dict[str, Any]:
         """Provides UI configuration widgets for metadata rendering."""
         return {
+            **super().widgets(),
             "storage_size": {"order": 7, "label": "Storage Size"},
             "replica_count": {
                 "order": 10,
@@ -89,6 +90,9 @@ class KafkaPlatformService(PlatformService[KafkaPlatform]):
     async def template_vars(self, model: KafkaPlatform) -> dict:
         """Resolves template variables required for rendering manifests."""
         vars = model.model_dump()
+        self.populate_scheduling_vars(
+            model, vars, pod_labels={"strimzi.io/cluster": model.name}
+        )
         vars["image"], vars["image_tag"] = await self.resolve_image(
             model, "kafka", "ghcr.io/kagesenshi/mindweaver/kafka", "4.0.0-rev.1"
         )

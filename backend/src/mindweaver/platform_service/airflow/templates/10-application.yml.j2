@@ -48,6 +48,10 @@ spec:
             pullPolicy: IfNotPresent
 
         executor: "{{ executor }}"
+        {% if affinity_yaml %}
+        affinity:
+          {{ affinity_yaml | indent(10) }}
+        {% endif %}
 
         data:
           metadataConnection:

@@ -4,6 +4,7 @@
 from datetime import datetime
 import abc
 import asyncio
+import enum
 import functools
 import fastapi
 from fastapi import Depends
@@ -17,10 +18,15 @@ from mindweaver.fw.exc import ModelValidationError
 from mindweaver.service.base import ProjectScopedNamedBase, ProjectScopedService
 from mindweaver.service.project import Project
 from mindweaver.service.k8s_cluster import K8sCluster, K8sClusterType, K8sClusterStatus
+from mindweaver.service.k8s_cluster.model import DEFAULT_NODE_ROLES
+from mindweaver.service.k8s_cluster.service import (
+    PROTECTED_NODE_ROLES,
+    validate_role_name,
+)
 from mindweaver.fw.service import after_update, before_delete, before_create, after_create
 from mindweaver.fw.state import BaseState
 from mindweaver.fw.cert_manager import reconcile_manifest_certificates
-from mindweaver.fw.permission import Execute, require
+from mindweaver.fw.permission import Execute, View, require
 import base64
 import inspect
 import os
@@ -32,7 +38,7 @@ from mindweaver.tasks.poll_coordinator import (
     schedule_platform_poll,
     schedule_k8s_cluster_poll,
 )
-from sqlalchemy import Column, DateTime, String
+from sqlalchemy import Column, DateTime, Enum as SQLEnum, String
 from sqlalchemy_utils import JSONType
 from sqlmodel import Field, select, delete
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -95,8 +101,45 @@ class PlatformStateUpdate(pydantic.BaseModel):
         return bool(v)
 
 
+class PlatformDeploymentMethod(enum.StrEnum):
+    """Pod scheduling / placement strategy for platform services."""
+
+    DEFAULT = "default"
+    PREFER_SAME_NODE = "prefer_same_node"
+    PREFER_DIFFERENT_NODES = "prefer_different_nodes"
+    REQUIRE_DIFFERENT_NODES = "require_different_nodes"
+    PREFER_DIFFERENT_ZONES = "prefer_different_zones"
+    PREFER_DIFFERENT_RACKS = "prefer_different_racks"
+
+
 class PlatformBase(ProjectScopedNamedBase):
-    pass
+    """Base model for deployable platform services with node-role and placement options."""
+
+    cluster_role: Optional[str] = Field(default=None, nullable=True)
+    deployment_method: PlatformDeploymentMethod = Field(
+        default=PlatformDeploymentMethod.DEFAULT,
+        sa_type=SQLEnum(
+            PlatformDeploymentMethod,
+            native_enum=False,
+            values_callable=lambda x: [i.value for i in x],
+        ),
+        sa_column_kwargs={
+            "nullable": False,
+            "server_default": PlatformDeploymentMethod.DEFAULT.value,
+        },
+    )
+
+    @pydantic.field_validator("cluster_role", mode="before")
+    @classmethod
+    def _validate_cluster_role(cls, v: Any) -> Optional[str]:
+        """Validate cluster_role, coercing blank strings to None."""
+        if v is None:
+            return None
+        if isinstance(v, str):
+            v = v.strip()
+            if not v:
+                return None
+        return validate_role_name(v)
 
 
 T = TypeVar("T", bound=PlatformBase)
@@ -173,11 +216,158 @@ class PlatformService(ProjectScopedService[T], abc.ABC):
             logger.warning(f"Failed to fetch trusted certs: {e}")
             return []
 
+    @classmethod
+    def widgets(cls) -> dict[str, Any]:
+        """Return shared form widgets for platform service scheduling options."""
+        return {
+            "cluster_role": {
+                "order": 5,
+                "column_span": 1,
+                "type": "select",
+                "label": "Cluster Role",
+                "endpoint": f"/api/v1{cls.service_path()}/_cluster-roles",
+                "placeholder": "Any node (no role restriction)",
+            },
+            "deployment_method": {
+                "order": 6,
+                "column_span": 1,
+                "type": "select",
+                "label": "Deployment Method",
+                "options": [
+                    {"label": "Default (Kubernetes Scheduler)", "value": PlatformDeploymentMethod.DEFAULT.value},
+                    {"label": "Prefer Same Node", "value": PlatformDeploymentMethod.PREFER_SAME_NODE.value},
+                    {"label": "Prefer Different Nodes", "value": PlatformDeploymentMethod.PREFER_DIFFERENT_NODES.value},
+                    {"label": "Require Different Nodes", "value": PlatformDeploymentMethod.REQUIRE_DIFFERENT_NODES.value},
+                    {"label": "Prefer Different Zones", "value": PlatformDeploymentMethod.PREFER_DIFFERENT_ZONES.value},
+                    {"label": "Prefer Different Racks", "value": PlatformDeploymentMethod.PREFER_DIFFERENT_RACKS.value},
+                ],
+            },
+        }
+
+    def build_scheduling_config(
+        self, model: T, pod_labels: dict[str, str] | None = None
+    ) -> dict[str, Any]:
+        """Build Kubernetes affinity structures from cluster_role and deployment_method."""
+        labels = pod_labels or {"app.kubernetes.io/instance": model.name}
+        affinity: dict[str, Any] = {}
+        node_affinity: dict[str, Any] = {}
+        pod_affinity: dict[str, Any] = {}
+        pod_anti_affinity: dict[str, Any] = {}
+
+        cluster_role = getattr(model, "cluster_role", None)
+        if cluster_role:
+            node_affinity = {
+                "requiredDuringSchedulingIgnoredDuringExecution": {
+                    "nodeSelectorTerms": [
+                        {
+                            "matchExpressions": [
+                                {
+                                    "key": f"node-role.kubernetes.io/{cluster_role}",
+                                    "operator": "Exists",
+                                }
+                            ]
+                        }
+                    ]
+                }
+            }
+            affinity["nodeAffinity"] = node_affinity
+
+        raw_method = getattr(model, "deployment_method", PlatformDeploymentMethod.DEFAULT)
+        method = raw_method.value if isinstance(raw_method, enum.Enum) else (raw_method or PlatformDeploymentMethod.DEFAULT.value)
+
+        selector = {"matchLabels": dict(labels)}
+        if method == PlatformDeploymentMethod.PREFER_SAME_NODE.value:
+            pod_affinity = {
+                "preferredDuringSchedulingIgnoredDuringExecution": [
+                    {
+                        "weight": 100,
+                        "podAffinityTerm": {
+                            "labelSelector": selector,
+                            "topologyKey": "kubernetes.io/hostname",
+                        },
+                    }
+                ]
+            }
+            affinity["podAffinity"] = pod_affinity
+        elif method == PlatformDeploymentMethod.PREFER_DIFFERENT_NODES.value:
+            pod_anti_affinity = {
+                "preferredDuringSchedulingIgnoredDuringExecution": [
+                    {
+                        "weight": 100,
+                        "podAffinityTerm": {
+                            "labelSelector": selector,
+                            "topologyKey": "kubernetes.io/hostname",
+                        },
+                    }
+                ]
+            }
+            affinity["podAntiAffinity"] = pod_anti_affinity
+        elif method == PlatformDeploymentMethod.REQUIRE_DIFFERENT_NODES.value:
+            pod_anti_affinity = {
+                "requiredDuringSchedulingIgnoredDuringExecution": [
+                    {
+                        "labelSelector": selector,
+                        "topologyKey": "kubernetes.io/hostname",
+                    }
+                ]
+            }
+            affinity["podAntiAffinity"] = pod_anti_affinity
+        elif method == PlatformDeploymentMethod.PREFER_DIFFERENT_ZONES.value:
+            pod_anti_affinity = {
+                "preferredDuringSchedulingIgnoredDuringExecution": [
+                    {
+                        "weight": 100,
+                        "podAffinityTerm": {
+                            "labelSelector": selector,
+                            "topologyKey": "topology.kubernetes.io/zone",
+                        },
+                    }
+                ]
+            }
+            affinity["podAntiAffinity"] = pod_anti_affinity
+        elif method == PlatformDeploymentMethod.PREFER_DIFFERENT_RACKS.value:
+            pod_anti_affinity = {
+                "preferredDuringSchedulingIgnoredDuringExecution": [
+                    {
+                        "weight": 100,
+                        "podAffinityTerm": {
+                            "labelSelector": selector,
+                            "topologyKey": "topology.kubernetes.io/rack",
+                        },
+                    }
+                ]
+            }
+            affinity["podAntiAffinity"] = pod_anti_affinity
+
+        return {
+            "affinity": affinity,
+            "affinity_yaml": yaml.safe_dump(affinity, sort_keys=False).rstrip() if affinity else "",
+            "node_affinity": node_affinity,
+            "node_affinity_yaml": yaml.safe_dump(node_affinity, sort_keys=False).rstrip() if node_affinity else "",
+            "pod_affinity": pod_affinity,
+            "pod_affinity_yaml": yaml.safe_dump(pod_affinity, sort_keys=False).rstrip() if pod_affinity else "",
+            "pod_anti_affinity": pod_anti_affinity,
+            "pod_anti_affinity_yaml": yaml.safe_dump(pod_anti_affinity, sort_keys=False).rstrip() if pod_anti_affinity else "",
+        }
+
+    def populate_scheduling_vars(
+        self, model: T, vars: dict[str, Any], pod_labels: dict[str, str] | None = None
+    ) -> dict[str, Any]:
+        """Inject scheduling affinity variables into template vars."""
+        sched = self.build_scheduling_config(model, pod_labels=pod_labels)
+        vars["scheduling"] = sched
+        vars["affinity_yaml"] = sched["affinity_yaml"]
+        vars["node_affinity_yaml"] = sched["node_affinity_yaml"]
+        vars["pod_affinity_yaml"] = sched["pod_affinity_yaml"]
+        vars["pod_anti_affinity_yaml"] = sched["pod_anti_affinity_yaml"]
+        return vars
+
     async def template_vars(self, model: T) -> dict:
         """returns the variables to be used in the template"""
         vars = model.model_dump()
         vars["trusted_certs"] = await self._fetch_trusted_certs(model)
         self.populate_trusted_cert_init_container(model, vars)
+        self.populate_scheduling_vars(model, vars)
         return vars
 
     async def render_manifests(self, model: T) -> str:
@@ -201,6 +391,8 @@ class PlatformService(ProjectScopedService[T], abc.ABC):
         if "trusted_certs" not in vars:
             vars["trusted_certs"] = await self._fetch_trusted_certs(model)
         self.populate_trusted_cert_init_container(model, vars)
+        if "scheduling" not in vars:
+            self.populate_scheduling_vars(model, vars)
         project = await self.project(model)
         vars["project_name"] = project.name
         vars["project_title"] = sanitize_label_value(project.title)
@@ -741,11 +933,67 @@ class PlatformService(ProjectScopedService[T], abc.ABC):
         cls, router: fastapi.APIRouter, service_path: str, model_path: str
     ):
         """Register views for the service, adding the deploy endpoint"""
-        super().register_views(router, service_path, model_path)
-
         model_class = cls.model_class()
         entity_type = cls.entity_type()
         path_tags = cls.path_tags()
+
+
+        @router.get(
+            f"{service_path}/_cluster-roles",
+            operation_id=f"mw-cluster-roles-{entity_type}",
+            dependencies=cls.extra_dependencies() + [require(View)],
+            tags=path_tags,
+        )
+        async def list_cluster_roles(
+            svc: Annotated[cls, Depends(cls.get_service)],  # type: ignore
+            request: fastapi.Request,
+        ):
+            """Return available Kubernetes node roles for the active project's cluster."""
+            roles: set[str] = set()
+            project_id_raw = request.headers.get("x-project-id")
+            if project_id_raw:
+                try:
+                    project_id = int(project_id_raw)
+                    proj_res = await svc.session.exec(
+                        select(Project).where(Project.id == project_id)
+                    )
+                    project = proj_res.one_or_none()
+                    if project and project.k8s_cluster_id:
+                        cluster = (
+                            await svc.session.exec(
+                                select(K8sCluster).where(
+                                    K8sCluster.id == project.k8s_cluster_id
+                                )
+                            )
+                        ).one_or_none()
+                        if cluster and isinstance(cluster.topology_config, dict):
+                            cfg_roles = cluster.topology_config.get("roles")
+                            if isinstance(cfg_roles, list) and cfg_roles:
+                                roles.update(
+                                    r for r in cfg_roles if r not in PROTECTED_NODE_ROLES
+                                )
+                        status_model = (
+                            await svc.session.exec(
+                                select(K8sClusterStatus).where(
+                                    K8sClusterStatus.k8s_cluster_id
+                                    == project.k8s_cluster_id
+                                )
+                            )
+                        ).one_or_none()
+                        if status_model and isinstance(status_model.nodes_details, list):
+                            for node in status_model.nodes_details:
+                                for r in node.get("roles") or []:
+                                    if r not in PROTECTED_NODE_ROLES:
+                                        roles.add(r)
+                except (ValueError, TypeError):
+                    pass
+
+            if not roles:
+                roles.update(DEFAULT_NODE_ROLES)
+
+            return [{"label": r, "value": r} for r in sorted(roles)]
+
+        super().register_views(router, service_path, model_path)
 
         @router.post(
             f"{model_path}/_deploy",

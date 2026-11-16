@@ -50,6 +50,7 @@ class PgSqlPlatformService(PlatformService[PgSqlPlatform]):
     @classmethod
     def widgets(cls) -> dict[str, Any]:
         return {
+            **super().widgets(),
             "instances": {"order": 10, "type": "range", "min": 1, "max": 9, "step": 2},
 
             "cpu_request": {
@@ -115,6 +116,9 @@ class PgSqlPlatformService(PlatformService[PgSqlPlatform]):
 
     async def template_vars(self, model: PgSqlPlatform) -> dict:
         vars = model.model_dump()
+        self.populate_scheduling_vars(
+            model, vars, pod_labels={"cnpg.io/cluster": model.name}
+        )
 
         # Resolve namespace
         vars["namespace"] = await self._resolve_namespace(model)

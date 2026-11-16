@@ -40,6 +40,7 @@ class HiveMetastorePlatformService(PlatformService[HiveMetastorePlatform]):
     @classmethod
     def widgets(cls) -> dict[str, Any]:
         return {
+            **super().widgets(),
             "replica_count": {
                 "order": 10,
                 "type": "range",

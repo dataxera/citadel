@@ -40,6 +40,10 @@ spec:
           enabled: {{ 'true' if iceberg_enabled else 'false' }}
           port: 9001
         warehouseDir: {{ warehouse_dir }}
+        {% if affinity_yaml %}
+        affinity:
+          {{ affinity_yaml | indent(10) }}
+        {% endif %}
   destination:
     server: 'https://kubernetes.default.svc'
     namespace: {{ namespace }}
