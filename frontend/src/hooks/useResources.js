@@ -285,6 +285,24 @@ export const useK8sClusters = () => {
         return response.data;
     }, [fetchClusters]);
 
+    const updateNodeLabels = useCallback(async (id, nodeName, payload) => {
+        const response = await apiClient.put(
+            `/k8s_clusters/${id}/_nodes/${encodeURIComponent(nodeName)}/labels`,
+            payload
+        );
+        return response.data;
+    }, []);
+
+    const getClusterTopology = useCallback(async (id) => {
+        const response = await apiClient.get(`/k8s_clusters/${id}/_topology`);
+        return response.data;
+    }, []);
+
+    const updateClusterTopology = useCallback(async (id, payload) => {
+        const response = await apiClient.put(`/k8s_clusters/${id}/_topology`, payload);
+        return response.data;
+    }, []);
+
     useEffect(() => {
         fetchClusters();
     }, [fetchClusters]);
@@ -292,7 +310,8 @@ export const useK8sClusters = () => {
     return {
         clusters, loading, error,
         fetchClusters, createCluster, updateCluster, deleteCluster,
-        getClusterState, refreshClusterState, fetchActions, executeAction
+        getClusterState, refreshClusterState, fetchActions, executeAction,
+        updateNodeLabels, getClusterTopology, updateClusterTopology
     };
 };
 

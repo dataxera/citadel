@@ -6,11 +6,27 @@ from datetime import datetime
 from typing import Optional, Any
 
 from sqlmodel import Field, Column
-from sqlalchemy import String, Enum as SQLEnum, DateTime
+from sqlalchemy import String, Enum as SQLEnum, DateTime, text
 from sqlalchemy_utils import JSONType
 
 from mindweaver.service import NamedBase
 from mindweaver.fw.model import Base, ts_now
+
+
+DEFAULT_TOPOLOGY_LEVELS: list[dict[str, str]] = [
+    {"name": "region", "label": "Region", "key": "topology.kubernetes.io/region"},
+    {"name": "zone", "label": "Zone", "key": "topology.kubernetes.io/zone"},
+    {"name": "rack", "label": "Rack", "key": "topology.kubernetes.io/rack"},
+]
+
+DEFAULT_NODE_ROLES: tuple[str, ...] = (
+    "ingest",
+    "queue",
+    "compute",
+    "database",
+    "warehouse",
+    "application",
+)
 
 
 class K8sClusterType(enum.StrEnum):
@@ -35,6 +51,10 @@ class K8sCluster(NamedBase, table=True):
         ),
     )
     kubeconfig: Optional[str] = Field(default=None, sa_type=String)
+    topology_config: dict[str, Any] = Field(
+        default_factory=dict,
+        sa_column=Column(JSONType(), nullable=False, server_default=text("'{}'")),
+    )
 
 
 class K8sClusterStatus(Base, table=True):

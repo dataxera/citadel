@@ -64,6 +64,11 @@ class Refresh(View):
     name: str = "k8s_cluster:refresh"
 
 
+class ConfigureNodes(Write):
+    """Permission to configure k8s cluster node labels, roles, GPU labels, and rack topology."""
+    name: str = "k8s_cluster:configure_nodes"
+
+
 # Canonical Aliases
 ManageK8sCluster = Manage
 ManageK8sClusterPermission = Manage
@@ -78,3 +83,4 @@ K8sClusterUpdate = Update
 K8sClusterDelete = Delete
 K8sClusterExecute = Execute
 K8sClusterRefresh = Refresh
+K8sClusterConfigureNodes = ConfigureNodes

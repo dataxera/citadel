@@ -3,19 +3,132 @@
 
 import asyncio
 import logging
+import re
 import tempfile
 from typing import Any
 
 from kubernetes import client, config
+from sqlalchemy.orm.attributes import flag_modified
 from sqlmodel import select
 
 from mindweaver.service import Service
 from mindweaver.fw.model import ts_now
 from mindweaver.tasks.poll_coordinator import schedule_k8s_cluster_poll
-from .model import K8sCluster, K8sClusterStatus, K8sClusterType
+from .model import (
+    DEFAULT_NODE_ROLES,
+    DEFAULT_TOPOLOGY_LEVELS,
+    K8sCluster,
+    K8sClusterStatus,
+    K8sClusterType,
+)
 from . import permission
 
 logger = logging.getLogger(__name__)
+
+_UNSET = object()
+
+_LABEL_PREFIX_RE = re.compile(
+    r"^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$"
+)
+_LABEL_NAME_RE = re.compile(r"^[A-Za-z0-9]([-A-Za-z0-9_.]*[A-Za-z0-9])?$")
+
+PROTECTED_NODE_LABELS = frozenset(
+    {
+        "kubernetes.io/hostname",
+        "kubernetes.io/os",
+        "kubernetes.io/arch",
+        "beta.kubernetes.io/os",
+        "beta.kubernetes.io/arch",
+    }
+)
+PROTECTED_NODE_LABEL_PREFIXES = (
+    "k3s.io/",
+    "k3s.cattle.io/",
+)
+PROTECTED_NODE_LABEL_SUFFIX_PREFIXES = (
+    ".k3s.io/",
+    ".k3s.cattle.io/",
+)
+PROTECTED_NODE_ROLES = frozenset({"control-plane", "master", "etcd"})
+
+
+def is_protected_node_label(key: str) -> bool:
+    """Return True if the node label key is system- or K3s-managed and must not be modified."""
+    if key in PROTECTED_NODE_LABELS:
+        return True
+    if key.startswith(PROTECTED_NODE_LABEL_PREFIXES):
+        return True
+    if "/" in key:
+        prefix = key.split("/", 1)[0] + "/"
+        if prefix.endswith(PROTECTED_NODE_LABEL_SUFFIX_PREFIXES):
+            return True
+    return False
+
+NVIDIA_GPU_LABEL = "nvidia.com/gpu.present"
+NVIDIA_PCI_LABEL = "feature.node.kubernetes.io/pci-10de.present"
+AMD_GPU_LABEL = "amd.com/gpu.present"
+AMD_PCI_LABEL = "feature.node.kubernetes.io/pci-1002.present"
+
+
+def validate_k8s_label_key(key: str) -> str:
+    """Validate a Kubernetes label key (optional DNS prefix + name)."""
+    if not isinstance(key, str) or not key:
+        raise ValueError("Label key must be a non-empty string")
+    if key.count("/") > 1:
+        raise ValueError(f"Invalid label key '{key}': multiple '/' characters")
+    if "/" in key:
+        prefix, name = key.split("/", 1)
+        if not prefix or len(prefix) > 253 or not _LABEL_PREFIX_RE.match(prefix):
+            raise ValueError(f"Invalid label key prefix '{prefix}'")
+    else:
+        name = key
+    if not name or len(name) > 63 or not _LABEL_NAME_RE.match(name):
+        raise ValueError(f"Invalid label key name '{name}'")
+    return key
+
+
+def validate_k8s_label_value(value: str) -> str:
+    """Validate a Kubernetes label value."""
+    if not isinstance(value, str):
+        raise ValueError("Label value must be a string")
+    if value == "":
+        return value
+    if len(value) > 63 or not _LABEL_NAME_RE.match(value):
+        raise ValueError(f"Invalid label value '{value}'")
+    return value
+
+
+def validate_role_name(role: str) -> str:
+    """Validate a user-defined Kubernetes node role name."""
+    if not isinstance(role, str) or not role:
+        raise ValueError("Role name must be a non-empty string")
+    if role in PROTECTED_NODE_ROLES:
+        raise ValueError(f"Role '{role}' is system-managed and cannot be modified")
+    if len(role) > 63 or not _LABEL_NAME_RE.match(role):
+        raise ValueError(f"Invalid role name '{role}'")
+    return role
+
+
+def sanitize_topology_label_value(value: str) -> str:
+    """Convert a hierarchical topology value (possibly containing '/') into a valid K8s label value."""
+    return value.replace("/", "-")
+
+
+def validate_topology_value(value: str, allow_slash: bool = False) -> str:
+    """Validate a topology tier value, optionally allowing '/' for hierarchical rack paths."""
+    if not isinstance(value, str) or not value:
+        raise ValueError("Topology value must be a non-empty string")
+    if not allow_slash:
+        return validate_k8s_label_value(value)
+    if value.startswith("/") or value.endswith("/") or "//" in value:
+        raise ValueError(f"Invalid hierarchical topology value '{value}'")
+    for segment in value.split("/"):
+        if not segment or not _LABEL_NAME_RE.match(segment):
+            raise ValueError(f"Invalid segment '{segment}' in topology value '{value}'")
+    sanitized = sanitize_topology_label_value(value)
+    if len(sanitized) > 63:
+        raise ValueError(f"Topology value '{value}' exceeds 63 characters")
+    return value
 
 _BYTE_UNITS_TO_GIB: dict[str, float] = {
     "Ki": 1024 / (1024**3),
@@ -120,7 +233,9 @@ def compute_pod_requests(pod) -> tuple[float, float, float]:
 
 
 def build_nodes_details(
-    nodes_items: list[Any], pods_items: list[Any]
+    nodes_items: list[Any],
+    pods_items: list[Any],
+    topology_levels: list[dict[str, str]] | None = None,
 ) -> tuple[
     dict[str, str],
     list[str],
@@ -130,7 +245,7 @@ def build_nodes_details(
     float,
     list[dict[str, Any]],
 ]:
-    """Aggregate node health, capacity, and pod request utilization per node."""
+    """Aggregate node health, capacity, labels, topology, GPU info, and pod utilization per node."""
     pod_requests_by_node: dict[str, list[float]] = {}
     for pod in pods_items or []:
         phase = getattr(getattr(pod, "status", None), "phase", None)
@@ -185,13 +300,58 @@ def build_nodes_details(
         ram_allocated += req_ram
 
         created_at = getattr(node.metadata, "creation_timestamp", None)
-        labels = getattr(node.metadata, "labels", None) or {}
+        raw_labels = getattr(node.metadata, "labels", None)
+        labels = dict(raw_labels) if isinstance(raw_labels, dict) else {}
         roles = sorted(
             key.split("node-role.kubernetes.io/", 1)[1]
             for key in labels
             if key.startswith("node-role.kubernetes.io/")
             and key.split("node-role.kubernetes.io/", 1)[1]
         )
+
+        levels = topology_levels or DEFAULT_TOPOLOGY_LEVELS
+        topology = {
+            lvl["name"]: labels[lvl["key"]]
+            for lvl in levels
+            if lvl.get("key") in labels and labels[lvl["key"]] != ""
+        }
+
+        def _parse_int(val: Any) -> int:
+            try:
+                return int(val)
+            except (TypeError, ValueError):
+                return 0
+
+        nvidia_cap = _parse_int(capacity.get("nvidia.com/gpu"))
+        amd_cap = _parse_int(capacity.get("amd.com/gpu"))
+        intel_cap = _parse_int(capacity.get("intel.com/gpu"))
+
+        gpu_vendor: str | None = None
+        gpu_count = 0
+        if (
+            nvidia_cap > 0
+            or labels.get(NVIDIA_GPU_LABEL) == "true"
+            or labels.get(NVIDIA_PCI_LABEL) == "true"
+        ):
+            gpu_vendor = "nvidia"
+            gpu_count = nvidia_cap
+        elif (
+            amd_cap > 0
+            or labels.get(AMD_GPU_LABEL) == "true"
+            or labels.get(AMD_PCI_LABEL) == "true"
+        ):
+            gpu_vendor = "amd"
+            gpu_count = amd_cap
+        elif intel_cap > 0:
+            gpu_vendor = "intel"
+            gpu_count = intel_cap
+
+        gpu_product = (
+            labels.get("nvidia.com/gpu.product")
+            or labels.get("amd.com/gpu.product")
+            or None
+        )
+
         node_info = getattr(node.status, "node_info", None)
         version = getattr(node_info, "kubelet_version", None) if node_info else None
 
@@ -201,6 +361,11 @@ def build_nodes_details(
                 "ip": internal_ip or external_ip,
                 "status": status,
                 "roles": roles,
+                "labels": labels,
+                "topology": topology,
+                "gpu_vendor": gpu_vendor,
+                "gpu_count": gpu_count,
+                "gpu_product": gpu_product,
                 "creation_timestamp": created_at.isoformat() if created_at else None,
                 "version": version,
                 "cpu_total": round(node_cpu_total, 4),
@@ -290,6 +455,11 @@ class K8sClusterService(Service[K8sCluster]):
                 except Exception as e:
                     logger.warning(f"Failed to list pods for node requests: {e}")
 
+                topology_levels = (
+                    model.topology_config.get("levels")
+                    if isinstance(model.topology_config, dict)
+                    else None
+                )
                 (
                     nodes_status,
                     node_ips,
@@ -298,7 +468,11 @@ class K8sClusterService(Service[K8sCluster]):
                     cpu_allocated,
                     ram_allocated,
                     nodes_details,
-                ) = build_nodes_details(nodes.items, all_pods_items)
+                ) = build_nodes_details(
+                    nodes.items,
+                    all_pods_items,
+                    topology_levels=topology_levels,
+                )
 
                 def _pod_readiness(pods_items) -> tuple[str, str]:
                     if not pods_items:
@@ -746,6 +920,263 @@ class K8sClusterService(Service[K8sCluster]):
             )
 
         await self.session.flush()
+
+    @classmethod
+    def _get_core_v1_client(cls, model: K8sCluster) -> client.CoreV1Api:
+        """Build a synchronous Kubernetes CoreV1Api client for the given cluster."""
+        conf = client.Configuration()
+        if model.type == K8sClusterType.IN_CLUSTER:
+            config.load_incluster_config(client_configuration=conf)
+        else:
+            if not model.kubeconfig:
+                raise ValueError(f"Cluster {model.name} has no kubeconfig")
+            with tempfile.NamedTemporaryFile(mode="w") as kf:
+                kf.write(model.kubeconfig)
+                kf.flush()
+                config.load_kube_config(config_file=kf.name, client_configuration=conf)
+        conf.request_timeout = 10
+        return client.CoreV1Api(client.ApiClient(conf))
+
+    @staticmethod
+    def _build_gpu_label_patch(gpu_vendor: str | None) -> dict[str, str | None]:
+        """Build strategic-merge label patch for NVIDIA/AMD GPU provisioning labels."""
+        if gpu_vendor == "nvidia":
+            return {
+                NVIDIA_GPU_LABEL: "true",
+                AMD_GPU_LABEL: None,
+                AMD_PCI_LABEL: None,
+            }
+        if gpu_vendor == "amd":
+            return {
+                AMD_GPU_LABEL: "true",
+                AMD_PCI_LABEL: "true",
+                NVIDIA_GPU_LABEL: None,
+            }
+        if gpu_vendor in (None, "", "none"):
+            return {
+                NVIDIA_GPU_LABEL: None,
+                NVIDIA_PCI_LABEL: None,
+                AMD_GPU_LABEL: None,
+                AMD_PCI_LABEL: None,
+            }
+        raise ValueError(f"Unsupported GPU vendor '{gpu_vendor}'")
+
+    async def update_node_labels(
+        self,
+        model: K8sCluster,
+        node_name: str,
+        set_labels: dict[str, str] | None = None,
+        remove_labels: list[str] | None = None,
+        roles: list[str] | None = None,
+        gpu_vendor: Any = _UNSET,
+    ) -> dict[str, Any]:
+        """Update node labels, user-defined roles, and GPU provisioning labels on a K8s node."""
+        patch_labels: dict[str, str | None] = {}
+
+        for k, v in (set_labels or {}).items():
+            validate_k8s_label_key(k)
+            validate_k8s_label_value(v)
+            if is_protected_node_label(k):
+                raise ValueError(f"Label '{k}' is system-protected and cannot be modified")
+            if k.startswith("node-role.kubernetes.io/"):
+                role_part = k.split("node-role.kubernetes.io/", 1)[1]
+                validate_role_name(role_part)
+            patch_labels[k] = v
+
+        for k in remove_labels or []:
+            validate_k8s_label_key(k)
+            if is_protected_node_label(k):
+                raise ValueError(f"Label '{k}' is system-protected and cannot be removed")
+            if k.startswith("node-role.kubernetes.io/"):
+                role_part = k.split("node-role.kubernetes.io/", 1)[1]
+                validate_role_name(role_part)
+            patch_labels[k] = None
+
+        validated_roles: list[str] | None = None
+        if roles is not None:
+            validated_roles = [validate_role_name(r) for r in roles]
+
+        if gpu_vendor is not _UNSET:
+            patch_labels.update(self._build_gpu_label_patch(gpu_vendor))
+
+        def _patch():
+            core_v1 = self._get_core_v1_client(model)
+            if validated_roles is not None:
+                node_obj = core_v1.read_node(name=node_name)
+                raw = getattr(getattr(node_obj, "metadata", None), "labels", None)
+                existing_labels = dict(raw) if isinstance(raw, dict) else {}
+                existing_user_roles = {
+                    k.split("node-role.kubernetes.io/", 1)[1]
+                    for k in existing_labels
+                    if k.startswith("node-role.kubernetes.io/")
+                    and k.split("node-role.kubernetes.io/", 1)[1] not in PROTECTED_NODE_ROLES
+                }
+                desired_roles = set(validated_roles)
+                for r in existing_user_roles - desired_roles:
+                    patch_labels[f"node-role.kubernetes.io/{r}"] = None
+                for r in desired_roles:
+                    patch_labels[f"node-role.kubernetes.io/{r}"] = ""
+
+            if patch_labels:
+                core_v1.patch_node(
+                    name=node_name,
+                    body={"metadata": {"labels": patch_labels}},
+                )
+
+        await asyncio.to_thread(_patch)
+        await self.poll_status(model)
+        return {"status": "success", "node": node_name, "patched_labels": patch_labels}
+
+    async def get_topology(self, model: K8sCluster) -> dict[str, Any]:
+        """Return cluster rack hierarchy levels, user-defined roles, presets, and node assignments."""
+        cfg = model.topology_config if isinstance(model.topology_config, dict) else {}
+        levels = list(DEFAULT_TOPOLOGY_LEVELS)
+        saved_roles = set(
+            cfg["roles"] if "roles" in cfg and cfg["roles"] is not None else DEFAULT_NODE_ROLES
+        )
+        saved_presets = cfg.get("presets") if isinstance(cfg.get("presets"), list) else []
+        presets: list[dict[str, str]] = []
+        for entry in saved_presets:
+            if isinstance(entry, dict):
+                clean = {
+                    lvl["name"]: str(entry[lvl["name"]]).strip()
+                    for lvl in levels
+                    if entry.get(lvl["name"])
+                }
+                if clean and clean not in presets:
+                    presets.append(clean)
+
+        stmt = select(K8sClusterStatus).where(
+            K8sClusterStatus.k8s_cluster_id == model.id
+        )
+        res = await self.session.exec(stmt)
+        status_model = res.one_or_none()
+        nodes_details = (
+            list(status_model.nodes_details)
+            if status_model and isinstance(status_model.nodes_details, list)
+            else []
+        )
+
+        assignments: dict[str, dict[str, str]] = {}
+        saved_assignments = cfg.get("assignments") or {}
+        for host, vals in saved_assignments.items():
+            if isinstance(vals, dict):
+                assignments[host] = {k: v for k, v in vals.items() if v}
+
+        for node in nodes_details:
+            host = node.get("hostname")
+            if not host:
+                continue
+            node_labels = node.get("labels") or {}
+            node_topo = dict(assignments.get(host) or {})
+            for lvl in levels:
+                key = lvl.get("key")
+                name = lvl.get("name")
+                if key and name and node_labels.get(key):
+                    live_val = node_labels[key]
+                    saved_val = node_topo.get(name)
+                    if not saved_val or sanitize_topology_label_value(saved_val) != live_val:
+                        node_topo[name] = live_val
+            if node_topo:
+                assignments[host] = node_topo
+            for r in node.get("roles") or []:
+                if r not in PROTECTED_NODE_ROLES:
+                    saved_roles.add(r)
+
+        return {
+            "levels": levels,
+            "roles": sorted(saved_roles),
+            "presets": presets,
+            "assignments": assignments,
+            "nodes": nodes_details,
+        }
+
+    async def update_topology(
+        self,
+        model: K8sCluster,
+        roles: list[str] | None = None,
+        presets: list[dict[str, str]] | None = None,
+        assignments: dict[str, dict[str, str | None]] | None = None,
+    ) -> dict[str, Any]:
+        """Persist rack hierarchy roles/presets/assignments and patch topology labels onto K8s nodes."""
+        cfg = dict(model.topology_config) if isinstance(model.topology_config, dict) else {}
+        active_levels = list(DEFAULT_TOPOLOGY_LEVELS)
+
+        if roles is not None:
+            cfg["roles"] = sorted({validate_role_name(r) for r in roles})
+
+        level_key_by_name = {lvl["name"]: lvl["key"] for lvl in active_levels}
+
+        if presets is not None:
+            clean_presets: list[dict[str, str]] = []
+            for entry in presets:
+                if not isinstance(entry, dict):
+                    raise ValueError("Each topology preset must be an object of region/zone/rack")
+                clean_entry: dict[str, str] = {}
+                for tier_name in level_key_by_name:
+                    raw_val = entry.get(tier_name)
+                    if raw_val is None or str(raw_val).strip() == "":
+                        continue
+                    val = str(raw_val).strip()
+                    validate_topology_value(val, allow_slash=(tier_name == "rack"))
+                    clean_entry[tier_name] = val
+                for unknown_key in entry:
+                    if unknown_key not in level_key_by_name:
+                        raise ValueError(f"Unknown topology level '{unknown_key}'")
+                if not clean_entry:
+                    raise ValueError("Topology preset must specify at least one of region, zone, or rack")
+                if clean_entry not in clean_presets:
+                    clean_presets.append(clean_entry)
+            cfg["presets"] = clean_presets
+
+        active_presets = cfg.get("presets") if isinstance(cfg.get("presets"), list) else []
+        node_patches: dict[str, dict[str, str | None]] = {}
+
+        if assignments is not None:
+            stored_assignments = dict(cfg.get("assignments") or {})
+            for hostname, tier_map in assignments.items():
+                patch_map: dict[str, str | None] = {}
+                clean_tiers = dict(stored_assignments.get(hostname) or {})
+                candidate_entry: dict[str, str] = {}
+                for tier_name, tier_val in tier_map.items():
+                    if tier_name not in level_key_by_name:
+                        raise ValueError(f"Unknown topology level '{tier_name}'")
+                    k8s_key = level_key_by_name[tier_name]
+                    if tier_val is None or tier_val == "":
+                        patch_map[k8s_key] = None
+                        clean_tiers.pop(tier_name, None)
+                    else:
+                        allow_slash = tier_name == "rack"
+                        validate_topology_value(tier_val, allow_slash=allow_slash)
+                        patch_map[k8s_key] = sanitize_topology_label_value(tier_val)
+                        clean_tiers[tier_name] = tier_val
+                        candidate_entry[tier_name] = tier_val
+                if candidate_entry and active_presets and candidate_entry not in active_presets:
+                    raise ValueError(
+                        f"Topology combination {candidate_entry} is not in configured presets"
+                    )
+                stored_assignments[hostname] = clean_tiers
+                if patch_map:
+                    node_patches[hostname] = patch_map
+            cfg["assignments"] = stored_assignments
+
+        model.topology_config = cfg
+        flag_modified(model, "topology_config")
+        await self.session.flush()
+
+        if node_patches:
+            def _patch_all():
+                core_v1 = self._get_core_v1_client(model)
+                for hostname, patch_map in node_patches.items():
+                    core_v1.patch_node(
+                        name=hostname,
+                        body={"metadata": {"labels": patch_map}},
+                    )
+
+            await asyncio.to_thread(_patch_all)
+            await self.poll_status(model)
+
+        return await self.get_topology(model)
 
     @classmethod
     def widgets(cls) -> dict[str, Any]:

@@ -1,11 +1,16 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
-    Activity, Monitor, RefreshCw, CheckCircle2, AlertCircle, Loader2, Clock, Copy, Check
+    Activity, Monitor, RefreshCw, CheckCircle2, AlertCircle, Loader2, Clock, Copy, Check,
+    Network, SlidersHorizontal, Cpu, Layers, Table2, GitBranch
 } from 'lucide-react';
 import { useNotification } from '../../providers/NotificationProvider';
 import Modal from '../../components/Modal';
 import { cn } from '../../utils/cn';
 import { useVisibilityPolling } from '../../hooks/useStatePolling';
+import NodeConfigModal from './NodeConfigModal';
+import RackTopologyModal from './RackTopologyModal';
+import TopologyPresetsModal from './TopologyPresetsModal';
+import NodeHierarchyView from './NodeHierarchyView';
 
 const CORE_INTEGRATIONS_CONFIG = [
     { key: 'argocd', name: 'ArgoCD', installedField: 'argocd_installed', versionField: 'argocd_version' },
@@ -75,12 +80,17 @@ const ServiceView = ({
     onBack,
     clustersHook
 }) => {
-    const { getClusterState, refreshClusterState } = clustersHook;
+    const { getClusterState, refreshClusterState, updateNodeLabels, getClusterTopology, updateClusterTopology } = clustersHook;
     const [clusterState, setClusterState] = useState(null);
     const [isRefreshing, setIsRefreshing] = useState(false);
     const [installingActions, setInstallingActions] = useState({});
     const [selectedSyncTask, setSelectedSyncTask] = useState(null);
     const [copiedLogs, setCopiedLogs] = useState(false);
+    const [selectedNodeForConfig, setSelectedNodeForConfig] = useState(null);
+    const [isRackTopologyOpen, setIsRackTopologyOpen] = useState(false);
+    const [isTopologyPresetsOpen, setIsTopologyPresetsOpen] = useState(false);
+    const [topologyData, setTopologyData] = useState(null);
+    const [nodeTopologyTab, setNodeTopologyTab] = useState('table');
     const { showSuccess, showError } = useNotification();
 
 
@@ -125,6 +135,56 @@ const ServiceView = ({
             showError("Failed to trigger core integrations sync");
         } finally {
             setInstallingActions(prev => ({ ...prev, [actionId]: false }));
+        }
+    };
+
+    const loadTopology = useCallback(async () => {
+        if (!selectedClusterId || !getClusterTopology) return;
+        try {
+            const data = await getClusterTopology(selectedClusterId);
+            setTopologyData(data);
+        } catch (e) {
+            console.error("Failed to load cluster topology", e);
+        }
+    }, [selectedClusterId, getClusterTopology]);
+
+    useEffect(() => {
+        loadTopology();
+    }, [loadTopology]);
+
+    const handleOpenRackTopology = async () => {
+        await loadTopology();
+        setIsRackTopologyOpen(true);
+    };
+
+    const handleOpenTopologyPresets = async () => {
+        await loadTopology();
+        setIsTopologyPresetsOpen(true);
+    };
+
+    const handleSaveNodeConfig = async (nodeName, payload) => {
+        try {
+            await updateNodeLabels(selectedClusterId, nodeName, payload);
+            showSuccess(`Updated configuration for node ${nodeName}`);
+            pollClusterState();
+            loadTopology();
+        } catch (e) {
+            const detail = e?.response?.data?.detail || "Failed to update node configuration";
+            showError(detail);
+            throw e;
+        }
+    };
+
+    const handleSaveRackTopology = async (payload) => {
+        try {
+            const updated = await updateClusterTopology(selectedClusterId, payload);
+            setTopologyData(updated);
+            showSuccess("Rack hierarchy topology updated");
+            pollClusterState();
+        } catch (e) {
+            const detail = e?.response?.data?.detail || "Failed to update rack topology";
+            showError(detail);
+            throw e;
         }
     };
 
@@ -277,14 +337,75 @@ const ServiceView = ({
                             id="node-topology-widget"
                             className="space-y-4 bg-slate-50/50 dark:bg-slate-900/50 p-6 rounded-2xl border border-slate-200/50 dark:border-slate-800/50"
                         >
-                            <div className="flex items-center justify-between">
-                                <p className="text-xs font-bold uppercase tracking-widest text-slate-400">
-                                    Node Topology ({clusterState.node_count || nodeRows.length || 0})
-                                </p>
+                            <div className="flex flex-wrap items-center justify-between gap-3">
+                                <div className="flex items-center gap-4">
+                                    <p className="text-xs font-bold uppercase tracking-widest text-slate-400">
+                                        Node Topology ({clusterState.node_count || nodeRows.length || 0})
+                                    </p>
+                                    <div className="inline-flex rounded-lg p-0.5 bg-slate-200/70 dark:bg-slate-800/80 border border-slate-300/60 dark:border-slate-700/60">
+                                        <button
+                                            id="node-topology-tab-table"
+                                            type="button"
+                                            onClick={() => setNodeTopologyTab('table')}
+                                            className={cn(
+                                                "px-2.5 py-1 rounded-md text-[11px] font-bold uppercase tracking-wider flex items-center gap-1.5 transition-all",
+                                                nodeTopologyTab === 'table'
+                                                    ? "bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-sm"
+                                                    : "text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
+                                            )}
+                                        >
+                                            <Table2 size={12} />
+                                            Table
+                                        </button>
+                                        <button
+                                            id="node-topology-tab-hierarchy"
+                                            type="button"
+                                            onClick={() => setNodeTopologyTab('hierarchy')}
+                                            className={cn(
+                                                "px-2.5 py-1 rounded-md text-[11px] font-bold uppercase tracking-wider flex items-center gap-1.5 transition-all",
+                                                nodeTopologyTab === 'hierarchy'
+                                                    ? "bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-sm"
+                                                    : "text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
+                                            )}
+                                        >
+                                            <GitBranch size={12} />
+                                            Hierarchy
+                                        </button>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        id="configure-topology-presets-btn"
+                                        type="button"
+                                        onClick={handleOpenTopologyPresets}
+                                        className="mw-btn-secondary px-3 py-1.5 text-xs flex items-center gap-1.5"
+                                    >
+                                        <Layers size={14} />
+                                        TOPOLOGY PRESETS
+                                    </button>
+                                    <button
+                                        id="configure-rack-topology-btn"
+                                        type="button"
+                                        onClick={handleOpenRackTopology}
+                                        className="mw-btn-secondary px-3 py-1.5 text-xs flex items-center gap-1.5"
+                                    >
+                                        <Network size={14} />
+                                        RACK TOPOLOGY
+                                    </button>
+                                </div>
                             </div>
 
                             {nodeRows.length === 0 ? (
                                 <p className="text-sm text-slate-500">No nodes reported.</p>
+                            ) : nodeTopologyTab === 'hierarchy' ? (
+                                <NodeHierarchyView
+                                    nodes={nodeRows}
+                                    assignments={topologyData?.assignments || {}}
+                                    onConfigureNode={(node) => {
+                                        loadTopology();
+                                        setSelectedNodeForConfig(node);
+                                    }}
+                                />
                             ) : (
                                 <div className="overflow-x-auto">
                                     <table className="w-full text-left border-collapse">
@@ -294,11 +415,14 @@ const ServiceView = ({
                                                 <th className="py-2.5 px-3">IP</th>
                                                 <th className="py-2.5 px-3">Status</th>
                                                 <th className="py-2.5 px-3">Roles</th>
+                                                <th className="py-2.5 px-3">GPU</th>
+                                                <th className="py-2.5 px-3">Topology</th>
                                                 <th className="py-2.5 px-3">Age</th>
                                                 <th className="py-2.5 px-3">Version</th>
                                                 <th className="py-2.5 px-3">CPU (Req / Total)</th>
                                                 <th className="py-2.5 px-3">RAM (Req / Total)</th>
-                                                <th className="py-2.5 pl-3">Ephemeral Storage (Req / Total)</th>
+                                                <th className="py-2.5 px-3">Ephemeral Storage (Req / Total)</th>
+                                                <th className="py-2.5 pl-3 text-right">Actions</th>
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-slate-200/50 dark:divide-slate-800/60 text-sm">
@@ -342,6 +466,35 @@ const ServiceView = ({
                                                                 <span className="text-xs text-slate-400">—</span>
                                                             )}
                                                         </td>
+                                                        <td className="py-3 px-3 whitespace-nowrap">
+                                                            {node.gpu_vendor ? (
+                                                                <span
+                                                                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-bold bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 uppercase"
+                                                                    title={node.gpu_product || `${node.gpu_vendor.toUpperCase()} GPU`}
+                                                                >
+                                                                    <Cpu size={11} />
+                                                                    {node.gpu_count > 0 ? `${node.gpu_count}x ` : ''}{node.gpu_vendor}
+                                                                </span>
+                                                            ) : (
+                                                                <span className="text-xs text-slate-400">—</span>
+                                                            )}
+                                                        </td>
+                                                        <td className="py-3 px-3 whitespace-nowrap">
+                                                            {node.topology && Object.keys(node.topology).length > 0 ? (
+                                                                <div className="flex flex-wrap gap-1">
+                                                                    {Object.entries(node.topology).map(([tier, val]) => (
+                                                                        <span
+                                                                            key={tier}
+                                                                            className="px-2 py-0.5 rounded-md text-[11px] font-mono bg-indigo-500/10 border border-indigo-500/20 text-indigo-500 dark:text-indigo-400"
+                                                                        >
+                                                                            {tier}:{val}
+                                                                        </span>
+                                                                    ))}
+                                                                </div>
+                                                            ) : (
+                                                                <span className="text-xs text-slate-400">—</span>
+                                                            )}
+                                                        </td>
                                                         <td
                                                             className="py-3 px-3 text-xs font-medium text-slate-600 dark:text-slate-300 whitespace-nowrap tabular-nums"
                                                             title={node.creation_timestamp || ''}
@@ -367,13 +520,27 @@ const ServiceView = ({
                                                                 barClass="bg-purple-500"
                                                             />
                                                         </td>
-                                                        <td className="py-3 pl-3">
+                                                        <td className="py-3 px-3">
                                                             <NodeResourceCell
                                                                 requested={node.ephemeral_storage_requested}
                                                                 total={node.ephemeral_storage_total}
                                                                 unit="GiB"
                                                                 barClass="bg-amber-500"
                                                             />
+                                                        </td>
+                                                        <td className="py-3 pl-3 text-right whitespace-nowrap">
+                                                            <button
+                                                                id={`configure-node-${node.hostname}-btn`}
+                                                                type="button"
+                                                                onClick={() => {
+                                                                    loadTopology();
+                                                                    setSelectedNodeForConfig(node);
+                                                                }}
+                                                                className="p-2 rounded-lg text-slate-400 hover:text-indigo-500 hover:bg-slate-200/60 dark:hover:bg-slate-800 transition-colors"
+                                                                title="Configure Node Labels, Roles & GPU"
+                                                            >
+                                                                <SlidersHorizontal size={15} />
+                                                            </button>
                                                         </td>
                                                     </tr>
                                                 );
@@ -637,6 +804,30 @@ const ServiceView = ({
                     </div>
                 )}
             </Modal>
+
+            <NodeConfigModal
+                isOpen={Boolean(selectedNodeForConfig)}
+                onClose={() => setSelectedNodeForConfig(null)}
+                node={selectedNodeForConfig}
+                availableRoles={topologyData?.roles || []}
+                onSave={handleSaveNodeConfig}
+            />
+
+            <RackTopologyModal
+                isOpen={isRackTopologyOpen}
+                onClose={() => setIsRackTopologyOpen(false)}
+                topologyData={topologyData}
+                nodes={Array.isArray(clusterState.nodes_details) ? clusterState.nodes_details : []}
+                onSave={handleSaveRackTopology}
+                onOpenPresets={handleOpenTopologyPresets}
+            />
+
+            <TopologyPresetsModal
+                isOpen={isTopologyPresetsOpen}
+                onClose={() => setIsTopologyPresetsOpen(false)}
+                topologyData={topologyData}
+                onSave={handleSaveRackTopology}
+            />
 
         </div>
     );
