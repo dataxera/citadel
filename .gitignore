@@ -19,3 +19,5 @@ ranger-*.tgz
 backend/logs
 *.tgz
 ippool.yml
+# MkDocs build output
+site/

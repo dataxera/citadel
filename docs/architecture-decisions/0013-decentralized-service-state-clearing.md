@@ -25,8 +25,8 @@ We delegate all state clearing operations to the service state object (`BaseStat
 
 ## References
 
-- [0006. Platform Management (State and Actions)](file:///home/izhar/Projects/citadel/docs/architecture-decisions/0006-platform-management.md)
-- [Citadel Constitution](file:///home/izhar/Projects/citadel/.agents/rules/constitution.md)
+- [0006. Platform Management (State and Actions)](0006-platform-management.md)
+- Citadel Constitution (`.agents/rules/constitution.md`)
 
 ---
 SPDX-FileCopyrightText: Copyright © 2026 Mohd Izhar Firdaus Bin Ismail

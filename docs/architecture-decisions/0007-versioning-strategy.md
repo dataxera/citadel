@@ -24,7 +24,7 @@ We have implemented a unified versioning strategy based on `VERSION.txt` files:
 
 ## References
 
-- [Citadel Packaging Skill](file:///home/izhar/Projects/citadel/.agents/skills/citadel-packaging/SKILL.md)
+- Citadel Packaging Skill (`.agents/skills/dxc-packaging/SKILL.md`)
 
 ---
 SPDX-FileCopyrightText: Copyright © 2026 Mohd Izhar Firdaus Bin Ismail

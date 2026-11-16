@@ -1,0 +1,86 @@
+# SPDX-FileCopyrightText: Copyright © 2026 Mohd Izhar Firdaus Bin Ismail
+# SPDX-License-Identifier: AGPLv3+
+
+site_name: Dataxera Citadel
+site_description: 100% open-source data & AI orchestration platform for Kubernetes
+docs_dir: docs
+exclude_docs: |
+  requirements.txt
+
+theme:
+  name: material
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.indexes
+    - navigation.top
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+
+markdown_extensions:
+  - admonition
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.details
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+
+nav:
+  - Home: index.md
+  - Installation:
+      - installation/index.md
+      - Citadel Quickstart (Docker): installation/citadel-quickstart.md
+      - K3s Quickstart Setup: installation/k3s-quickstart.md
+      - K3s Disaster Recovery: installation/k3s-disaster-recovery.md
+  - User Guide:
+      - user/index.md
+      - Getting Started: user/getting-started.md
+      - Core Concepts: user/core-concepts.md
+      - Platform Components: user/platform-components.md
+      - Metadata Management: user/metadata-management.md
+  - Developer Guide:
+      - developer/index.md
+      - Architecture: developer/architecture.md
+      - Backend Development: developer/backend.md
+      - Frontend Development: developer/frontend.md
+      - Testing: developer/testing.md
+  - Architecture Decisions:
+      - architecture-decisions/index.md
+      - "0001. Backend Framework": architecture-decisions/0001-backend-framework.md
+      - "0002. Frontend Framework": architecture-decisions/0002-frontend-framework.md
+      - "0003. API Specification": architecture-decisions/0003-api-specification.md
+      - "0004. Kubernetes Orchestration": architecture-decisions/0004-kubernetes-orchestration.md
+      - "0005. Sensitive Data Handling": architecture-decisions/0005-sensitive-data-handling.md
+      - "0006. Platform Management": architecture-decisions/0006-platform-management.md
+      - "0007. Versioning Strategy": architecture-decisions/0007-versioning-strategy.md
+      - "0008. Async Architecture": architecture-decisions/0008-async-architecture.md
+      - "0009. TDD Strategy": architecture-decisions/0009-tdd-strategy.md
+      - "0010. Custom View Naming": architecture-decisions/0010-custom-view-naming.md
+      - "0011. Container & Helm Packaging": architecture-decisions/0011-container-helm-packaging.md
+      - "0012. Service Permission Architecture": architecture-decisions/0012-service-permission-architecture.md
+      - "0013. Decentralized Service State Clearing": architecture-decisions/0013-decentralized-service-state-clearing.md

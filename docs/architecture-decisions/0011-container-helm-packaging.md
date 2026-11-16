@@ -25,7 +25,7 @@ We have established standards for building and pushing artifacts:
 
 ## References
 
-- [Citadel Packaging Skill](file:///home/izhar/Projects/citadel/.agents/skills/citadel-packaging/SKILL.md)
+- Citadel Packaging Skill (`.agents/skills/dxc-packaging/SKILL.md`)
 
 ---
 SPDX-FileCopyrightText: Copyright © 2026 Mohd Izhar Firdaus Bin Ismail

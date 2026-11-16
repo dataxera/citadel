@@ -21,7 +21,7 @@ The backend architecture is built around Python's `asyncio`. Use of `async/await
 
 ## References
 
-- [Citadel Constitution (Section 3)](file:///home/izhar/Projects/citadel/.agent/rules/constitution.md)
+- Citadel Constitution, Section 3 (`.agents/rules/constitution.md`)
 
 ---
 SPDX-FileCopyrightText: Copyright © 2026 Mohd Izhar Firdaus Bin Ismail

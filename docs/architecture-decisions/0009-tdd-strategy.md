@@ -21,7 +21,7 @@ We have adopted a mandatory **Test-Driven Development (TDD)** workflow for backe
 
 ## References
 
-- [Citadel Constitution (Section 3 & 7)](file:///home/izhar/Projects/citadel/.agent/rules/constitution.md)
+- Citadel Constitution, Sections 3 & 7 (`.agents/rules/constitution.md`)
 
 ---
 SPDX-FileCopyrightText: Copyright © 2026 Mohd Izhar Firdaus Bin Ismail

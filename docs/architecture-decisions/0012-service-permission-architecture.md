@@ -51,9 +51,9 @@ Citadel uses class-based permission inheritance in `citadel.fw.permission`. To a
 
 ## References
 
-- [Citadel Constitution (Section 3 & 4)](file:///home/izhar/Projects/citadel/.agents/rules/constitution.md)
-- [Citadel Framework Permission](file:///home/izhar/Projects/citadel/backend/src/citadel/fw/permission.py)
-- [Citadel Backend Permissions Skill](file:///home/izhar/Projects/citadel/.agents/skills/dxc-backend-permission/SKILL.md)
+- Citadel Constitution, Sections 3 & 4 (`.agents/rules/constitution.md`)
+- Citadel Framework Permission (`backend/src/citadel/fw/permission.py`)
+- Citadel Backend Permissions Skill (`.agents/skills/dxc-backend-permission/SKILL.md`)
 
 ---
 SPDX-FileCopyrightText: Copyright © 2026 Mohd Izhar Firdaus Bin Ismail
