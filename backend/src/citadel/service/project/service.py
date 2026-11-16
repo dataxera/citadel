@@ -4,7 +4,7 @@
 import logging
 from typing import Any
 
-from citadel.service import Service, before_create, before_update
+from citadel.service import Service, after_create, before_create, before_update
 from citadel.tasks.poll_coordinator import schedule_k8s_cluster_poll
 
 from .model import Project
@@ -30,6 +30,15 @@ class ProjectService(Service[Project]):
         """Set default k8s_namespace to project name if not provided"""
         if not model.k8s_namespace:
             model.k8s_namespace = model.name
+
+    @after_create()
+    async def _sync_integrations_on_create(self, model: Project):
+        """Trigger project integrations sync automatically when a project is created."""
+        if model.k8s_cluster_id:
+            # Import inside hook to avoid circular import with citadel.tasks.project_tasks
+            from citadel.tasks.project_tasks import sync_project_integrations_task
+
+            sync_project_integrations_task.delay(model.id)
 
     @before_update
     async def _handle_namespace_update(self, model: Project, data: Project):

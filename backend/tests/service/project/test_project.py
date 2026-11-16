@@ -306,3 +306,38 @@ def test_project_excludes_envoy_nodeport_and_service_type(client: TestClient, te
         assert "envoy_nodeport" not in widgets
         assert "envoy_gateway_service_type" not in widgets
 
+
+def test_create_project_triggers_sync_integrations(client: TestClient, test_cluster: dict):
+    """Creating a project automatically triggers sync_project_integrations_task."""
+    with patch(
+        "citadel.tasks.project_tasks.sync_project_integrations_task.delay"
+    ) as mock_delay:
+        resp = client.post(
+            "/api/v1/projects",
+            json={
+                "name": "auto-sync-proj",
+                "title": "Auto Sync Project",
+                "k8s_cluster_id": test_cluster["id"],
+            },
+        )
+        assert resp.status_code == 200
+        project_id = resp.json()["data"]["id"]
+        mock_delay.assert_called_once_with(project_id)
+
+
+def test_create_project_validation_failure_does_not_trigger_sync(client: TestClient):
+    """Failed project creation must not trigger sync_project_integrations_task."""
+    with patch(
+        "citadel.tasks.project_tasks.sync_project_integrations_task.delay"
+    ) as mock_delay:
+        resp = client.post(
+            "/api/v1/projects",
+            json={
+                "name": "invalid-proj",
+                "title": "Invalid Project",
+            },
+        )
+        assert resp.status_code in (400, 422)
+        mock_delay.assert_not_called()
+
+
