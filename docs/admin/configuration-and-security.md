@@ -96,8 +96,8 @@ Superadministrators (`is_superadmin=True`) have access to the **Administration >
   - Superadmins can reset any user's password via `POST /api/v1/users/{id}/_change_password` (minimum 8 characters).
   - Regular users can change their own password via the same endpoint for their own user ID, and update their own `display_name`/`title` via `PUT /api/v1/auth/me`.
 
-> [!NOTE]
-> Control plane users (`/users`) are distinct from **Project Local Users** (`ProjectLocalUser`), which are scoped to individual projects and used to populate static credentials in project-deployed services such as Dex.
+!!! note
+    Control plane users (`/users`) are distinct from **Project Local Users** (`ProjectLocalUser`), which are scoped to individual projects and used to populate static credentials in project-deployed services such as Dex.
 
 ### Permission Hierarchy
 Mindweaver uses a class-based permission hierarchy (`backend/src/mindweaver/fw/permission.py`):

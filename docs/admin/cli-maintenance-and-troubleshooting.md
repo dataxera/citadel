@@ -72,8 +72,8 @@ uv run mindweaver queue flush
 
 Because Mindweaver stores all platform metadata, encrypted credentials, and cluster configurations in its PostgreSQL database (`mindweaver`), regular backups of PostgreSQL and secure offline storage of `MINDWEAVER_FERNET_KEY` are critical.
 
-> [!CAUTION]
-> A database backup is **unrecoverable** for encrypted fields (`kubeconfig`, passwords, private keys) without the matching `MINDWEAVER_FERNET_KEY` that was active when the backup was taken. Always back up your `MINDWEAVER_FERNET_KEY` in a secure enterprise vault alongside your database snapshots.
+!!! danger
+    A database backup is **unrecoverable** for encrypted fields (`kubeconfig`, passwords, private keys) without the matching `MINDWEAVER_FERNET_KEY` that was active when the backup was taken. Always back up your `MINDWEAVER_FERNET_KEY` in a secure enterprise vault alongside your database snapshots.
 
 ### Backing Up PostgreSQL
 ```bash
@@ -150,3 +150,34 @@ The FastAPI backend, Celery Worker, or Celery Beat exits during startup inside `
 
 **Resolution:**
 Generate a valid key via `uv run mindweaver crypto generate-key` and ensure the exact same `MINDWEAVER_FERNET_KEY` value is provided to the `web`, `worker`, and `scheduler` (beat) deployments.
+
+---
+
+### Issue 5: Cluster Marked `error` and Platform Services Show `Cluster '<name>' is unreachable`
+
+**Symptoms:**
+A registered Kubernetes cluster shows `status == "error"` in **Environment > K8s Clusters**, and active platform services in projects on that cluster report `error` with their live endpoint URLs cleared.
+
+**Root Cause:**
+The 15-second Celery Beat poller (`poll-all-k8s-clusters-15s`) cannot reach the Kubernetes API server from the Mindweaver API/Worker pods—typically due to a `127.0.0.1` server URL in `kubeconfig`, expired client certificates/tokens, or network/firewall restrictions.
+
+**Resolution:**
+1. Verify API server reachability from inside the Mindweaver worker/API pod or host network.
+2. Check the cluster's `kubeconfig` (if `type` is `remote`) and update it if the endpoint IP, port, or credentials changed.
+3. Click **Refresh** (`POST /api/v1/k8s_clusters/{id}/_refresh`) or wait for the next 15-second poll cycle; once the cluster returns to `online`, platform service status polling (`poll-all-platforms-15s`) restores live endpoints.
+
+---
+
+### Issue 6: Core Operator or Platform Service Stuck Syncing in ArgoCD
+
+**Symptoms:**
+After triggering **Sync Core Integrations** or deploying a platform service (`/_deploy`), the workload remains in `Pending` or `OutOfSync`/`Degraded` state.
+
+**Resolution:**
+1. Inspect the ArgoCD `Application` resources in the `argocd` namespace and the target operator/project namespace:
+   ```bash
+   kubectl get applications -n argocd
+   kubectl describe application <app-name> -n argocd
+   ```
+2. Verify that **ArgoCD** itself is installed and healthy before other operators (Cert-Manager, CNPG, Envoy Gateway, Strimzi, NiFiKop, Doris Operator), as they are managed as ArgoCD `Application` resources.
+3. Check pod events and operator logs in the target namespace (e.g., `cert-manager`, `cnpg-system`, `envoy-gateway-system`, `strimzi`, `nifikop`, `doris`, or the project namespace) to identify image pull, StorageClass, or CRD readiness issues.

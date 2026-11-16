@@ -6,6 +6,7 @@
 
 - **[Installation & Operations](installation/index.md)**: Deploy Citadel using Docker Compose and set up production-ready K3s clusters with Cilium, OpenEBS LocalPV-LVM, and disaster recovery.
 - **[User Guide](user/index.md)**: Learn core concepts, deploy platform components (PostgreSQL, Trino, Kafka, Airflow, Superset, etc.), and manage metadata, data sources, and AI agents.
+- **[Administrator Manual](admin/index.md)**: Configure authentication and RBAC, manage Kubernetes clusters, stacks, and projects, administer platform services, and run maintenance and troubleshooting runbooks.
 - **[Developer Guide](developer/index.md)**: Explore the internal architecture, FastAPI/SQLModel backend framework, React frontend with Dynamic Forms, and testing workflows.
 - **[Architecture Decisions](architecture-decisions/index.md)**: Browse the Architecture Decision Records (ADRs) documenting key technical choices in Citadel.
 

@@ -192,6 +192,9 @@ kubectl get nodes
 
 ### Configure Cilium L2 LoadBalancer IP Pool
 
+!!! note
+    If you prefer **MetalLB** instead of Cilium L2 announcements (for example, on clusters using Flannel or BGP), skip `l2announcements.enabled=true` and follow the **[MetalLB LoadBalancer Setup](metallb-setup.md)** guide.
+
 Create an IP pool using an unused IP range on your node's L2 subnet (adjust `10.210.14.230-10.210.14.240` and `eth0` to match your network):
 
 ```bash

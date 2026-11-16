@@ -5,20 +5,21 @@ SPDX-License-Identifier: AGPLv3+
 
 # Mindweaver Administrator Manual
 
-Welcome to the **Mindweaver Administrator Manual**. This documentation is designed for system administrators, platform engineers, and DevOps operators responsible for installing, configuring, securing, and maintaining Mindweaver and its managed Kubernetes environments.
+Welcome to the **Mindweaver Administrator Manual**. This documentation is designed for system administrators, platform engineers, and DevOps operators responsible for configuring, securing, managing, and troubleshooting Mindweaver and its connected Kubernetes environments.
+
+!!! note "Looking for Installation Instructions?"
+    For deploying the Mindweaver control plane and setting up K3s clusters with Cilium, OpenEBS, and Disaster Recovery, see the **[Installation & Operations Guide](../installation/index.md)**.
 
 ## Chapters
 
-1. **[Installation & Production Deployment](installation-and-deployment.md)**
-   Prerequisites, Kubernetes cluster preparation (`k3s`, MetalLB, CloudNativePG), Helm chart deployment, Docker Compose deployment, and post-installation bootstrap (`db migrate` and `stack import`).
-2. **[Configuration, Authentication & Security](configuration-and-security.md)**
+1. **[Configuration, Authentication & Security](configuration-and-security.md)**
    Complete `MINDWEAVER_*` environment variable reference, local and OIDC authentication, Superadmin & Role-Based Access Control (RBAC), Fernet secret encryption, redaction conventions, and encryption key rotation.
-3. **[Cluster, Stack & Environment Management](cluster-and-environment-management.md)**
-   Registering Kubernetes clusters, installing and syncing core cluster operators (ArgoCD, Cert-Manager, CloudNativePG, Envoy Gateway, Strimzi, NiFiKop, Doris Operator), managing component Stacks, global LDAP configurations, Project networking/Gateways, per-project Dex OIDC identity, and PKI certificate lifecycle management.
-4. **[Connectivity & Platform Services Administration](connectivity-and-platform-services.md)**
+2. **[Cluster, Stack & Environment Management](cluster-and-environment-management.md)**
+   Registering Kubernetes clusters, syncing core cluster operators (ArgoCD, Cert-Manager, CloudNativePG, Envoy Gateway, Strimzi, NiFiKop, Doris Operator), managing component Stacks, global LDAP configurations, Project networking/Gateways, per-project Dex OIDC identity, and PKI certificate lifecycle management.
+3. **[Connectivity & Platform Services Administration](connectivity-and-platform-services.md)**
    Managing project-scoped connectivity resources (S3 Storage, SSH Keys, Git Repositories, Container Registries, Trusted Certificates, Database Sources) and administering the lifecycle and dependencies of platform services (PostgreSQL, Apache Doris, Hive Metastore, Trino, Apache Kafka, Apache NiFi, Apache Airflow, Apache Superset).
-5. **[CLI Reference, Maintenance & Troubleshooting](cli-maintenance-and-troubleshooting.md)**
-   Complete `mindweaver` CLI reference, Celery background task and queue management, database maintenance, and operational troubleshooting runbooks.
+4. **[CLI Reference, Maintenance & Troubleshooting](cli-maintenance-and-troubleshooting.md)**
+   Complete `mindweaver` CLI reference, Celery background task and queue management, database backup & recovery, and operational troubleshooting runbooks.
 
 ---
 
@@ -78,6 +79,7 @@ flowchart TB
 
 ## Related Documentation
 
-- **[User Documentation](../user/README.md)**: End-user guides for navigating projects, deploying components, and managing metadata.
-- **[Developer Documentation](../developer/README.md)**: Internal framework architecture, coding standards, and test suite guides.
-- **[Architecture Decision Records (ADRs)](../architecture-decisions/)**: Historical design decisions and technical specifications.
+- **[Installation & Operations](../installation/index.md)**: Deploying Mindweaver, K3s quickstart, and disaster recovery.
+- **[User Documentation](../user/index.md)**: End-user guides for navigating projects, deploying components, and managing metadata.
+- **[Developer Documentation](../developer/index.md)**: Internal framework architecture, coding standards, and test suite guides.
+- **[Architecture Decision Records (ADRs)](../architecture-decisions/index.md)**: Historical design decisions and technical specifications.

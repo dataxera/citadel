@@ -56,6 +56,7 @@ nav:
       - installation/index.md
       - Citadel Quickstart (Docker): installation/citadel-quickstart.md
       - K3s Quickstart Setup: installation/k3s-quickstart.md
+      - MetalLB LoadBalancer Setup: installation/metallb-setup.md
       - K3s Disaster Recovery: installation/k3s-disaster-recovery.md
   - User Guide:
       - user/index.md
@@ -63,6 +64,12 @@ nav:
       - Core Concepts: user/core-concepts.md
       - Platform Components: user/platform-components.md
       - Metadata Management: user/metadata-management.md
+  - Administrator Manual:
+      - admin/index.md
+      - Configuration, Authentication & Security: admin/configuration-and-security.md
+      - Cluster, Stack & Environment Management: admin/cluster-and-environment-management.md
+      - Connectivity & Platform Services: admin/connectivity-and-platform-services.md
+      - CLI, Maintenance & Troubleshooting: admin/cli-maintenance-and-troubleshooting.md
   - Developer Guide:
       - developer/index.md
       - Architecture: developer/architecture.md

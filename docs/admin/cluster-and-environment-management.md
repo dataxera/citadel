@@ -32,8 +32,8 @@ Celery Beat polls all registered clusters every **15 seconds** (`poll-all-k8s-cl
 - Total vs. allocated CPU cores (`cpu_total`, `cpu_allocated`) and RAM (`ram_total`, `ram_allocated`).
 - Installation status and versions of all core cluster operators.
 
-> [!WARNING]
-> If a cluster becomes unreachable (`status == "error"`), Mindweaver automatically marks all active platform services running in projects on that cluster as `error` (`Cluster '<name>' is unreachable`) and clears their live endpoint URLs until connectivity is restored.
+!!! warning
+    If a cluster becomes unreachable (`status == "error"`), Mindweaver automatically marks all active platform services running in projects on that cluster as `error` (`Cluster '<name>' is unreachable`) and clears their live endpoint URLs until connectivity is restored.
 
 ---
 
@@ -51,8 +51,8 @@ Mindweaver relies on Kubernetes operators and ArgoCD to manage the lifecycle of 
 | **NiFiKop Operator** (`install_nifikop`) | ArgoCD `Application` | `nifikop` | Manages Apache NiFi clusters (`NifiCluster`). |
 | **Doris Operator** (`install_doris_operator`) | ArgoCD `Application` | `doris` | Manages Apache Doris FE/BE clusters (`DorisCluster`). |
 
-> [!TIP]
-> Always install **ArgoCD** first (or use **Sync Core Integrations**, which installs ArgoCD as Step 1), because Cert-Manager, CNPG, Envoy Gateway, Strimzi, NiFiKop, and Doris Operator are deployed as ArgoCD `Application` resources.
+!!! tip
+    Always install **ArgoCD** first (or use **Sync Core Integrations**, which installs ArgoCD as Step 1), because Cert-Manager, CNPG, Envoy Gateway, Strimzi, NiFiKop, and Doris Operator are deployed as ArgoCD `Application` resources.
 
 ---
 
