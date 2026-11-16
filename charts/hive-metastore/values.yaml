@@ -5,10 +5,10 @@
 replicaCount: 1
 
 image:
-  repository: ghcr.io/kagesenshi/mindweaver/hive-metastore
+  repository: ghcr.io/kagesenshi/citadel/hive-metastore
   pullPolicy: Always
   # Overrides the image tag whose default is the chart appVersion.
-  tag: "4.2.0-rev.6"
+  tag: "4.2.0-rev.7"
 
 imagePullSecrets: []
 nameOverride: ""
