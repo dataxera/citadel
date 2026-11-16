@@ -35,6 +35,8 @@ def test_trino_resource_defaults():
     assert model.hms_ids == []
 
     assert len(model.internal_shared_secret) == 64 # hex of 32 bytes
+    assert "process_forwarded" not in TrinoPlatform.model_fields
+    assert "process_forwarded" not in TrinoPlatformService.widgets()
 
 
 def test_trino_validation():
@@ -106,7 +108,6 @@ async def test_trino_template_rendering(mock_service_dependencies):
         project_id=1,
         hms_ids=[10],
         database_source_ids=[20],
-        process_forwarded=True,
     )
 
     # Mock _resolve_namespace

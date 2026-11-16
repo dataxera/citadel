@@ -39,8 +39,6 @@ class TrinoPlatform(PlatformBase, table=True):
     # Database sources for Trino catalog
     database_source_ids: list[int] = Field(default_factory=list, sa_type=JSONType())
 
-    process_forwarded: bool = Field(default=False)
-
     admin_password: Optional[str] = Field(default=None)
 
     # Internal communication secret (required when auth is enabled)
