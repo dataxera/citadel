@@ -622,7 +622,7 @@ class PlatformService(ProjectScopedService[T], abc.ABC):
     async def on_state_requested(self, model: T):
         """Trigger a deduplicated background poll when platform state is viewed."""
         state = await self.platform_state(model)
-        if state and not state.active:
+        if not state or not state.active:
             return
         await schedule_platform_poll(self.__class__.__name__, model.id)
         try:
@@ -643,7 +643,9 @@ class PlatformService(ProjectScopedService[T], abc.ABC):
         Delegates to the registered poller if available.
         """
         state = await self.platform_state(model)
-        if state and not state.active:
+        if not state:
+            return
+        if not state.active:
             state.status = "offline"
             state.message = "Decommissioned"
             await self.session.flush()

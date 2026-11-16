@@ -100,7 +100,7 @@ def test_get_state_triggers_demand_poll(client: TestClient, test_project: dict):
             assert resp.status_code == 200
             mock_cluster_poll.assert_awaited_once_with(cluster_id)
 
-    # Create a PgSql platform (inactive/active)
+    # Create a PgSql platform (not yet deployed -> no state)
     with patch("citadel.platform_service.pgsql.PgSqlPlatformService.poll_status", new_callable=AsyncMock):
         create_resp = client.post(
             "/api/v1/platform/pgsql",
@@ -112,6 +112,24 @@ def test_get_state_triggers_demand_poll(client: TestClient, test_project: dict):
         )
         assert create_resp.status_code in (200, 201)
         platform_id = create_resp.json()["data"]["id"]
+
+    with patch(
+        "citadel.platform_service.base.schedule_platform_poll",
+        new_callable=AsyncMock,
+    ) as mock_plat_poll:
+        state_resp = client.get(f"/api/v1/platform/pgsql/{platform_id}/_state")
+        assert state_resp.status_code == 200
+        mock_plat_poll.assert_not_awaited()
+
+    # Deploy / activate the PgSql platform, then GET /_state should trigger a poll
+    with patch("citadel.platform_service.base.PlatformService.deploy", new_callable=AsyncMock), patch(
+        "citadel.platform_service.pgsql.PgSqlPlatformService.poll_status", new_callable=AsyncMock
+    ):
+        activate_resp = client.post(
+            f"/api/v1/platform/pgsql/{platform_id}/_state",
+            json={"active": True},
+        )
+        assert activate_resp.status_code == 200
 
     with patch(
         "citadel.platform_service.base.schedule_platform_poll",

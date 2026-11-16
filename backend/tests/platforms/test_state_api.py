@@ -104,3 +104,66 @@ def test_platform_state_api(client: TestClient, test_project):
         assert state["active"] is True  # Should remain unchanged
         assert state["message"] == "Something went wrong"
         assert state["extra_data"] == {"nodes": 3}  # Should remain unchanged
+
+
+def test_new_pgsql_cluster_remains_uncommissioned_on_state_and_refresh(
+    client: TestClient, test_project
+):
+    """Creating a new PgSQL cluster and viewing/refreshing its state must not mark it active/commissioned."""
+    project_update = {
+        "name": test_project["name"],
+        "title": test_project["title"],
+        "description": test_project["description"],
+        "k8s_cluster_id": test_project["k8s_cluster_id"],
+        "k8s_cluster_type": "remote",
+        "k8s_cluster_kubeconfig": 'apiVersion: v1\nkind: Config\nclusters: []\ncontexts: []\ncurrent-context: ""\nusers: []',
+    }
+    resp = client.put(
+        f"/api/v1/projects/{test_project['id']}",
+        json=project_update,
+        headers={"X-Project-Id": str(test_project["id"])},
+    )
+    resp.raise_for_status()
+
+    model_data = {
+        "name": "uncommissioned-pg",
+        "title": "Uncommissioned Postgres",
+        "project_id": test_project["id"],
+        "instances": 3,
+        "storage_size": "2Gi",
+    }
+    resp = client.post(
+        "/api/v1/platform/pgsql",
+        json=model_data,
+        headers={"X-Project-Id": str(test_project["id"])},
+    )
+    resp.raise_for_status()
+    model_id = resp.json()["data"]["id"]
+
+    # Viewing state must not schedule a background poll or create an active state
+    with patch(
+        "citadel.platform_service.base.schedule_platform_poll"
+    ) as mock_schedule:
+        resp = client.get(
+            f"/api/v1/platform/pgsql/{model_id}/_state",
+            headers={"X-Project-Id": str(test_project["id"])},
+        )
+        resp.raise_for_status()
+        assert resp.json() == {}
+        mock_schedule.assert_not_called()
+
+    # Refreshing an uncommissioned cluster must not mark it active/commissioned
+    resp = client.post(
+        f"/api/v1/platform/pgsql/{model_id}/_refresh",
+        headers={"X-Project-Id": str(test_project["id"])},
+    )
+    resp.raise_for_status()
+    assert resp.json() == {}
+
+    # Subsequent _state check must still be empty (uncommissioned)
+    resp = client.get(
+        f"/api/v1/platform/pgsql/{model_id}/_state",
+        headers={"X-Project-Id": str(test_project["id"])},
+    )
+    resp.raise_for_status()
+    assert resp.json() == {}

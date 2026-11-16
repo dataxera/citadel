@@ -28,7 +28,14 @@ class PgSQLPoller:
         namespace = await self.service._resolve_namespace(self.model)
 
         state = await self.service.platform_state(self.model)
-        is_active = state.active if state else True
+        if not state:
+            return
+        if not state.active:
+            state.status = "offline"
+            state.message = "Decommissioned"
+            await self.service.session.flush()
+            return
+        is_active = state.active
 
         def _poll(active: bool):
             if kubeconfig is None:

@@ -103,4 +103,6 @@ async def get_session(
         await session.commit()
 
 
-AsyncSession = Annotated[SQLModelAsyncSession, Depends(get_session)]
+AsyncSession = Annotated[
+    SQLModelAsyncSession, Depends(get_session, scope="function")
+]
