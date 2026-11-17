@@ -56,7 +56,6 @@ nav:
       - installation/index.md
       - Citadel Quickstart (Docker): installation/citadel-quickstart.md
       - K3s Quickstart Setup: installation/k3s-quickstart.md
-      - MetalLB LoadBalancer Setup: installation/metallb-setup.md
       - K3s Disaster Recovery: installation/k3s-disaster-recovery.md
   - User Guide:
       - user/index.md

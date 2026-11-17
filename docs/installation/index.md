@@ -13,8 +13,6 @@ This section covers deploying **Citadel** and setting up a production-ready **K3
    - **Cilium CNI** installation (eBPF kube-proxy replacement + L2 LoadBalancer IPAM).
    - **OpenEBS `lvm-localpv`** standalone installation for hard volume quotas and capacity-aware scheduling.
    - Wildcard DNS configuration pointing to your cluster Ingress / Gateway.
-3. **[MetalLB LoadBalancer Setup](metallb-setup.md)**
-   - Installing MetalLB on bare-metal / K3s clusters and configuring `IPAddressPool` and `L2Advertisement` (or BGP) for `LoadBalancer` services.
-4. **[K3s Disaster Recovery Guide](k3s-disaster-recovery.md)**
+3. **[K3s Disaster Recovery Guide](k3s-disaster-recovery.md)**
    - Connecting two K3s clusters with **Cilium ClusterMesh**.
    - Automated & S3-backed **etcd snapshots** and full cluster restore procedures.
