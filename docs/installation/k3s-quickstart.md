@@ -6,6 +6,9 @@ This guide sets up a **K3s** Kubernetes cluster tailored for Citadel's data and 
 
 ## 1. Minimum & Recommended Requirements
 
+> [!TIP]
+> For multi-node production cluster sizing (Standard vs. Separate Control Plane) and detailed disk partitioning layouts, see [Production Cluster Hardware Requirements](production-hardware-requirements.md).
+
 ### Minimum (Lab / Evaluation)
 - **CPU**: 8 vCPU
 - **RAM**: 32 GB
@@ -45,7 +48,7 @@ sudo tee /etc/sysctl.d/99-citadel-k8s.conf <<'EOF'
 # Required for Elasticsearch / OpenSearch / Doris BE mmap allocations
 vm.max_map_count = 2621440
 
-# Reduce swap aggressiveness (or disable swap completely)
+# Keep swap enabled for stability while minimizing unnecessary swapping
 vm.swappiness = 1
 
 # File descriptors & inotify watches for many containers/pods (32 vCPU / 128 GB)
@@ -101,14 +104,6 @@ TasksMax=infinity
 EOF
 
 sudo systemctl daemon-reload
-```
-
-### Disable Swap
-
-```bash
-sudo swapoff -a
-# Comment out swap entries in /etc/fstab so swap stays off across reboots
-sudo sed -i.bak '/\sswap\s/s/^/#/' /etc/fstab
 ```
 
 ---

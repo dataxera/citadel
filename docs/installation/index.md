@@ -4,15 +4,18 @@ This section covers deploying **Citadel** and setting up a production-ready **K3
 
 ## Guides
 
-1. **[Citadel Quickstart (Single-Node Docker)](citadel-quickstart.md)**
+1. **[Production Cluster Hardware Requirements](production-hardware-requirements.md)**
+   - Recommended hardware, NVMe/SSD endurance, and LACP networking specs for **Standard (Converged)** and **Separate Control Plane** production clusters.
+   - Disk partitioning layouts for OS/`etcd`, ephemeral & logs (`kubelet`/`containerd`/`/var/log`), and OpenEBS `lvm-localpv` PVCs.
+2. **[Citadel Quickstart (Single-Node Docker)](citadel-quickstart.md)**
    - Run the Citadel control plane (PostgreSQL, Redis, API, Celery Worker/Scheduler, and UI) on a single host using Docker / Docker Compose.
-2. **[K3s Quickstart Setup](k3s-quickstart.md)**
+3. **[K3s Quickstart Setup](k3s-quickstart.md)**
    - Hardware & disk requirements.
    - OS `ulimits` and `sysctl` tuning for a **32 vCPU / 128 GB RAM** node running data platform workloads.
    - K3s installation (with embedded `etcd`, Flannel/Traefik/ServiceLB disabled).
    - **Cilium CNI** installation (eBPF kube-proxy replacement + L2 LoadBalancer IPAM).
    - **OpenEBS `lvm-localpv`** standalone installation for hard volume quotas and capacity-aware scheduling.
    - Wildcard DNS configuration pointing to your cluster Ingress / Gateway.
-3. **[K3s Disaster Recovery Guide](k3s-disaster-recovery.md)**
+4. **[K3s Disaster Recovery Guide](k3s-disaster-recovery.md)**
    - Connecting two K3s clusters with **Cilium ClusterMesh**.
    - Automated & S3-backed **etcd snapshots** and full cluster restore procedures.

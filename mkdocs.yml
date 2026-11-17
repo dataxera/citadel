@@ -54,6 +54,7 @@ nav:
   - Home: index.md
   - Installation:
       - installation/index.md
+      - Production Hardware Requirements: installation/production-hardware-requirements.md
       - Citadel Quickstart (Docker): installation/citadel-quickstart.md
       - K3s Quickstart Setup: installation/k3s-quickstart.md
       - K3s Disaster Recovery: installation/k3s-disaster-recovery.md
