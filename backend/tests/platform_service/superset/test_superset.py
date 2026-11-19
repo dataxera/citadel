@@ -280,7 +280,8 @@ async def test_superset_template_rendering(mock_service_dependencies):
         assert "app.app_context()" in values["init"]["initscript"]
         assert "db.session.delete" in values["init"]["initscript"]
         assert values["supersetNode"]["connections"]["db_host"] == "my-db-pooler-rw.superset-ns.svc.cluster.local"
-        assert values["service"]["type"] == "NodePort"
+        assert values["service"]["type"] == "ClusterIP"
+        assert "nodePort" not in values["service"]
         assert values["service"]["port"] == 8088
         assert "AUTH_LDAP" in values["configOverrides"]["ldap"]
         assert "SQLALCHEMY_EXAMPLES_URI = SQLALCHEMY_DATABASE_URI" in values["configOverrides"]["secret_key"]
@@ -340,7 +341,7 @@ async def test_superset_template_rendering(mock_service_dependencies):
         assert encrypted_extra_data["auth_params"]["cert"] == "/etc/superset/trino-certs/tls.crt"
         assert encrypted_extra_data["auth_params"]["key"] == "/etc/superset/trino-certs/tls.key"
 
-    # 3. Verify dual-stack URI derivation in poll_status
+    # 3. Verify URI derivation in poll_status (NodePort disabled; uses Ingress or ClusterIP)
     # We need a new mock for this as it's a separate concern from template rendering
     mock_state = MagicMock(spec=SupersetPlatformState)
     mock_state.active = True
@@ -353,27 +354,26 @@ async def test_superset_template_rendering(mock_service_dependencies):
          patch.object(svc, "kubeconfig", AsyncMock(return_value="mock-kubeconfig")), \
          patch.object(svc, "_resolve_namespace", AsyncMock(return_value="superset-ns")):
         
-        # Dual stack cluster nodes
         cluster_nodes_dual = [
             {"hostname": "node1", "ipv4": "1.2.3.4", "ipv6": None},
             {"hostname": "node2", "ipv4": None, "ipv6": "2001:db8::1"}
         ]
-        node_ports = [{"name": "superset-test", "port": 8088, "node_port": 30001}]
         
         async def mock_poll(*args):
-            return "online", "Healthy", {}, node_ports, cluster_nodes_dual
+            return "online", "Healthy", {}, [], cluster_nodes_dual
             
         with patch("citadel.platform_service.superset.poller.asyncio.to_thread", side_effect=mock_poll), \
              patch("citadel.platform_service.superset.poller.decrypt_password", side_effect=lambda x: x):
-            # Test without ingress_domain
+            # Test without ingress_domain -> falls back to internal ClusterIP service URI
             mock_project_no_ingress = MagicMock()
             mock_project_no_ingress.ingress_domain = None
             svc.project = AsyncMock(return_value=mock_project_no_ingress)
 
             await svc.poll_status(model)
             
-            assert mock_state.superset_uri == "http://1.2.3.4:30001"
-            assert mock_state.superset_uri_ipv6 == "http://[2001:db8::1]:30001"
+            assert mock_state.superset_uri == "http://superset-test.superset-ns.svc.cluster.local:8088"
+            assert mock_state.superset_uri_ipv6 is None
+            assert mock_state.node_ports == []
             assert mock_state.admin_user == "admin"
             assert mock_state.admin_password is not None
 

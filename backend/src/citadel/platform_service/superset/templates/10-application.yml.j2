@@ -77,10 +77,8 @@ spec:
           pullPolicy: IfNotPresent
         
         service:
-          type: NodePort
+          type: ClusterIP
           port: 8088
-          nodePort: 
-            http: ~
         
         redis:
           enabled: true # Internal redis for caching/celery is fine for now

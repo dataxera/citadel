@@ -144,28 +144,15 @@ const ServiceView = ({
         const ingressDomain = platformState?.extra_data?.ingress_domain;
 
         if (supersetUriObj && ingressDomain && supersetUriObj.hostname.endsWith(ingressDomain)) {
+            const scheme = supersetUriObj.protocol.replace(':', '');
+            const port = supersetUriObj.port ? parseInt(supersetUriObj.port) : (scheme === 'https' ? 443 : 80);
             ports.push({
                 label: 'Superset UI (Envoy Ingress)',
-                load_balancer_ips: [supersetUriObj.hostname],
-                port: supersetUriObj.port ? parseInt(supersetUriObj.port) : (supersetUriObj.protocol === 'https:' ? 443 : 80),
-                scheme: supersetUriObj.protocol.replace(':', '')
+                url: supersetUriObj.origin,
+                port,
+                scheme
             });
             isIngressUsed = true;
-        }
-
-        const httpPort = platformState?.node_ports?.find(np => np.port === 8088);
-        if (httpPort) {
-            ports.push({
-                label: 'Superset UI (NodePort)',
-                node_port: httpPort.node_port,
-                scheme: supersetUriObj ? supersetUriObj.protocol.replace(':', '') : 'http'
-            });
-        } else if (!isIngressUsed && supersetUriObj) {
-            ports.push({
-                label: 'Superset UI (NodePort)',
-                node_port: supersetUriObj.port ? parseInt(supersetUriObj.port) : 8088,
-                scheme: supersetUriObj.protocol.replace(':', '')
-            });
         }
 
         return (

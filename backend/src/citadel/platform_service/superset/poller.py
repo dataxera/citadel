@@ -101,23 +101,8 @@ class SupersetPoller:
                 if status == "online":
                     status = "pending"
 
-            # 3. Fetch NodePorts (for Superset UI)
+            # 3. NodePorts are intentionally disabled (Superset UI uses Ingress or internal ClusterIP)
             node_ports = []
-            try:
-                services = core_v1.list_namespaced_service(namespace=namespace)
-                for svc in services.items:
-                    if svc.metadata.name.startswith(self.model.name):
-                        if svc.spec.type == "NodePort":
-                            for port in svc.spec.ports:
-                                node_ports.append(
-                                    {
-                                        "name": svc.metadata.name,
-                                        "port": port.port,
-                                        "node_port": port.node_port,
-                                    }
-                                )
-            except Exception as e:
-                logger.error(f"Failed to fetch services for {self.model.name}: {e}")
 
             # 4. Fetch Nodes for IP info
             cluster_nodes = []
@@ -182,38 +167,11 @@ class SupersetPoller:
         state.admin_user = "admin"
         state.admin_password = decrypt_password(self.model.admin_password)
 
-        # Derive Superset URI
+        # Derive Superset URI (Ingress when configured, otherwise internal ClusterIP service)
         if status == "online":
             if project.ingress_domain:
                 state.superset_uri = f"https://{self.model.name}.{project.ingress_domain}"
                 state.superset_uri_ipv6 = None
-            elif cluster_nodes:
-                superset_np = next(
-                    (np for np in node_ports if np["name"] == self.model.name), None
-                )
-                if superset_np:
-                    # Find first node with IPv4
-                    node_v4 = next((n for n in cluster_nodes if n["ipv4"]), None)
-                    if node_v4:
-                        state.superset_uri = (
-                            f"http://{node_v4['ipv4']}:{superset_np['node_port']}"
-                        )
-                    else:
-                        state.superset_uri = None
-
-                    # Find first node with IPv6
-                    node_v6 = next((n for n in cluster_nodes if n["ipv6"]), None)
-                    if node_v6:
-                        state.superset_uri_ipv6 = (
-                            f"http://[{node_v6['ipv6']}]:{superset_np['node_port']}"
-                        )
-                    else:
-                        state.superset_uri_ipv6 = None
-                else:
-                    state.superset_uri = (
-                        f"http://{self.model.name}.{namespace}.svc.cluster.local:8088"
-                    )
-                    state.superset_uri_ipv6 = None
             else:
                 state.superset_uri = (
                     f"http://{self.model.name}.{namespace}.svc.cluster.local:8088"

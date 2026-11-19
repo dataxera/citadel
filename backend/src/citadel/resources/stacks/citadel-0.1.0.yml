@@ -69,7 +69,7 @@ configuration:
       images:
         main:
           repository: ghcr.io/dataxera/citadel/superset
-          tag: "6.1.0-rev.2"
+          tag: "6.1.0-rev.3"
         redis:
           repository: bitnamilegacy/redis
           tag: "7.0.10-debian-11-r4"
