@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
-import { Briefcase } from 'lucide-react';
+import { Briefcase, AlertTriangle } from 'lucide-react';
 import Modal from '../../components/Modal';
 import DynamicForm from '../../components/DynamicForm';
 import GenericListingView from '../../components/GenericListingView';
-import { useNotification } from '../../providers/NotificationProvider';
 import { useK8sClusters } from '../../hooks/useResources';
+import { projectNeedsIntegrationSync } from './projectIntegrations';
 
 const ListingView = ({ context, projectsHook, onSelectProject }) => {
     const { darkMode, refreshProjects } = context;
@@ -12,8 +12,6 @@ const ListingView = ({ context, projectsHook, onSelectProject }) => {
     const { clusters } = useK8sClusters();
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [selectedProjectForEdit, setSelectedProjectForEdit] = useState(null);
-    const [successfullyTriggered, setSuccessfullyTriggered] = useState({});
-    const { showSuccess, showError } = useNotification();
 
     const renderSubtitle = (proj) => (
         <span>{proj.description}</span>
@@ -28,30 +26,19 @@ const ListingView = ({ context, projectsHook, onSelectProject }) => {
         ] : []
     );
 
-    const renderActions = (proj, state, { onDelete, canUpdate, canDelete, canExecute }) => {
+    const renderActions = (proj, state, { onDelete, canUpdate, canDelete }) => {
         const resourceCount = (state.pgsql || 0) + (state.trino || 0) + (state.airflow || 0);
-        const cluster = state.cluster || {};
 
         return (
             <div className="flex items-center gap-12">
-                {canExecute && !cluster.argocd_installed && cluster.status === 'online' && !successfullyTriggered[proj.id] && (
-                    <button
-                        onClick={async (e) => {
-                            e.stopPropagation();
-                            try {
-                                const res = await projectsHook.executeAction(proj.id, 'install_argocd');
-                                showSuccess(res.message || "ArgoCD installation triggered");
-                                setSuccessfullyTriggered(prev => ({ ...prev, [proj.id]: true }));
-                                refreshProjects?.();
-                            } catch (err) {
-                                console.error("Failed to install ArgoCD", err);
-                                showError("Failed to trigger ArgoCD installation");
-                            }
-                        }}
-                        className="text-[10px] font-bold bg-indigo-500 hover:bg-indigo-600 text-white px-3 py-1.5 rounded-lg transition-all"
+                {projectNeedsIntegrationSync(proj, state) && (
+                    <div
+                        className="project-integration-alert flex items-center justify-center p-2 rounded-lg bg-amber-500/10 text-amber-500 border border-amber-500/20"
+                        title="Project integrations need to be installed or updated. Open project to sync integrations."
+                        aria-label="Project integrations need to be installed or updated"
                     >
-                        INSTALL ARGOCD
-                    </button>
+                        <AlertTriangle size={18} />
+                    </div>
                 )}
 
                 <div className="text-center">

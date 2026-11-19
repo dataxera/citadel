@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
-    Briefcase, Database, Server, Activity, ArrowLeft, Monitor, Users, UserPlus, Edit, Trash2, Shield, RefreshCw, Download, Search, Key, CheckCircle2, AlertCircle, Eye, RefreshCcw, Network, Copy, Check
+    Briefcase, Database, Server, Activity, ArrowLeft, Monitor, Users, UserPlus, Edit, Trash2, Shield, RefreshCw, Download, Search, Key, CheckCircle2, AlertCircle, AlertTriangle, Eye, RefreshCcw, Network, Copy, Check, Loader2
 } from 'lucide-react';
 import { useProjectLocalUsers } from '../../hooks/useResources';
 import Modal from '../../components/Modal';
@@ -11,6 +11,22 @@ import { ExternalNetworkAccessBlock } from '../../components/ServiceBlocks';
 import apiClient from '../../services/api';
 import { useVisibilityPolling } from '../../hooks/useStatePolling';
 import { useResourcePermissions } from '../../hooks/usePermissions';
+import { cn } from '../../utils/cn';
+import { PROJECT_INTEGRATIONS_CONFIG, projectNeedsIntegrationSync } from './projectIntegrations';
+
+const IntegrationStatusBadge = ({ status }) => {
+    const styles = {
+        online: 'dxc-badge-success',
+        pending: 'dxc-badge-warning',
+        offline: 'dxc-badge-neutral',
+        error: 'dxc-badge-danger',
+    };
+    return (
+        <span className={cn(styles[status] || 'dxc-badge-neutral')}>
+            {(status || 'unknown').toUpperCase()}
+        </span>
+    );
+};
 
 const ServiceView = ({
     context,
@@ -147,6 +163,7 @@ const ServiceView = ({
     const [editItem, setEditItem] = useState(null);
     const [deleteItem, setDeleteItem] = useState(null);
     const [isSyncing, setIsSyncing] = useState(false);
+    const [isRefreshing, setIsRefreshing] = useState(false);
     const [enableDex, setEnableDex] = useState(false);
 
     useEffect(() => {
@@ -165,6 +182,30 @@ const ServiceView = ({
         };
         fetchFeatureFlags();
     }, []);
+
+    const handleRefresh = async () => {
+        if (!selectedProjectId) return;
+        setIsRefreshing(true);
+        try {
+            if (refreshProjectState) {
+                await refreshProjectState(selectedProjectId);
+            }
+            const newState = await getProjectState(selectedProjectId);
+            if (newState) {
+                setProjectState(newState);
+            }
+            if (getProjectCertManager) {
+                const cmData = await getProjectCertManager(selectedProjectId);
+                setCertData(cmData);
+            }
+            showSuccess("Project state refreshed");
+        } catch (e) {
+            console.error("Failed to refresh project state:", e);
+            showError("Failed to refresh project state");
+        } finally {
+            setIsRefreshing(false);
+        }
+    };
 
     const handleSyncIntegrations = async () => {
         setIsSyncing(true);
@@ -279,6 +320,10 @@ const ServiceView = ({
         }
     ];
 
+    const needsProjectSync = projectNeedsIntegrationSync(selectedProject, projectState, {
+        certData,
+    });
+
     return (
         <div className="space-y-8 animate-in fade-in duration-500">
             <div className="dxc-page-header flex items-center justify-between">
@@ -295,28 +340,6 @@ const ServiceView = ({
                     <div>
                         <div className="flex items-center gap-3">
                             <h2 className="text-4xl font-bold tracking-tight text-slate-900 dark:text-white">{selectedProject.title} Fleet Overview</h2>
-                            <button
-                                onClick={async () => {
-                                    if (refreshProjectState) {
-                                        try {
-                                            await refreshProjectState(selectedProjectId);
-                                        } catch (e) {
-                                            console.error("Failed to refresh project state:", e);
-                                        }
-                                    }
-                                    const newState = await getProjectState(selectedProjectId);
-                                    setProjectState(newState);
-                                    if (getProjectCertManager) {
-                                        const cmData = await getProjectCertManager(selectedProjectId);
-                                        setCertData(cmData);
-                                    }
-                                }}
-                                className="p-2 text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors bg-slate-100 dark:bg-slate-800 rounded-xl"
-                                title="Refresh Status"
-                                id="refresh-project-status"
-                            >
-                                <RefreshCw size={18} />
-                            </button>
                         </div>
                         <div className="flex items-center gap-4 mt-2">
                             <span className="flex items-center gap-1.5 text-sm text-slate-400">
@@ -326,16 +349,62 @@ const ServiceView = ({
                     </div>
                 </div>
 
-                <button
-                    onClick={handleSyncIntegrations}
-                    disabled={isSyncing || !selectedProject.ingress_domain}
-                    className="dxc-btn-primary px-6 py-2.5 flex items-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
-                    id="project-sync-integrations-btn"
-                >
-                    {isSyncing ? <RefreshCw size={16} className="animate-spin" /> : <RefreshCw size={16} />}
-                    {isSyncing ? 'SYNCING...' : 'SYNC INTEGRATIONS'}
-                </button>
+                <div className="flex gap-3">
+                    <button
+                        id="refresh-project-status"
+                        onClick={handleRefresh}
+                        disabled={isRefreshing}
+                        className="dxc-btn-secondary px-6 py-2.5 flex items-center gap-2"
+                    >
+                        <RefreshCw size={16} className={isRefreshing ? "animate-spin" : ""} />
+                        {isRefreshing ? 'REFRESHING...' : 'REFRESH'}
+                    </button>
+                    <button
+                        onClick={handleSyncIntegrations}
+                        disabled={isSyncing || !selectedProject.ingress_domain}
+                        className={cn(
+                            "px-6 py-2.5 flex items-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed",
+                            needsProjectSync
+                                ? "bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-xl shadow-lg shadow-amber-500/25 transition-all"
+                                : "dxc-btn-primary"
+                        )}
+                        id="project-sync-integrations-btn"
+                    >
+                        {isSyncing ? <RefreshCw size={16} className="animate-spin" /> : <RefreshCw size={16} />}
+                        {isSyncing ? 'SYNCING...' : 'SYNC INTEGRATIONS'}
+                    </button>
+                </div>
             </div>
+
+            {needsProjectSync && (
+                <div
+                    id="project-integration-sync-alert"
+                    className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-900 dark:text-amber-200 animate-in fade-in duration-300"
+                >
+                    <div className="flex items-start sm:items-center gap-4">
+                        <div className="p-2.5 rounded-xl bg-amber-500/20 text-amber-600 dark:text-amber-400 shrink-0">
+                            <AlertTriangle size={22} />
+                        </div>
+                        <div>
+                            <h4 className="text-sm font-bold uppercase tracking-wide text-amber-800 dark:text-amber-300">
+                                Project Integrations Require Sync
+                            </h4>
+                            <p className="text-sm text-amber-700 dark:text-amber-200/80 mt-0.5">
+                                One or more project integrations need to be installed or updated.
+                            </p>
+                        </div>
+                    </div>
+                    <button
+                        id="alert-sync-project-integrations-btn"
+                        onClick={handleSyncIntegrations}
+                        disabled={isSyncing || !selectedProject.ingress_domain}
+                        className="bg-amber-500 hover:bg-amber-600 text-white font-bold px-5 py-2.5 rounded-xl text-xs flex items-center gap-2 shrink-0 shadow-md shadow-amber-500/20 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                        <RefreshCw size={14} className={isSyncing ? "animate-spin" : ""} />
+                        {isSyncing ? 'SYNCING...' : 'SYNC INTEGRATIONS'}
+                    </button>
+                </div>
+            )}
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-7 gap-6">
                 {resourceCards.map((card, i) => {
@@ -355,6 +424,70 @@ const ServiceView = ({
                         </div>
                     );
                 })}
+            </div>
+
+            {/* Project Integrations Status */}
+            <div
+                id="project-integrations-widget"
+                className="dxc-card p-8 space-y-6 animate-in slide-in-from-bottom duration-700"
+            >
+                <div className="flex flex-wrap items-center justify-between gap-4">
+                    <div className="flex items-center gap-4">
+                        <div className="dxc-icon-box text-indigo-500">
+                            <Activity size={24} />
+                        </div>
+                        <div>
+                            <h3 className="text-2xl font-bold text-slate-900 dark:text-white">Project Integrations</h3>
+                            <p className="text-sm text-slate-500 font-medium uppercase tracking-tight">
+                                Namespace, ArgoCD, certificate issuers, and ingress gateway status
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {PROJECT_INTEGRATIONS_CONFIG.map((item) => {
+                        const info = projectState?.integrations_status?.[item.key];
+                        const status = info?.status || 'offline';
+                        const message = info?.message || (
+                            item.requiresIngressDomain && !selectedProject.ingress_domain
+                                ? 'Ingress domain not configured'
+                                : 'Not installed'
+                        );
+                        const isActiveIcon = status === 'online' || status === 'pending';
+
+                        return (
+                            <div
+                                key={item.key}
+                                id={`project-integration-${item.key}`}
+                                className="flex flex-col justify-between gap-3 p-4 bg-slate-50/70 dark:bg-slate-800/80 rounded-xl border border-slate-200 dark:border-slate-700"
+                            >
+                                <div className="flex items-start justify-between gap-2">
+                                    <div className="flex items-center gap-3 min-w-0">
+                                        <div className={cn(
+                                            "p-2 rounded-lg shrink-0",
+                                            isActiveIcon ? "bg-indigo-500 text-white" : "bg-slate-200 dark:bg-slate-700 text-slate-400"
+                                        )}>
+                                            {status === 'pending' ? (
+                                                <Loader2 size={16} className="animate-spin" />
+                                            ) : (
+                                                <Activity size={16} />
+                                            )}
+                                        </div>
+                                        <div className="min-w-0">
+                                            <p className="text-sm font-bold text-slate-700 dark:text-white truncate">{item.name}</p>
+                                            <p className="text-[11px] font-mono text-slate-400 truncate">{item.resource}</p>
+                                        </div>
+                                    </div>
+                                    <IntegrationStatusBadge status={status} />
+                                </div>
+                                <p className="text-xs text-slate-500 dark:text-slate-400 truncate" title={message}>
+                                    {message}
+                                </p>
+                            </div>
+                        );
+                    })}
+                </div>
             </div>
 
             {/* Envoy Gateway Integration */}

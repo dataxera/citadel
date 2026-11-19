@@ -23,95 +23,16 @@ Dataxera Citadel is a 100% open-source data & AI orchestration platform, providi
 *   **Docker** and **Docker Compose** (for running backing services)
 *   **CloudNativePG Operator** (for Kubernetes deployments): [Installation guide](https://cloudnative-pg.io/documentation/current/installation_operator/)
 
-## Kubernetes Deployment Requirements
+## Kubernetes Deployment Setup
 
-### Prerequisites
+For Kubernetes cluster setup and Citadel deployment instructions, see the [Installation & Kubernetes Operations Guide](docs/installation/index.md):
 
-*   **Kubernetes**: v1.28+ (tested with k3s)
-*   **Load Balancer**: Required for external access to services.
-    *   **Self-hosted** (`k3s` with `docker` containerd): **[MetalLB](https://metallb.io/)** is recommended.
-    *   **Cloud providers** (EKS, GKE, AKS): Default cloud load balancer.
-    *   **On-premise**: Ensure firewall rules are configured for the required ports.
+*   **[Production Cluster Hardware Requirements](docs/installation/production-hardware-requirements.md)**: Recommended hardware, disk partitioning, and networking specs for production clusters.
+*   **[K3s Quickstart Setup](docs/installation/k3s-quickstart.md)**: Setting up a K3s cluster with Cilium CNI (L2 LoadBalancer IPAM), OpenEBS `lvm-localpv`, OS tuning, and wildcard DNS.
+*   **[K3s Disaster Recovery Guide](docs/installation/k3s-disaster-recovery.md)**: Multi-cluster Cilium ClusterMesh and automated S3-backed `etcd` backup/restore.
+*   **[Citadel Quickstart (Single-Node Docker)](docs/installation/citadel-quickstart.md)**: Running the Citadel control plane with Docker Compose.
 
-### Install k3s with Load Balancer Support
-
-For self-hosted Kubernetes using **k3s**, follow these steps:
-
-```bash
-# 1. Install k3s
-curl -sfL https://get.k3s.io | sh -
-
-# 2. Start k3s
-k3s server \
-    --disable traefik \
-    --disable servicelb \
-    --cluster-cidr 192.168.0.0/16,fd42:0:0/64 \
-    --service-cidr 10.96.0.0/12,fd43:0:0/64 \
-```
-
-**For a single node, k3s automatically sets up the necessary configuration** without any extra setup needed.
-
-### Set up MetalLB
-
-After k3s is installed, configure **MetalLB** for external access to services:
-
-1.  **Obtain a physical device or virtual router** that provides external IP addresses.
-    -   Use your **cloud provider's virtual router** options like AWS EC2, Azure VM, or GCE.
-    -   Ensure the device provides IP addresses through the **physical links** at the bottom.
-
-3.  **Choose the right MetalLB mode** for your network:
-    -   **Layer 2** mode: Required when using a single homogeneous network. Provides cluster-wide IP routing.
-    -   **Layer 3** mode: Required when using a multi-homed, homogeneous, or heterogeneous network with a physical router.
-
-If your secondary IP and primary IP are in the same /24 CIDR, MetalLB will instruct k3s for Layer 2 routing and advertise the secondary one.
-
-Install MetalLB:
-
-```bash
-# Apply MetalLB manifest
-kubectl apply -f https://raw.githubusercontent.com/metallb/metallb/main/manifests/metallb.yaml
-
-# Wait for MetalLB controller pod to be created
-kubectl wait --for=condition=ready pod --selector app=metallb -n metallb-system --timeout=120s
-```
-
-**Make sure to check MetalLB status using `kubectl get pods -n metallb-system` and ensure it's running successfully.**
-
-#### Configure MetalLB IP Address Pool
-
-Once MetalLB is running, create an `IPAddressPool` and an advertisement resource (such as `L2Advertisement` for Layer 2 mode) so MetalLB can assign external IPs to `LoadBalancer` services:
-
-```bash
-kubectl apply -f - <<EOF
-apiVersion: metallb.io/v1beta1
-kind: IPAddressPool
-metadata:
-  name: default-pool
-  namespace: metallb-system
-spec:
-  addresses:
-    # Replace with an unused IP range or CIDR on your network (outside your DHCP range)
-    - 192.168.1.240-192.168.1.250
----
-apiVersion: metallb.io/v1beta1
-kind: L2Advertisement
-metadata:
-  name: default-l2
-  namespace: metallb-system
-spec:
-  ipAddressPools:
-    - default-pool
-EOF
-```
-
-*   **`addresses`**: Specify one or more IP ranges (e.g., `192.168.1.240-192.168.1.250`) or CIDRs (e.g., `192.168.1.240/28`) reachable on your network and not used by your DHCP server or other hosts.
-*   **Layer 3 (BGP) mode**: If using BGP instead of Layer 2, configure `BGPPeer` and `BGPAdvertisement` resources referencing `default-pool` in place of `L2Advertisement`.
-
-Verify the IP pool configuration:
-
-```bash
-kubectl get ipaddresspools,l2advertisements -n metallb-system
-```
+For the full documentation index, see [docs/index.md](docs/index.md).
 
 ## Development Environment Setup
 

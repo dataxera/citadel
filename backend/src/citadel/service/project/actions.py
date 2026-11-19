@@ -42,7 +42,7 @@ def _render_gateway_manifests(model, namespace: str) -> str:
     templates = sorted(env.list_templates())
     rendered = []
     for template_name in templates:
-        if not template_name.endswith((".yaml", ".yml", ".yml.j2", ".yaml.j2")) or "dex-app" in template_name or "03-trusted-certs" in template_name:
+        if not template_name.endswith((".yaml", ".yml", ".yml.j2", ".yaml.j2")) or "03-trusted-certs" in template_name:
             continue
         template = env.get_template(template_name)
         rendered.append(template.render(**vars))

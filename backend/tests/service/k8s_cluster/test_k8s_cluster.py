@@ -2114,6 +2114,178 @@ async def test_install_kube_prometheus_stack_locks_images(test_stack):
     assert 'tag: "1.99.1"' in manifest
 
 
+@pytest.mark.asyncio
+async def test_sync_core_integration_streams_stdout_and_stderr_logs(client: TestClient):
+    """Streaming stdout and stderr from subprocesses should be persisted to sync_state logs while running and preserved on completion."""
+    import asyncio
+    from unittest.mock import AsyncMock, MagicMock
+    from citadel.tasks.k8s_cluster_status import _sync_core_integration_task
+
+    p1 = client.post(
+        "/api/v1/k8s_clusters",
+        json={
+            "name": "sync-stream-logs",
+            "title": "Sync Stream Logs",
+            "type": "in-cluster",
+        },
+    ).json()["data"]
+
+    with patch("citadel.tasks.k8s_cluster_status.sync_core_integrations_task.delay"):
+        client.post(
+            f"/api/v1/k8s_clusters/{p1['id']}/_actions",
+            json={"action": "sync_core_integrations"},
+        )
+
+    observed_mid_logs = []
+
+    def make_stream(lines: list[bytes]):
+        reader = asyncio.StreamReader()
+        for line in lines:
+            reader.feed_data(line)
+        reader.feed_eof()
+        return reader
+
+    async def mock_subprocess(*cmd, **kwargs):
+        proc = MagicMock()
+        proc.returncode = 0
+        proc.stdout = make_stream([b"stdout line 1\n", b"stdout line 2\n"])
+        proc.stderr = make_stream([b"stderr warning line\n"])
+
+        async def _wait_and_check_mid_state():
+            # Allow the trailing log flush (0.25s) to persist lines while task is still running
+            await asyncio.sleep(0.35)
+            mid_state = client.get(f"/api/v1/k8s_clusters/{p1['id']}/_state").json()["sync_state"]
+            observed_mid_logs.append(
+                (mid_state["tasks"]["cert_manager"]["status"], mid_state["tasks"]["cert_manager"]["logs"] or "")
+            )
+            return 0
+
+        proc.wait = AsyncMock(side_effect=_wait_and_check_mid_state)
+        return proc
+
+    with patch("asyncio.create_subprocess_exec", side_effect=mock_subprocess), patch(
+        "citadel.tasks.k8s_cluster_status.poll_k8s_cluster_status.delay"
+    ):
+        await _sync_core_integration_task(p1["id"], "cert_manager")
+
+    assert len(observed_mid_logs) == 1
+    assert observed_mid_logs[0][0] == "running"
+    assert "stdout line 1" in observed_mid_logs[0][1]
+    assert "stderr warning line" in observed_mid_logs[0][1]
+
+    state_end = client.get(f"/api/v1/k8s_clusters/{p1['id']}/_state").json()["sync_state"]
+    task_state = state_end["tasks"]["cert_manager"]
+    assert task_state["status"] == "completed"
+    assert task_state["logs"] is not None
+    assert "stdout line 1" in task_state["logs"]
+    assert "stdout line 2" in task_state["logs"]
+    assert "stderr warning line" in task_state["logs"]
+    assert "$ kubectl" in task_state["logs"]
+
+
+@pytest.mark.asyncio
+async def test_sync_core_integration_failure_preserves_streamed_logs_and_appends_traceback(
+    client: TestClient,
+):
+    """On subprocess failure, sync_state logs must retain streamed stdout+stderr and append the error/traceback."""
+    import asyncio
+    from unittest.mock import AsyncMock, MagicMock
+    from citadel.tasks.k8s_cluster_status import _sync_core_integration_task
+
+    p1 = client.post(
+        "/api/v1/k8s_clusters",
+        json={
+            "name": "sync-stream-fail",
+            "title": "Sync Stream Fail",
+            "type": "in-cluster",
+        },
+    ).json()["data"]
+
+    with patch("citadel.tasks.k8s_cluster_status.sync_core_integrations_task.delay"):
+        client.post(
+            f"/api/v1/k8s_clusters/{p1['id']}/_actions",
+            json={"action": "sync_core_integrations"},
+        )
+
+    def make_stream(lines: list[bytes]):
+        reader = asyncio.StreamReader()
+        for line in lines:
+            reader.feed_data(line)
+        reader.feed_eof()
+        return reader
+
+    async def mock_subprocess(*cmd, **kwargs):
+        proc = MagicMock()
+        proc.returncode = 1
+        proc.stdout = make_stream([b"applying resource...\n"])
+        proc.stderr = make_stream([b"error: connection refused\n"])
+        proc.wait = AsyncMock(return_value=1)
+        return proc
+
+    with patch("asyncio.create_subprocess_exec", side_effect=mock_subprocess), patch(
+        "citadel.tasks.k8s_cluster_status.poll_k8s_cluster_status.delay"
+    ):
+        await _sync_core_integration_task(p1["id"], "cert_manager")
+
+    state_end = client.get(f"/api/v1/k8s_clusters/{p1['id']}/_state").json()["sync_state"]
+    task_state = state_end["tasks"]["cert_manager"]
+    assert task_state["status"] == "failed"
+    assert "applying resource..." in task_state["logs"]
+    assert "error: connection refused" in task_state["logs"]
+    assert "RuntimeError:" in task_state["logs"]
+
+
+@pytest.mark.asyncio
+async def test_sync_core_integrations_argocd_streams_logs_on_success(client: TestClient):
+    """ArgoCD step in _sync_core_integrations_task should stream stdout+stderr logs and preserve them on completion."""
+    import asyncio
+    from unittest.mock import AsyncMock, MagicMock
+    from citadel.tasks.k8s_cluster_status import _sync_core_integrations_task
+
+    p1 = client.post(
+        "/api/v1/k8s_clusters",
+        json={
+            "name": "sync-argocd-stream",
+            "title": "Sync ArgoCD Stream",
+            "type": "in-cluster",
+        },
+    ).json()["data"]
+
+    with patch("citadel.tasks.k8s_cluster_status.sync_core_integrations_task.delay"):
+        client.post(
+            f"/api/v1/k8s_clusters/{p1['id']}/_actions",
+            json={"action": "sync_core_integrations"},
+        )
+
+    def make_stream(lines: list[bytes]):
+        reader = asyncio.StreamReader()
+        for line in lines:
+            reader.feed_data(line)
+        reader.feed_eof()
+        return reader
+
+    async def mock_subprocess(*cmd, **kwargs):
+        proc = MagicMock()
+        proc.returncode = 0
+        proc.stdout = make_stream([b"Release argocd upgraded\n"])
+        proc.stderr = make_stream([b"Walk-through notice\n"])
+        proc.wait = AsyncMock(return_value=0)
+        return proc
+
+    with patch("asyncio.create_subprocess_exec", side_effect=mock_subprocess), patch(
+        "citadel.tasks.k8s_cluster_status.sync_core_integration_task.delay"
+    ):
+        await _sync_core_integrations_task(p1["id"])
+
+    state_end = client.get(f"/api/v1/k8s_clusters/{p1['id']}/_state").json()["sync_state"]
+    argocd_task = state_end["tasks"]["argocd"]
+    assert argocd_task["status"] == "completed"
+    assert "Release argocd upgraded" in argocd_task["logs"]
+    assert "Walk-through notice" in argocd_task["logs"]
+    assert "$ helm" in argocd_task["logs"]
+
+
+
 
 
 

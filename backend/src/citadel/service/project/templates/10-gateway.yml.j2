@@ -14,16 +14,6 @@ spec:
       kind: EnvoyProxy
       name: project-envoy-proxy-config
   listeners:
-    - name: https
-      protocol: HTTPS
-      port: 443
-      hostname: "dex.{{ ingress_domain }}"
-      tls:
-        mode: Terminate
-        certificateRefs:
-          - group: ""
-            kind: Secret
-            name: dex-tls
     - name: wildcard-https
       protocol: HTTPS
       port: 443

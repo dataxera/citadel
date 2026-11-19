@@ -1,17 +1,15 @@
 import React, { useState } from 'react';
-import { Server } from 'lucide-react';
+import { Server, AlertTriangle } from 'lucide-react';
 import Modal from '../../components/Modal';
 import DynamicForm from '../../components/DynamicForm';
 import GenericListingView from '../../components/GenericListingView';
-import { useNotification } from '../../providers/NotificationProvider';
+import { clusterNeedsIntegrationSync } from './coreIntegrations';
 
 const ListingView = ({ context, clustersHook, onSelectCluster }) => {
     const { darkMode } = context;
-    const { clusters, loading, deleteCluster, fetchClusters, getClusterState, executeAction } = clustersHook;
+    const { clusters, loading, deleteCluster, fetchClusters, getClusterState } = clustersHook;
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [selectedClusterForEdit, setSelectedClusterForEdit] = useState(null);
-    const [successfullyTriggered, setSuccessfullyTriggered] = useState({});
-    const { showSuccess, showError } = useNotification();
 
     const renderSubtitle = (cluster, state) => {
         const statusColor = state.status === 'online' ? 'bg-green-500' :
@@ -34,26 +32,17 @@ const ListingView = ({ context, clustersHook, onSelectCluster }) => {
         state.k8s_version ? [{ text: state.k8s_version, variant: "dxc-badge-neutral" }] : []
     );
 
-    const renderActions = (cluster, state, { onDelete, canUpdate, canDelete, canExecute }) => (
+    const renderActions = (cluster, state, { onDelete, canUpdate, canDelete }) => (
         <React.Fragment>
             <div className="flex items-center gap-12">
-                {canExecute && !state.argocd_installed && state.status === 'online' && !successfullyTriggered[cluster.id] && executeAction && (
-                    <button
-                        onClick={async (e) => {
-                            e.stopPropagation();
-                            try {
-                                const res = await executeAction(cluster.id, 'install_argocd');
-                                showSuccess(res.message || "ArgoCD installation triggered");
-                                setSuccessfullyTriggered(prev => ({ ...prev, [cluster.id]: true }));
-                            } catch (err) {
-                                console.error("Failed to install ArgoCD", err);
-                                showError("Failed to trigger ArgoCD installation");
-                            }
-                        }}
-                        className="text-[10px] font-bold bg-indigo-500 hover:bg-indigo-600 text-white px-3 py-1.5 rounded-lg transition-all"
+                {clusterNeedsIntegrationSync(state) && (
+                    <div
+                        className="cluster-integration-alert flex items-center justify-center p-2 rounded-lg bg-amber-500/10 text-amber-500 border border-amber-500/20"
+                        title="Core integrations need to be installed or updated. Open cluster to sync integrations."
+                        aria-label="Core integrations need to be installed or updated"
                     >
-                        INSTALL ARGOCD
-                    </button>
+                        <AlertTriangle size={18} />
+                    </div>
                 )}
 
                 <div className="text-center">

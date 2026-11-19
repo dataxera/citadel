@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
-    Activity, Monitor, RefreshCw, CheckCircle2, AlertCircle, Loader2, Clock, Copy, Check,
+    Activity, Monitor, RefreshCw, CheckCircle2, AlertCircle, AlertTriangle, Loader2, Clock, Copy, Check,
     Network, SlidersHorizontal, Cpu, Layers, Table2, GitBranch, ExternalLink, Eye, EyeOff, HardDrive
 } from 'lucide-react';
 import { useNotification } from '../../providers/NotificationProvider';
@@ -12,17 +12,7 @@ import NodeConfigModal from './NodeConfigModal';
 import RackTopologyModal from './RackTopologyModal';
 import TopologyPresetsModal from './TopologyPresetsModal';
 import NodeHierarchyView from './NodeHierarchyView';
-
-const CORE_INTEGRATIONS_CONFIG = [
-    { key: 'argocd', name: 'ArgoCD', installedField: 'argocd_installed', versionField: 'argocd_version' },
-    { key: 'cert_manager', name: 'Cert Manager', installedField: 'cert_manager_installed', versionField: 'cert_manager_version' },
-    { key: 'cnpg', name: 'CNPG Operator', installedField: 'cnpg_installed', versionField: 'cnpg_version' },
-    { key: 'envoy_gateway', name: 'Envoy Gateway', installedField: 'envoy_gateway_installed', versionField: 'envoy_gateway_version' },
-    { key: 'kafka_operator', name: 'Kafka Operator', installedField: 'kafka_operator_installed', versionField: 'kafka_operator_version' },
-    { key: 'nifikop', name: 'NiFi Operator', installedField: 'nifikop_installed', versionField: 'nifikop_version' },
-    { key: 'doris_operator', name: 'Doris Operator', installedField: 'doris_operator_installed', versionField: 'doris_operator_version' },
-    { key: 'kube_prometheus_stack', name: 'Kube Prometheus Stack', installedField: 'kube_prometheus_stack_installed', versionField: 'kube_prometheus_stack_version' },
-];
+import { CORE_INTEGRATIONS_CONFIG, clusterNeedsIntegrationSync } from './coreIntegrations';
 
 const IntegrationStatusBadge = ({ status }) => {
     const styles = {
@@ -140,8 +130,10 @@ const ServiceView = ({
     const [clusterState, setClusterState] = useState(null);
     const [isRefreshing, setIsRefreshing] = useState(false);
     const [installingActions, setInstallingActions] = useState({});
-    const [selectedSyncTask, setSelectedSyncTask] = useState(null);
+    const [selectedSyncTaskRef, setSelectedSyncTaskRef] = useState(null);
     const [copiedLogs, setCopiedLogs] = useState(false);
+    const logContainerRef = useRef(null);
+    const shouldAutoScrollRef = useRef(true);
     const [showArgoPassword, setShowArgoPassword] = useState(false);
     const [copiedArgoField, setCopiedArgoField] = useState(null);
     const [selectedNodeForConfig, setSelectedNodeForConfig] = useState(null);
@@ -151,6 +143,22 @@ const ServiceView = ({
     const [nodeTopologyTab, setNodeTopologyTab] = useState('table');
     const { showSuccess, showError } = useNotification();
 
+
+    const syncState = clusterState?.sync_state;
+    const syncTasksMap = syncState?.tasks || {};
+    const selectedSyncTask = selectedSyncTaskRef
+        ? {
+              key: selectedSyncTaskRef.key,
+              name: selectedSyncTaskRef.name,
+              ...(syncTasksMap[selectedSyncTaskRef.key] || {}),
+          }
+        : null;
+
+    useEffect(() => {
+        if (selectedSyncTask?.logs && shouldAutoScrollRef.current && logContainerRef.current) {
+            logContainerRef.current.scrollTop = logContainerRef.current.scrollHeight;
+        }
+    }, [selectedSyncTask?.logs]);
 
     const pollClusterState = useCallback(() => {
         if (!selectedClusterId || !getClusterState) return;
@@ -284,11 +292,11 @@ const ServiceView = ({
         );
     }
 
-    const syncState = clusterState.sync_state;
     const isSyncInProgress = Boolean(
         installingActions['sync_core_integrations'] ||
         syncState?.status === 'in_progress'
     );
+    const needsIntegrationSync = !isSyncInProgress && clusterNeedsIntegrationSync(clusterState);
 
     return (
         <div className="space-y-8 animate-in fade-in duration-500">
@@ -321,7 +329,12 @@ const ServiceView = ({
                         id="sync-core-integrations-btn"
                         onClick={() => handleInstallAction('sync_core_integrations')}
                         disabled={isSyncInProgress}
-                        className="dxc-btn-secondary px-6 py-2.5 flex items-center gap-2 disabled:opacity-60"
+                        className={cn(
+                            "px-6 py-2.5 flex items-center gap-2 disabled:opacity-60",
+                            needsIntegrationSync
+                                ? "bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-xl shadow-lg shadow-amber-500/25 transition-all"
+                                : "dxc-btn-secondary"
+                        )}
                     >
                         <RefreshCw size={16} className={isSyncInProgress ? "animate-spin" : ""} />
                         {isSyncInProgress ? 'SYNCING...' : 'SYNC INTEGRATIONS'}
@@ -334,6 +347,36 @@ const ServiceView = ({
                     </button>
                 </div>
             </div>
+
+            {needsIntegrationSync && (
+                <div
+                    id="cluster-integration-sync-alert"
+                    className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-900 dark:text-amber-200 animate-in fade-in duration-300"
+                >
+                    <div className="flex items-start sm:items-center gap-4">
+                        <div className="p-2.5 rounded-xl bg-amber-500/20 text-amber-600 dark:text-amber-400 shrink-0">
+                            <AlertTriangle size={22} />
+                        </div>
+                        <div>
+                            <h4 className="text-sm font-bold uppercase tracking-wide text-amber-800 dark:text-amber-300">
+                                Core Integrations Require Sync
+                            </h4>
+                            <p className="text-sm text-amber-700 dark:text-amber-200/80 mt-0.5">
+                                One or more core integrations need to be installed or updated on this cluster.
+                            </p>
+                        </div>
+                    </div>
+                    <button
+                        id="alert-sync-core-integrations-btn"
+                        onClick={() => handleInstallAction('sync_core_integrations')}
+                        disabled={isSyncInProgress}
+                        className="bg-amber-500 hover:bg-amber-600 text-white font-bold px-5 py-2.5 rounded-xl text-xs flex items-center gap-2 shrink-0 shadow-md shadow-amber-500/20 transition-all disabled:opacity-60"
+                    >
+                        <RefreshCw size={14} className={isSyncInProgress ? "animate-spin" : ""} />
+                        {isSyncInProgress ? 'SYNCING...' : 'SYNC INTEGRATIONS'}
+                    </button>
+                </div>
+            )}
 
             <div className="dxc-card p-8 space-y-8 animate-in slide-in-from-bottom duration-700">
                 <div className="flex items-center justify-between">
@@ -365,11 +408,6 @@ const ServiceView = ({
                         syncState.total > 0 &&
                         syncState.status !== 'completed'
                     );
-                    const hasMissingIntegration = CORE_INTEGRATIONS_CONFIG.some(
-                        (item) =>
-                            !clusterState[item.installedField] ||
-                            clusterState.integrations_status?.[item.key]?.status === 'offline'
-                    );
                     const syncTasks = syncState?.tasks || {};
                     const completedCount = syncState?.completed || 0;
                     const totalCount = syncState?.total || CORE_INTEGRATIONS_CONFIG.length;
@@ -383,17 +421,6 @@ const ServiceView = ({
                                     <p className="text-xs font-bold uppercase tracking-widest text-slate-400">Core Integrations</p>
                                     <p className="text-xs text-slate-500 mt-1">Cluster-wide operators and platform dependencies</p>
                                 </div>
-                                {hasMissingIntegration && (
-                                    <button
-                                        id="widget-sync-core-integrations-btn"
-                                        onClick={() => handleInstallAction('sync_core_integrations')}
-                                        disabled={isSyncInProgress}
-                                        className="dxc-btn-primary py-2 px-4 text-xs flex items-center gap-2 disabled:opacity-60"
-                                    >
-                                        <RefreshCw size={14} className={isSyncInProgress ? "animate-spin" : ""} />
-                                        {isSyncInProgress ? 'SYNCING...' : 'SYNC INTEGRATIONS'}
-                                    </button>
-                                )}
                             </div>
 
                             {/* Persistent Sync Progress Bar */}
@@ -461,19 +488,18 @@ const ServiceView = ({
                                         {CORE_INTEGRATIONS_CONFIG.map(({ key, name }) => {
                                             const task = syncTasks[key];
                                             if (!task) return null;
-                                            const hasDetails = Boolean(task.message || task.logs || task.status === 'failed');
                                             return (
                                                 <button
                                                     type="button"
                                                     key={key}
                                                     id={`sync-task-chip-${key}`}
-                                                    onClick={() => hasDetails && setSelectedSyncTask({ key, name, ...task })}
-                                                    disabled={!hasDetails}
-                                                    title={hasDetails ? "Click to view task details & logs" : task.status}
+                                                    onClick={() => {
+                                                        shouldAutoScrollRef.current = true;
+                                                        setSelectedSyncTaskRef({ key, name });
+                                                    }}
+                                                    title="Click to view task details & live logs"
                                                     className={cn(
-                                                        "px-2.5 py-1 rounded-lg text-[11px] font-semibold border flex items-center gap-1.5 transition-all",
-                                                        hasDetails && "cursor-pointer hover:brightness-95 dark:hover:brightness-110",
-                                                        !hasDetails && "cursor-default",
+                                                        "px-2.5 py-1 rounded-lg text-[11px] font-semibold border flex items-center gap-1.5 transition-all cursor-pointer hover:brightness-95 dark:hover:brightness-110",
                                                         task.status === 'completed' && "bg-green-500/10 border-green-500/20 text-green-600 dark:text-green-400",
                                                         task.status === 'running' && "bg-indigo-500/10 border-indigo-500/20 text-indigo-600 dark:text-indigo-400",
                                                         task.status === 'failed' && "bg-red-500/10 border-red-500/30 text-red-600 dark:text-red-400 underline decoration-red-400/50 underline-offset-2",
@@ -1041,7 +1067,7 @@ const ServiceView = ({
             <Modal
                 isOpen={Boolean(selectedSyncTask)}
                 onClose={() => {
-                    setSelectedSyncTask(null);
+                    setSelectedSyncTaskRef(null);
                     setCopiedLogs(false);
                 }}
                 title={selectedSyncTask ? `${selectedSyncTask.name} Sync Details` : 'Sync Details'}
@@ -1053,20 +1079,27 @@ const ServiceView = ({
                             <div className="flex items-center gap-2">
                                 <span className="text-xs font-bold uppercase tracking-widest text-slate-400">Status</span>
                                 <span className={cn(
-                                    "px-2.5 py-0.5 rounded-full text-xs font-bold uppercase",
+                                    "px-2.5 py-0.5 rounded-full text-xs font-bold uppercase inline-flex items-center gap-1.5",
                                     selectedSyncTask.status === 'failed' && "bg-red-500/10 text-red-500",
                                     selectedSyncTask.status === 'completed' && "bg-green-500/10 text-green-500",
                                     selectedSyncTask.status === 'running' && "bg-indigo-500/10 text-indigo-500",
                                     selectedSyncTask.status === 'pending' && "bg-slate-200 dark:bg-slate-700 text-slate-500"
                                 )}>
+                                    {selectedSyncTask.status === 'running' && <Loader2 size={11} className="animate-spin" />}
                                     {selectedSyncTask.status}
                                 </span>
+                                {selectedSyncTask.status === 'running' && (
+                                    <span className="text-[11px] font-medium text-indigo-500 flex items-center gap-1">
+                                        <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse" />
+                                        Streaming output
+                                    </span>
+                                )}
                             </div>
                             {(selectedSyncTask.logs || selectedSyncTask.message) && (
                                 <button
                                     type="button"
                                     onClick={() => {
-                                        const text = selectedSyncTask.logs || selectedSyncTask.message || '';
+                                        const text = [selectedSyncTask.message, selectedSyncTask.logs].filter(Boolean).join('\n\n');
                                         navigator.clipboard?.writeText(text);
                                         setCopiedLogs(true);
                                         setTimeout(() => setCopiedLogs(false), 2000);
@@ -1092,15 +1125,29 @@ const ServiceView = ({
 
                         {selectedSyncTask.logs && (
                             <div className="space-y-2">
-                                <p className="text-xs font-bold uppercase tracking-widest text-slate-400">Logs / Traceback</p>
-                                <pre className="p-4 bg-slate-950 text-slate-200 rounded-xl border border-slate-800 text-xs font-mono overflow-x-auto max-h-96 whitespace-pre-wrap break-words">
+                                <p className="text-xs font-bold uppercase tracking-widest text-slate-400">Task Output (stdout / stderr)</p>
+                                <pre
+                                    ref={logContainerRef}
+                                    onScroll={(e) => {
+                                        const el = e.currentTarget;
+                                        const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 24;
+                                        shouldAutoScrollRef.current = nearBottom;
+                                    }}
+                                    className="p-4 bg-slate-950 text-slate-200 rounded-xl border border-slate-800 text-xs font-mono overflow-x-auto max-h-96 whitespace-pre-wrap break-words"
+                                >
                                     {selectedSyncTask.logs}
                                 </pre>
                             </div>
                         )}
 
                         {!selectedSyncTask.message && !selectedSyncTask.logs && (
-                            <p className="text-sm text-slate-500">No additional logs recorded for this task.</p>
+                            <p className="text-sm text-slate-500">
+                                {selectedSyncTask.status === 'running'
+                                    ? 'Task is running, waiting for output...'
+                                    : selectedSyncTask.status === 'pending'
+                                        ? 'Task is queued and waiting to start...'
+                                        : 'No additional logs recorded for this task.'}
+                            </p>
                         )}
                     </div>
                 )}

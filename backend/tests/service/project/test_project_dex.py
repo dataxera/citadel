@@ -212,3 +212,70 @@ def test_download_haproxy_cert_view(client: TestClient):
         assert b"MOCK PRIVATE KEY CONTENT" in resp.content
 
 
+@pytest.mark.asyncio
+async def test_sync_project_integrations_excludes_dex(client):
+    """Ensure Dex manifests (certificate, route, gateway listener, app) are not rendered or applied during project sync integration."""
+    from citadel.service.project.actions import (
+        SyncProjectIntegrationsAction,
+        _render_gateway_manifests,
+    )
+
+    cluster = K8sCluster(
+        name="test-cluster-no-dex",
+        title="Test Cluster No Dex",
+        type=K8sClusterType.REMOTE,
+        kubeconfig="fake-kubeconfig",
+    )
+
+    engine = get_engine()
+    async with AsyncSession(engine, expire_on_commit=False) as session:
+        session.add(cluster)
+        await session.commit()
+        await session.refresh(cluster)
+
+        project = Project(
+            name="test-proj-no-dex",
+            title="Test Proj No Dex",
+            k8s_cluster_id=cluster.id,
+            k8s_namespace="test-proj-no-dex",
+            ingress_domain="no-dex.test.local",
+        )
+        session.add(project)
+        await session.commit()
+        await session.refresh(project)
+
+        manifest = _render_gateway_manifests(project, "test-proj-no-dex")
+        assert "dex-tls" not in manifest
+        assert "dex-route" not in manifest
+        assert "dex.no-dex.test.local" not in manifest
+        assert "test-proj-no-dex-dex" not in manifest
+        assert "wildcard-https" in manifest
+        assert "envoy-test-proj-no-dex" in manifest
+
+        mock_svc = MagicMock()
+        mock_svc.session = session
+        mock_svc.request = MagicMock()
+
+        applied_manifests = []
+
+        async def _capture_apply(target_cluster, rendered_manifest):
+            applied_manifests.append(rendered_manifest)
+
+        with patch(
+            "citadel.service.project.actions.apply_manifest_to_cluster",
+            side_effect=_capture_apply,
+        ):
+            action = SyncProjectIntegrationsAction(project, mock_svc)
+            action.session = session
+            await action.run()
+
+        combined = "\n---\n".join(applied_manifests)
+        assert "dex-tls" not in combined
+        assert "dex-route" not in combined
+        assert "dex.no-dex.test.local" not in combined
+        assert "test-proj-no-dex-dex" not in combined
+        assert "wildcard-https" in combined
+        assert "envoy-test-proj-no-dex" in combined
+
+
+

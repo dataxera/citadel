@@ -1,8 +1,10 @@
 # SPDX-FileCopyrightText: Copyright © 2026 Mohd Izhar Firdaus Bin Ismail
 # SPDX-License-Identifier: AGPLv3+
 
+import asyncio
 import copy
 from datetime import datetime, timezone
+import time
 import traceback
 from citadel.celery_app import app
 from sqlalchemy.orm.attributes import flag_modified
@@ -261,6 +263,116 @@ def _reconcile_sync_state_totals(sync_state: dict) -> bool:
     return all_done
 
 
+MAX_SYNC_LOG_CHARS = 100_000
+
+
+def _trim_sync_logs(text: str, max_chars: int = MAX_SYNC_LOG_CHARS) -> str:
+    """Trim sync logs from the front if they exceed max_chars."""
+    if len(text) <= max_chars:
+        return text
+    marker = "...[earlier logs truncated]...\n"
+    keep = max_chars - len(marker)
+    return marker + text[-keep:]
+
+
+async def _append_sync_task_logs(
+    session: AsyncSession,
+    k8s_cluster_id: int,
+    key: str,
+    chunk: str,
+    max_log_chars: int = MAX_SYNC_LOG_CHARS,
+) -> None:
+    """Append streamed log output to a single integration's sync_state entry under a row lock."""
+    if not chunk:
+        return
+    from citadel.service.k8s_cluster.actions import build_initial_sync_state
+
+    stmt = (
+        select(K8sClusterStatus)
+        .where(K8sClusterStatus.k8s_cluster_id == k8s_cluster_id)
+        .with_for_update()
+    )
+    res = await session.exec(stmt)
+    status_model = res.one_or_none()
+    if not status_model:
+        return
+
+    now_iso = ts_now().isoformat()
+    sync_state = copy.deepcopy(status_model.sync_state or build_initial_sync_state())
+    tasks = sync_state.setdefault("tasks", {})
+    if key in tasks:
+        existing = tasks[key].get("logs") or ""
+        tasks[key]["logs"] = _trim_sync_logs(existing + chunk, max_log_chars)
+        tasks[key]["updated_at"] = now_iso
+    sync_state["updated_at"] = now_iso
+
+    status_model.sync_state = sync_state
+    flag_modified(status_model, "sync_state")
+    await session.commit()
+
+
+class _SyncTaskLogStreamer:
+    """Buffered async log writer that flushes task output chunks to sync_state periodically."""
+
+    def __init__(
+        self,
+        session: AsyncSession,
+        k8s_cluster_id: int,
+        key: str,
+        flush_interval: float = 0.25,
+    ) -> None:
+        self._session = session
+        self._k8s_cluster_id = k8s_cluster_id
+        self._key = key
+        self._flush_interval = flush_interval
+        self._buffer: list[str] = []
+        self._last_flush = 0.0
+        self._lock = asyncio.Lock()
+        self._trailing_task: asyncio.Task | None = None
+
+    async def write(self, text: str) -> None:
+        """Buffer a log line/chunk and flush to DB immediately on interval or via a trailing timer."""
+        if not text:
+            return
+        async with self._lock:
+            self._buffer.append(text)
+            if time.monotonic() - self._last_flush >= self._flush_interval:
+                await self._flush_locked()
+            elif self._trailing_task is None or self._trailing_task.done():
+                self._trailing_task = asyncio.create_task(self._delayed_flush())
+
+    async def _delayed_flush(self) -> None:
+        """Flush buffered lines after flush_interval if no subsequent write triggered a flush."""
+        try:
+            await asyncio.sleep(self._flush_interval)
+            async with self._lock:
+                await self._flush_locked()
+        except asyncio.CancelledError:
+            pass
+
+    async def flush(self) -> None:
+        """Cancel any pending trailing flush and flush all remaining buffered log output to DB."""
+        if self._trailing_task and not self._trailing_task.done():
+            self._trailing_task.cancel()
+            try:
+                await self._trailing_task
+            except asyncio.CancelledError:
+                pass
+        self._trailing_task = None
+        async with self._lock:
+            await self._flush_locked()
+
+    async def _flush_locked(self) -> None:
+        if not self._buffer:
+            return
+        chunk = "".join(self._buffer)
+        self._buffer.clear()
+        await _append_sync_task_logs(
+            self._session, self._k8s_cluster_id, self._key, chunk
+        )
+        self._last_flush = time.monotonic()
+
+
 async def _update_sync_task_state(
     session: AsyncSession,
     k8s_cluster_id: int,
@@ -270,6 +382,7 @@ async def _update_sync_task_state(
     logs: str | None = None,
     installed_attr: str | None = None,
     mark_remaining_failed_on_error: bool = False,
+    append_logs: bool = False,
 ) -> bool:
     """Update a single integration's sync_state entry under a row lock. Returns True if all tasks finished."""
     from citadel.service.k8s_cluster.actions import build_initial_sync_state
@@ -290,7 +403,12 @@ async def _update_sync_task_state(
     if key in tasks:
         tasks[key]["status"] = task_status
         tasks[key]["message"] = message
-        tasks[key]["logs"] = logs
+        if logs is not None:
+            if append_logs and tasks[key].get("logs"):
+                combined = f"{tasks[key]['logs'].rstrip()}\n\n{logs}"
+                tasks[key]["logs"] = _trim_sync_logs(combined)
+            else:
+                tasks[key]["logs"] = _trim_sync_logs(logs)
         tasks[key]["updated_at"] = now_iso
         if task_status == "running":
             tasks[key]["attempts"] = tasks[key].get("attempts", 0) + 1
@@ -370,12 +488,15 @@ async def _sync_core_integrations_task(k8s_cluster_id: int):
 
                 if not argocd_already_done:
                     await _update_sync_task_state(
-                        session, k8s_cluster_id, "argocd", "running"
+                        session, k8s_cluster_id, "argocd", "running", logs=""
                     )
+                    streamer = _SyncTaskLogStreamer(session, k8s_cluster_id, "argocd")
                     try:
                         action = InstallArgoCDAction(model, svc)
                         action.session = session
+                        action.log_callback = streamer.write
                         await run_with_lock_heartbeat(orch_lock_key, action.run)
+                        await streamer.flush()
                         await _update_sync_task_state(
                             session,
                             k8s_cluster_id,
@@ -384,6 +505,7 @@ async def _sync_core_integrations_task(k8s_cluster_id: int):
                             installed_attr="argocd_installed",
                         )
                     except Exception as e:
+                        await streamer.flush()
                         logger.error(
                             f"Error installing ArgoCD during sync for cluster {k8s_cluster_id}: {e}"
                         )
@@ -395,14 +517,19 @@ async def _sync_core_integrations_task(k8s_cluster_id: int):
                             message=str(e) or type(e).__name__,
                             logs=traceback.format_exc(),
                             mark_remaining_failed_on_error=True,
+                            append_logs=True,
                         )
                         return
                 elif argocd_task_status != "completed":
+                    streamer = _SyncTaskLogStreamer(session, k8s_cluster_id, "argocd")
                     try:
                         action = InstallArgoCDAction(model, svc)
                         action.session = session
+                        action.log_callback = streamer.write
                         await action.ensure_load_balancer()
+                        await streamer.flush()
                     except Exception as e:
+                        await streamer.flush()
                         logger.warning(
                             f"Failed to ensure ArgoCD LoadBalancer service during sync for cluster {k8s_cluster_id}: {e}"
                         )
@@ -516,11 +643,18 @@ async def _sync_core_integration_task(k8s_cluster_id: int, integration_key: str)
 
                 model = await svc.get(k8s_cluster_id)
                 await _update_sync_task_state(
-                    session, k8s_cluster_id, integration_key, "running"
+                    session, k8s_cluster_id, integration_key, "running", logs=""
                 )
-                action = action_cls(model, svc)
-                action.session = session
-                await run_with_lock_heartbeat(lock_key, action.run)
+                streamer = _SyncTaskLogStreamer(session, k8s_cluster_id, integration_key)
+                try:
+                    action = action_cls(model, svc)
+                    action.session = session
+                    action.log_callback = streamer.write
+                    await run_with_lock_heartbeat(lock_key, action.run)
+                    await streamer.flush()
+                except Exception:
+                    await streamer.flush()
+                    raise
                 all_done = await _update_sync_task_state(
                     session,
                     k8s_cluster_id,
@@ -542,6 +676,7 @@ async def _sync_core_integration_task(k8s_cluster_id: int, integration_key: str)
                     "failed",
                     message=str(e) or type(e).__name__,
                     logs=traceback.format_exc(),
+                    append_logs=True,
                 )
 
             if all_done:

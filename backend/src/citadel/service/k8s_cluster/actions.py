@@ -2,9 +2,11 @@
 # SPDX-License-Identifier: AGPLv3+
 
 import asyncio
+import inspect
 import logging
 import tempfile
 import os
+from typing import Awaitable, Callable
 import yaml
 import jinja2 as j2
 from kubernetes import client, config
@@ -73,6 +75,80 @@ def get_integration_action_class(key: str):
 
 @K8sClusterService.register_action("install_argocd")
 class InstallArgoCDAction(BaseAction):
+    log_callback: Callable[[str], Awaitable[None]] | None = None
+
+    async def _emit_log(self, text: str) -> None:
+        """Forward a log chunk to the configured async log callback, if any."""
+        if self.log_callback is not None and text:
+            await self.log_callback(text)
+
+    @staticmethod
+    def _format_cmd_for_log(cmd: list[str]) -> str:
+        """Format a CLI command for user-facing logs without exposing temp kubeconfig paths."""
+        parts: list[str] = []
+        skip_next = False
+        for i, arg in enumerate(cmd):
+            if skip_next:
+                skip_next = False
+                continue
+            if arg == "--kubeconfig" and i + 1 < len(cmd):
+                skip_next = True
+                continue
+            parts.append(arg)
+        return " ".join(parts)
+
+    async def _run_subprocess(self, cmd: list[str], error_prefix: str) -> str:
+        """Execute a subprocess and stream its stdout and stderr line-by-line to log_callback."""
+        logger.debug(f"Running command: {' '.join(cmd)}")
+        await self._emit_log(f"$ {self._format_cmd_for_log(cmd)}\n")
+
+        proc = await asyncio.create_subprocess_exec(
+            *cmd,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+
+        stdout_chunks: list[str] = []
+        stderr_chunks: list[str] = []
+
+        is_streaming = isinstance(proc.stdout, asyncio.StreamReader) or inspect.iscoroutinefunction(
+            getattr(proc.stdout, "readline", None)
+        )
+
+        if is_streaming:
+            async def _read_stream(stream, collector: list[str]) -> None:
+                if stream is None:
+                    return
+                while True:
+                    raw = await stream.readline()
+                    if not raw:
+                        break
+                    line = raw.decode(errors="replace") if isinstance(raw, (bytes, bytearray)) else str(raw)
+                    collector.append(line)
+                    if not line.endswith("\n"):
+                        await self._emit_log(line + "\n")
+                    else:
+                        await self._emit_log(line)
+
+            await asyncio.gather(
+                _read_stream(proc.stdout, stdout_chunks),
+                _read_stream(proc.stderr, stderr_chunks),
+            )
+            await proc.wait()
+        else:
+            stdout_bytes, stderr_bytes = await proc.communicate()
+            stdout_text = stdout_bytes.decode(errors="replace") if isinstance(stdout_bytes, (bytes, bytearray)) else (stdout_bytes or "")
+            stderr_text = stderr_bytes.decode(errors="replace") if isinstance(stderr_bytes, (bytes, bytearray)) else (stderr_bytes or "")
+            if stdout_text:
+                stdout_chunks.append(stdout_text)
+                await self._emit_log(stdout_text if stdout_text.endswith("\n") else stdout_text + "\n")
+            if stderr_text:
+                stderr_chunks.append(stderr_text)
+                await self._emit_log(stderr_text if stderr_text.endswith("\n") else stderr_text + "\n")
+
+        if proc.returncode != 0:
+            raise RuntimeError(f"{error_prefix}: {''.join(stderr_chunks)}")
+        return "".join(stdout_chunks)
 
     async def available(self) -> bool:
         # Only available if not already installed
@@ -310,16 +386,7 @@ class InstallArgoCDAction(BaseAction):
                 if kubeconfig_path:
                     cmd.extend(["--kubeconfig", kubeconfig_path])
                 cmd.extend(args)
-                logger.debug(f"Running Helm command: {' '.join(cmd)}")
-                proc = await asyncio.create_subprocess_exec(
-                    *cmd,
-                    stdout=asyncio.subprocess.PIPE,
-                    stderr=asyncio.subprocess.PIPE,
-                )
-                stdout, stderr = await proc.communicate()
-                if proc.returncode != 0:
-                    raise RuntimeError(f"Helm command failed: {stderr.decode()}")
-                return stdout.decode()
+                return await self._run_subprocess(cmd, "Helm command failed")
 
             # Ensure repo is added
             if repo_url and not repo_url.startswith("oci://"):
@@ -380,16 +447,7 @@ class InstallArgoCDAction(BaseAction):
                 cmd.extend(["--kubeconfig", kubeconfig_path])
             cmd.extend(["apply", "-f", temp_manifest.name])
 
-            logger.debug(f"Running kubectl command: {' '.join(cmd)}")
-            proc = await asyncio.create_subprocess_exec(
-                *cmd,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-            )
-            stdout, stderr = await proc.communicate()
-            if proc.returncode != 0:
-                raise RuntimeError(f"Kubectl command failed: {stderr.decode()}")
-            return stdout.decode()
+            return await self._run_subprocess(cmd, "Kubectl command failed")
 
         finally:
             for f in [temp_kf, temp_manifest]:
