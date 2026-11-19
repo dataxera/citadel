@@ -9,5 +9,8 @@ RUN apt-get update && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-RUN uv pip install psycopg2-binary python-ldap Authlib cryptography trino ibm-db-sa pymysql elasticsearch-dbapi oracledb asyncpg pyhive impyla pymssql pymongosql
+RUN uv pip install psycopg2-binary python-ldap Authlib \
+    cryptography trino ibm-db-sa pymysql \
+    elasticsearch-dbapi oracledb asyncpg pyhive impyla \
+    pymssql pymongosql mysqlclient
 USER superset
