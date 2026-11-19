@@ -13,11 +13,12 @@ import { Plus, Trash2 } from 'lucide-react';
  * @param {string} name - Field name
  * @param {array} value - Initial array of mapping objects
  * @param {array} roles - Available roles to choose from
+ * @param {string} entityLabel - Placeholder/label for the entity input
  * @param {function} onChange - Callback function(name, value)
  * @param {boolean} darkMode - Whether dark mode is enabled
  * @param {boolean} isImmutable - Whether the field is disabled
  */
-const AuthRoleMappingWidget = React.memo(({ name, value, roles = [], onChange, darkMode, isImmutable }) => {
+const AuthRoleMappingWidget = React.memo(({ name, value, roles = [], entityLabel = 'Entity', onChange, darkMode, isImmutable }) => {
     // Initial load: convert array of objects to internal state
     const [items, setItems] = useState(() => {
         if (Array.isArray(value)) {
@@ -72,7 +73,7 @@ const AuthRoleMappingWidget = React.memo(({ name, value, roles = [], onChange, d
                 <div key={index} className="flex gap-2 items-start">
                     <input
                         type="text"
-                        placeholder="Entity"
+                        placeholder={entityLabel}
                         value={item.entity}
                         disabled={isImmutable}
                         onChange={(e) => handleItemChange(index, 'entity', e.target.value)}

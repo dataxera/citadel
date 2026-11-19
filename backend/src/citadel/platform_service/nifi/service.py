@@ -43,6 +43,7 @@ class NifiPlatformService(PlatformService[NifiPlatform]):
                 "label": "Auth Role Mapping",
                 "type": "auth-role-mapping",
                 "roles": ["Admin", "Reader"],
+                "entity_label": "Username",
             },
             "replica_count": {
                 "order": 10,

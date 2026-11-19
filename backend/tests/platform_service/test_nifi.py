@@ -358,6 +358,14 @@ def test_nifi_auth_role_mapping_dict_assignment():
     assert model.auth_role_mapping[0]["role"] == "Admin"
 
 
+def test_nifi_auth_role_mapping_widget_config():
+    """Test that NiFi auth_role_mapping widget configures entity_label as Username."""
+    widgets = NifiPlatformService.widgets()
+    auth_widget = widgets["auth_role_mapping"]
+    assert auth_widget["type"] == "auth-role-mapping"
+    assert auth_widget["entity_label"] == "Username"
+
+
 def _make_nifi_mock_pod(name: str, phase: str = "Running", ready: bool = True) -> MagicMock:
     """Create a mock Kubernetes pod object for NiFi poller tests."""
     pod = MagicMock()

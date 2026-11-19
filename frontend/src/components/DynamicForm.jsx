@@ -404,6 +404,7 @@ const DynamicForm = ({
                     name={name}
                     value={formData[name]}
                     roles={widget.roles}
+                    entityLabel={widget.entity_label}
                     onChange={handleChange}
                     darkMode={darkMode}
                     isImmutable={isImmutable}
