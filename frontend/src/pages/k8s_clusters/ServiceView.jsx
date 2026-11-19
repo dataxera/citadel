@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
     Activity, Monitor, RefreshCw, CheckCircle2, AlertCircle, AlertTriangle, Loader2, Clock, Copy, Check,
-    Network, SlidersHorizontal, Cpu, Layers, Table2, GitBranch, ExternalLink, Eye, EyeOff, HardDrive
+    Network, SlidersHorizontal, Cpu, Layers, Table2, GitBranch, ExternalLink, Eye, EyeOff, HardDrive, ChevronDown
 } from 'lucide-react';
 import { useNotification } from '../../providers/NotificationProvider';
 import Modal from '../../components/Modal';
@@ -132,6 +132,7 @@ const ServiceView = ({
     const [installingActions, setInstallingActions] = useState({});
     const [selectedSyncTaskRef, setSelectedSyncTaskRef] = useState(null);
     const [copiedLogs, setCopiedLogs] = useState(false);
+    const [syncAccordionExpanded, setSyncAccordionExpanded] = useState(null);
     const logContainerRef = useRef(null);
     const shouldAutoScrollRef = useRef(true);
     const [showArgoPassword, setShowArgoPassword] = useState(false);
@@ -162,13 +163,21 @@ const ServiceView = ({
 
     const pollClusterState = useCallback(() => {
         if (!selectedClusterId || !getClusterState) return;
-        getClusterState(selectedClusterId).then(setClusterState).catch(console.error);
+        getClusterState(selectedClusterId)
+            .then((state) => {
+                setClusterState(state);
+                if (state?.sync_state?.status === 'in_progress' || state?.sync_state?.status === 'error') {
+                    setSyncAccordionExpanded((prev) => (prev === null ? true : prev));
+                }
+            })
+            .catch(console.error);
     }, [selectedClusterId, getClusterState]);
 
     useEffect(() => {
         if (!selectedClusterId) {
             Promise.resolve().then(() => {
                 setClusterState(null);
+                setSyncAccordionExpanded(null);
             });
         }
     }, [selectedClusterId]);
@@ -198,6 +207,9 @@ const ServiceView = ({
 
     const handleInstallAction = async (actionId) => {
         setInstallingActions(prev => ({ ...prev, [actionId]: true }));
+        if (actionId === 'sync_core_integrations' || actionId === 'resume_sync_core_integrations') {
+            setSyncAccordionExpanded(true);
+        }
         try {
             await clustersHook.executeAction(selectedClusterId, actionId);
             showSuccess("Core integrations synchronization triggered");
@@ -405,9 +417,13 @@ const ServiceView = ({
                 {(() => {
                     const hasSyncState = Boolean(
                         syncState &&
-                        syncState.total > 0 &&
-                        syncState.status !== 'completed'
+                        syncState.total > 0
                     );
+                    const syncStatus = syncState?.status;
+                    const isSyncProgressExpanded =
+                        syncAccordionExpanded !== null
+                            ? syncAccordionExpanded
+                            : syncStatus !== 'completed';
                     const syncTasks = syncState?.tasks || {};
                     const completedCount = syncState?.completed || 0;
                     const totalCount = syncState?.total || CORE_INTEGRATIONS_CONFIG.length;
@@ -423,13 +439,26 @@ const ServiceView = ({
                                 </div>
                             </div>
 
-                            {/* Persistent Sync Progress Bar */}
+                            {/* Persistent Sync Progress Bar (Collapsible Accordion) */}
                             {hasSyncState && (
                                 <div
                                     id="core-integrations-sync-progress"
                                     className="p-4 bg-white dark:bg-slate-800/90 rounded-xl border border-slate-200 dark:border-slate-700 space-y-3"
                                 >
-                                    <div className="flex flex-wrap items-center justify-between gap-2">
+                                    <div
+                                        role="button"
+                                        tabIndex={0}
+                                        id="core-integrations-sync-accordion-toggle"
+                                        onClick={() => setSyncAccordionExpanded(!isSyncProgressExpanded)}
+                                        onKeyDown={(e) => {
+                                            if (e.key === 'Enter' || e.key === ' ') {
+                                                e.preventDefault();
+                                                setSyncAccordionExpanded(!isSyncProgressExpanded);
+                                            }
+                                        }}
+                                        aria-expanded={isSyncProgressExpanded}
+                                        className="flex flex-wrap items-center justify-between gap-2 cursor-pointer select-none"
+                                    >
                                         <div className="flex items-center gap-2">
                                             {syncState.status === 'in_progress' && (
                                                 <Loader2 size={16} className="text-indigo-500 animate-spin" />
@@ -455,7 +484,10 @@ const ServiceView = ({
                                                 <button
                                                     type="button"
                                                     id="resume-sync-core-integrations-btn"
-                                                    onClick={() => handleInstallAction('resume_sync_core_integrations')}
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        handleInstallAction('resume_sync_core_integrations');
+                                                    }}
                                                     disabled={Boolean(installingActions['resume_sync_core_integrations'])}
                                                     title="Resume any interrupted sync tasks"
                                                     className="dxc-btn-secondary py-1 px-2.5 text-[11px] flex items-center gap-1 disabled:opacity-60"
@@ -467,54 +499,65 @@ const ServiceView = ({
                                             <span className="text-xs font-mono font-bold text-slate-500 dark:text-slate-400">
                                                 {completedCount}/{totalCount} ({progressPercent}%)
                                             </span>
+                                            <ChevronDown
+                                                size={16}
+                                                className={cn(
+                                                    "text-slate-400 transition-transform duration-200",
+                                                    isSyncProgressExpanded ? "rotate-180" : ""
+                                                )}
+                                            />
                                         </div>
                                     </div>
 
-                                    <div className="h-2.5 w-full bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
-                                        <div
-                                            className={cn(
-                                                "h-full transition-all duration-500 rounded-full",
-                                                syncState.status === 'error'
-                                                    ? 'bg-red-500'
-                                                    : syncState.status === 'completed'
-                                                        ? 'bg-green-500'
-                                                        : 'bg-indigo-500'
-                                            )}
-                                            style={{ width: `${progressPercent}%` }}
-                                        />
-                                    </div>
-
-                                    <div className="flex flex-wrap gap-2 pt-1">
-                                        {CORE_INTEGRATIONS_CONFIG.map(({ key, name }) => {
-                                            const task = syncTasks[key];
-                                            if (!task) return null;
-                                            return (
-                                                <button
-                                                    type="button"
-                                                    key={key}
-                                                    id={`sync-task-chip-${key}`}
-                                                    onClick={() => {
-                                                        shouldAutoScrollRef.current = true;
-                                                        setSelectedSyncTaskRef({ key, name });
-                                                    }}
-                                                    title="Click to view task details & live logs"
+                                    {isSyncProgressExpanded && (
+                                        <>
+                                            <div className="h-2.5 w-full bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
+                                                <div
                                                     className={cn(
-                                                        "px-2.5 py-1 rounded-lg text-[11px] font-semibold border flex items-center gap-1.5 transition-all cursor-pointer hover:brightness-95 dark:hover:brightness-110",
-                                                        task.status === 'completed' && "bg-green-500/10 border-green-500/20 text-green-600 dark:text-green-400",
-                                                        task.status === 'running' && "bg-indigo-500/10 border-indigo-500/20 text-indigo-600 dark:text-indigo-400",
-                                                        task.status === 'failed' && "bg-red-500/10 border-red-500/30 text-red-600 dark:text-red-400 underline decoration-red-400/50 underline-offset-2",
-                                                        task.status === 'pending' && "bg-slate-100 dark:bg-slate-700/50 border-slate-200 dark:border-slate-600 text-slate-500 dark:text-slate-400"
+                                                        "h-full transition-all duration-500 rounded-full",
+                                                        syncState.status === 'error'
+                                                            ? 'bg-red-500'
+                                                            : syncState.status === 'completed'
+                                                                ? 'bg-green-500'
+                                                                : 'bg-indigo-500'
                                                     )}
-                                                >
-                                                    {task.status === 'running' && <Loader2 size={11} className="animate-spin" />}
-                                                    {task.status === 'completed' && <CheckCircle2 size={11} />}
-                                                    {task.status === 'failed' && <AlertCircle size={11} />}
-                                                    {task.status === 'pending' && <Clock size={11} />}
-                                                    <span>{name}</span>
-                                                </button>
-                                            );
-                                        })}
-                                    </div>
+                                                    style={{ width: `${progressPercent}%` }}
+                                                />
+                                            </div>
+
+                                            <div className="flex flex-wrap gap-2 pt-1">
+                                                {CORE_INTEGRATIONS_CONFIG.map(({ key, name }) => {
+                                                    const task = syncTasks[key];
+                                                    if (!task) return null;
+                                                    return (
+                                                        <button
+                                                            type="button"
+                                                            key={key}
+                                                            id={`sync-task-chip-${key}`}
+                                                            onClick={() => {
+                                                                shouldAutoScrollRef.current = true;
+                                                                setSelectedSyncTaskRef({ key, name });
+                                                            }}
+                                                            title="Click to view task details & live logs"
+                                                            className={cn(
+                                                                "px-2.5 py-1 rounded-lg text-[11px] font-semibold border flex items-center gap-1.5 transition-all cursor-pointer hover:brightness-95 dark:hover:brightness-110",
+                                                                task.status === 'completed' && "bg-green-500/10 border-green-500/20 text-green-600 dark:text-green-400",
+                                                                task.status === 'running' && "bg-indigo-500/10 border-indigo-500/20 text-indigo-600 dark:text-indigo-400",
+                                                                task.status === 'failed' && "bg-red-500/10 border-red-500/30 text-red-600 dark:text-red-400 underline decoration-red-400/50 underline-offset-2",
+                                                                task.status === 'pending' && "bg-slate-100 dark:bg-slate-700/50 border-slate-200 dark:border-slate-600 text-slate-500 dark:text-slate-400"
+                                                            )}
+                                                        >
+                                                            {task.status === 'running' && <Loader2 size={11} className="animate-spin" />}
+                                                            {task.status === 'completed' && <CheckCircle2 size={11} />}
+                                                            {task.status === 'failed' && <AlertCircle size={11} />}
+                                                            {task.status === 'pending' && <Clock size={11} />}
+                                                            <span>{name}</span>
+                                                        </button>
+                                                    );
+                                                })}
+                                            </div>
+                                        </>
+                                    )}
                                 </div>
                             )}
 

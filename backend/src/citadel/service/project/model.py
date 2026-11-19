@@ -1,9 +1,10 @@
 # SPDX-FileCopyrightText: Copyright © 2025 Mohd Izhar Firdaus Bin Ismail
 # SPDX-License-Identifier: AGPLv3+
 
-from typing import Optional
+from typing import Any, Optional
 from sqlmodel import Field
 from sqlalchemy import String
+from sqlalchemy_utils import JSONType
 from citadel.service import NamedBase
 
 
@@ -23,5 +24,6 @@ class Project(NamedBase, table=True):
     stack_id: Optional[int] = Field(
         default=None, foreign_key="dxc_stack.id", index=True
     )
+    sync_state: dict[str, Any] = Field(default_factory=dict, sa_type=JSONType())
 
 

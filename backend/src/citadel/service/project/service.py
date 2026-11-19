@@ -20,6 +20,16 @@ class ProjectService(Service[Project]):
     def model_class(cls) -> type[Project]:
         return Project
 
+    @classmethod
+    def internal_fields(cls) -> list[str]:
+        """Mark sync_state as internal so users cannot set it via CRUD payloads."""
+        return super().internal_fields() + ["sync_state"]
+
+    @classmethod
+    def hidden_fields(cls) -> list[str]:
+        """Hide sync_state from dynamic form schemas."""
+        return super().hidden_fields() + ["sync_state"]
+
     async def on_state_requested(self, model: Project):
         """Trigger a deduplicated background cluster poll when project state is viewed."""
         if model.k8s_cluster_id:

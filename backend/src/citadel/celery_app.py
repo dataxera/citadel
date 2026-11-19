@@ -34,6 +34,10 @@ app.conf.update(
             "task": "citadel.tasks.k8s_cluster_status.recover_stuck_sync_tasks",
             "schedule": 60.0,
         },
+        "recover-stuck-project-sync-tasks": {
+            "task": "citadel.tasks.project_tasks.recover_stuck_project_sync_tasks",
+            "schedule": 60.0,
+        },
     },
 )
 
@@ -66,6 +70,10 @@ def recover_stuck_tasks_on_worker_ready(**kwargs):
     try:
         app.send_task(
             "citadel.tasks.k8s_cluster_status.recover_stuck_sync_tasks",
+            kwargs={"stale_seconds": 0},
+        )
+        app.send_task(
+            "citadel.tasks.project_tasks.recover_stuck_project_sync_tasks",
             kwargs={"stale_seconds": 0},
         )
     except Exception:

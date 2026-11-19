@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
-    Briefcase, Database, Server, Activity, ArrowLeft, Monitor, Users, UserPlus, Edit, Trash2, Shield, RefreshCw, Download, Search, Key, CheckCircle2, AlertCircle, AlertTriangle, Eye, RefreshCcw, Network, Copy, Check, Loader2
+    Briefcase, Database, Server, Activity, ArrowLeft, Monitor, Users, UserPlus, Edit, Trash2, Shield, RefreshCw, Download, Search, Key, CheckCircle2, AlertCircle, AlertTriangle, Eye, RefreshCcw, Network, Copy, Check, Loader2, Clock, ChevronDown
 } from 'lucide-react';
 import { useProjectLocalUsers } from '../../hooks/useResources';
 import Modal from '../../components/Modal';
@@ -163,8 +163,30 @@ const ServiceView = ({
     const [editItem, setEditItem] = useState(null);
     const [deleteItem, setDeleteItem] = useState(null);
     const [isSyncing, setIsSyncing] = useState(false);
+    const [isResuming, setIsResuming] = useState(false);
     const [isRefreshing, setIsRefreshing] = useState(false);
     const [enableDex, setEnableDex] = useState(false);
+    const [selectedSyncTaskRef, setSelectedSyncTaskRef] = useState(null);
+    const [copiedLogs, setCopiedLogs] = useState(false);
+    const [syncAccordionExpanded, setSyncAccordionExpanded] = useState(null);
+    const logContainerRef = useRef(null);
+    const shouldAutoScrollRef = useRef(true);
+
+    const syncState = projectState?.sync_state;
+    const syncTasks = syncState?.tasks || {};
+    const selectedSyncTask = selectedSyncTaskRef
+        ? {
+              key: selectedSyncTaskRef.key,
+              name: selectedSyncTaskRef.name,
+              ...(syncTasks[selectedSyncTaskRef.key] || {}),
+          }
+        : null;
+
+    useEffect(() => {
+        if (selectedSyncTask?.logs && shouldAutoScrollRef.current && logContainerRef.current) {
+            logContainerRef.current.scrollTop = logContainerRef.current.scrollHeight;
+        }
+    }, [selectedSyncTask?.logs]);
 
     useEffect(() => {
         const fetchFeatureFlags = async () => {
@@ -209,6 +231,7 @@ const ServiceView = ({
 
     const handleSyncIntegrations = async () => {
         setIsSyncing(true);
+        setSyncAccordionExpanded(true);
         try {
             await projectsHook.executeAction(selectedProjectId, 'sync_project_integrations');
             showSuccess("Project integrations sync triggered");
@@ -219,6 +242,22 @@ const ServiceView = ({
             showError("Failed to trigger integrations sync");
         } finally {
             setIsSyncing(false);
+        }
+    };
+
+    const handleResumeSyncIntegrations = async () => {
+        setIsResuming(true);
+        setSyncAccordionExpanded(true);
+        try {
+            await projectsHook.executeAction(selectedProjectId, 'resume_sync_project_integrations');
+            showSuccess("Project integrations sync resumed");
+            const newState = await getProjectState(selectedProjectId);
+            setProjectState(newState);
+        } catch (e) {
+            console.error(e);
+            showError("Failed to resume integrations sync");
+        } finally {
+            setIsResuming(false);
         }
     };
 
@@ -249,7 +288,14 @@ const ServiceView = ({
 
     const pollProjectState = useCallback(() => {
         if (!selectedProjectId) return;
-        getProjectState(selectedProjectId).then(setProjectState).catch(console.error);
+        getProjectState(selectedProjectId)
+            .then((state) => {
+                setProjectState(state);
+                if (state?.sync_state?.status === 'in_progress' || state?.sync_state?.status === 'error') {
+                    setSyncAccordionExpanded((prev) => (prev === null ? true : prev));
+                }
+            })
+            .catch(console.error);
         if (getProjectCertManager) {
             getProjectCertManager(selectedProjectId).then(setCertData).catch(console.error);
         }
@@ -260,6 +306,7 @@ const ServiceView = ({
             Promise.resolve().then(() => {
                 setProjectState(null);
                 setCertData(null);
+                setSyncAccordionExpanded(null);
             });
         }
     }, [selectedProjectId]);
@@ -320,7 +367,11 @@ const ServiceView = ({
         }
     ];
 
-    const needsProjectSync = projectNeedsIntegrationSync(selectedProject, projectState, {
+    const isSyncInProgress = Boolean(
+        isSyncing ||
+        syncState?.status === 'in_progress'
+    );
+    const needsProjectSync = !isSyncInProgress && projectNeedsIntegrationSync(selectedProject, projectState, {
         certData,
     });
 
@@ -361,17 +412,17 @@ const ServiceView = ({
                     </button>
                     <button
                         onClick={handleSyncIntegrations}
-                        disabled={isSyncing || !selectedProject.ingress_domain}
+                        disabled={isSyncInProgress || !selectedProject.k8s_cluster_id}
                         className={cn(
                             "px-6 py-2.5 flex items-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed",
                             needsProjectSync
                                 ? "bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-xl shadow-lg shadow-amber-500/25 transition-all"
-                                : "dxc-btn-primary"
+                                : "dxc-btn-secondary"
                         )}
                         id="project-sync-integrations-btn"
                     >
-                        {isSyncing ? <RefreshCw size={16} className="animate-spin" /> : <RefreshCw size={16} />}
-                        {isSyncing ? 'SYNCING...' : 'SYNC INTEGRATIONS'}
+                        <RefreshCw size={16} className={isSyncInProgress ? "animate-spin" : ""} />
+                        {isSyncInProgress ? 'SYNCING...' : 'SYNC INTEGRATIONS'}
                     </button>
                 </div>
             </div>
@@ -397,11 +448,11 @@ const ServiceView = ({
                     <button
                         id="alert-sync-project-integrations-btn"
                         onClick={handleSyncIntegrations}
-                        disabled={isSyncing || !selectedProject.ingress_domain}
+                        disabled={isSyncInProgress || !selectedProject.k8s_cluster_id}
                         className="bg-amber-500 hover:bg-amber-600 text-white font-bold px-5 py-2.5 rounded-xl text-xs flex items-center gap-2 shrink-0 shadow-md shadow-amber-500/20 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
                     >
-                        <RefreshCw size={14} className={isSyncing ? "animate-spin" : ""} />
-                        {isSyncing ? 'SYNCING...' : 'SYNC INTEGRATIONS'}
+                        <RefreshCw size={14} className={isSyncInProgress ? "animate-spin" : ""} />
+                        {isSyncInProgress ? 'SYNCING...' : 'SYNC INTEGRATIONS'}
                     </button>
                 </div>
             )}
@@ -427,68 +478,211 @@ const ServiceView = ({
             </div>
 
             {/* Project Integrations Status */}
-            <div
-                id="project-integrations-widget"
-                className="dxc-card p-8 space-y-6 animate-in slide-in-from-bottom duration-700"
-            >
-                <div className="flex flex-wrap items-center justify-between gap-4">
-                    <div className="flex items-center gap-4">
-                        <div className="dxc-icon-box text-indigo-500">
-                            <Activity size={24} />
+            {(() => {
+                const hasSyncState = Boolean(
+                    syncState &&
+                    syncState.total > 0
+                );
+                const syncStatus = syncState?.status;
+                const isSyncProgressExpanded =
+                    syncAccordionExpanded !== null
+                        ? syncAccordionExpanded
+                        : syncStatus !== 'completed';
+                const completedCount = syncState?.completed || 0;
+                const totalCount = syncState?.total || PROJECT_INTEGRATIONS_CONFIG.length;
+                const progressPercent = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
+                const runningTasks = Object.values(syncTasks).filter(t => t.status === 'running');
+
+                return (
+                    <div
+                        id="project-integrations-widget"
+                        className="dxc-card p-8 space-y-6 animate-in slide-in-from-bottom duration-700"
+                    >
+                        <div className="flex flex-wrap items-center justify-between gap-4">
+                            <div className="flex items-center gap-4">
+                                <div className="dxc-icon-box text-indigo-500">
+                                    <Activity size={24} />
+                                </div>
+                                <div>
+                                    <h3 className="text-2xl font-bold text-slate-900 dark:text-white">Project Integrations</h3>
+                                    <p className="text-sm text-slate-500 font-medium uppercase tracking-tight">
+                                        Namespace, ArgoCD, certificate issuers, and ingress gateway status
+                                    </p>
+                                </div>
+                            </div>
                         </div>
-                        <div>
-                            <h3 className="text-2xl font-bold text-slate-900 dark:text-white">Project Integrations</h3>
-                            <p className="text-sm text-slate-500 font-medium uppercase tracking-tight">
-                                Namespace, ArgoCD, certificate issuers, and ingress gateway status
-                            </p>
+
+                        {/* Persistent Sync Progress Bar (Collapsible Accordion) */}
+                        {hasSyncState && (
+                            <div
+                                id="project-integrations-sync-progress"
+                                className="p-4 bg-slate-50 dark:bg-slate-800/90 rounded-xl border border-slate-200 dark:border-slate-700 space-y-3"
+                            >
+                                <div
+                                    role="button"
+                                    tabIndex={0}
+                                    id="project-integrations-sync-accordion-toggle"
+                                    onClick={() =>
+                                        setSyncAccordionExpanded(!isSyncProgressExpanded)
+                                    }
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter' || e.key === ' ') {
+                                            e.preventDefault();
+                                            setSyncAccordionExpanded(!isSyncProgressExpanded);
+                                        }
+                                    }}
+                                    aria-expanded={isSyncProgressExpanded}
+                                    className="flex flex-wrap items-center justify-between gap-2 cursor-pointer select-none"
+                                >
+                                    <div className="flex items-center gap-2">
+                                        {syncState.status === 'in_progress' && (
+                                            <Loader2 size={16} className="text-indigo-500 animate-spin" />
+                                        )}
+                                        {syncState.status === 'completed' && (
+                                            <CheckCircle2 size={16} className="text-green-500" />
+                                        )}
+                                        {syncState.status === 'error' && (
+                                            <AlertCircle size={16} className="text-red-500" />
+                                        )}
+                                        <span className="text-sm font-bold text-slate-800 dark:text-slate-100">
+                                            {syncState.status === 'in_progress'
+                                                ? runningTasks.length > 0
+                                                    ? `Syncing: ${runningTasks.map(t => t.label).join(', ')}`
+                                                    : 'Preparing project integration tasks...'
+                                                : syncState.status === 'completed'
+                                                    ? 'All project integrations synced'
+                                                    : 'Project integrations sync completed with errors'}
+                                        </span>
+                                    </div>
+                                    <div className="flex items-center gap-3">
+                                        {syncState.status === 'in_progress' && (
+                                            <button
+                                                type="button"
+                                                id="resume-sync-project-integrations-btn"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    handleResumeSyncIntegrations();
+                                                }}
+                                                disabled={isResuming}
+                                                title="Resume any interrupted sync tasks"
+                                                className="dxc-btn-secondary py-1 px-2.5 text-[11px] flex items-center gap-1 disabled:opacity-60"
+                                            >
+                                                <RefreshCw size={12} className={isResuming ? "animate-spin" : ""} />
+                                                {isResuming ? 'RESUMING...' : 'RESUME'}
+                                            </button>
+                                        )}
+                                        <span className="text-xs font-mono font-bold text-slate-500 dark:text-slate-400">
+                                            {completedCount}/{totalCount} ({progressPercent}%)
+                                        </span>
+                                        <ChevronDown
+                                            size={16}
+                                            className={cn(
+                                                "text-slate-400 transition-transform duration-200",
+                                                isSyncProgressExpanded ? "rotate-180" : ""
+                                            )}
+                                        />
+                                    </div>
+                                </div>
+
+                                {isSyncProgressExpanded && (
+                                    <>
+                                        <div className="h-2.5 w-full bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
+                                            <div
+                                                className={cn(
+                                                    "h-full transition-all duration-500 rounded-full",
+                                                    syncState.status === 'error'
+                                                        ? 'bg-red-500'
+                                                        : syncState.status === 'completed'
+                                                            ? 'bg-green-500'
+                                                            : 'bg-indigo-500'
+                                                )}
+                                                style={{ width: `${progressPercent}%` }}
+                                            />
+                                        </div>
+
+                                        <div className="flex flex-wrap gap-2 pt-1">
+                                            {PROJECT_INTEGRATIONS_CONFIG.map(({ key, name }) => {
+                                                const task = syncTasks[key];
+                                                if (!task) return null;
+                                                return (
+                                                    <button
+                                                        type="button"
+                                                        key={key}
+                                                        id={`project-sync-task-chip-${key}`}
+                                                        onClick={() => {
+                                                            shouldAutoScrollRef.current = true;
+                                                            setSelectedSyncTaskRef({ key, name });
+                                                        }}
+                                                        title="Click to view task details & logs"
+                                                        className={cn(
+                                                            "px-2.5 py-1 rounded-lg text-[11px] font-semibold border flex items-center gap-1.5 transition-all cursor-pointer hover:brightness-95 dark:hover:brightness-110",
+                                                            task.status === 'completed' && "bg-green-500/10 border-green-500/20 text-green-600 dark:text-green-400",
+                                                            task.status === 'running' && "bg-indigo-500/10 border-indigo-500/20 text-indigo-600 dark:text-indigo-400",
+                                                            task.status === 'failed' && "bg-red-500/10 border-red-500/30 text-red-600 dark:text-red-400 underline decoration-red-400/50 underline-offset-2",
+                                                            task.status === 'pending' && "bg-slate-100 dark:bg-slate-700/50 border-slate-200 dark:border-slate-600 text-slate-500 dark:text-slate-400"
+                                                        )}
+                                                    >
+                                                        {task.status === 'running' && <Loader2 size={11} className="animate-spin" />}
+                                                        {task.status === 'completed' && <CheckCircle2 size={11} />}
+                                                        {task.status === 'failed' && <AlertCircle size={11} />}
+                                                        {task.status === 'pending' && <Clock size={11} />}
+                                                        <span>{name}</span>
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+                                    </>
+                                )}
+                            </div>
+                        )}
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            {PROJECT_INTEGRATIONS_CONFIG.map((item) => {
+                                const info = projectState?.integrations_status?.[item.key];
+                                const status = info?.status || 'offline';
+                                const message = info?.message || (
+                                    item.requiresIngressDomain && !selectedProject.ingress_domain
+                                        ? 'Ingress domain not configured'
+                                        : 'Not installed'
+                                );
+                                const taskStatus = syncTasks[item.key]?.status;
+                                const isActiveIcon = status === 'online' || status === 'pending' || taskStatus === 'running';
+
+                                return (
+                                    <div
+                                        key={item.key}
+                                        id={`project-integration-${item.key}`}
+                                        className="flex flex-col justify-between gap-3 p-4 bg-slate-50/70 dark:bg-slate-800/80 rounded-xl border border-slate-200 dark:border-slate-700"
+                                    >
+                                        <div className="flex items-start justify-between gap-2">
+                                            <div className="flex items-center gap-3 min-w-0">
+                                                <div className={cn(
+                                                    "p-2 rounded-lg shrink-0",
+                                                    isActiveIcon ? "bg-indigo-500 text-white" : "bg-slate-200 dark:bg-slate-700 text-slate-400"
+                                                )}>
+                                                    {status === 'pending' || taskStatus === 'running' ? (
+                                                        <Loader2 size={16} className="animate-spin" />
+                                                    ) : (
+                                                        <Activity size={16} />
+                                                    )}
+                                                </div>
+                                                <div className="min-w-0">
+                                                    <p className="text-sm font-bold text-slate-700 dark:text-white truncate">{item.name}</p>
+                                                    <p className="text-[11px] font-mono text-slate-400 truncate">{item.resource}</p>
+                                                </div>
+                                            </div>
+                                            <IntegrationStatusBadge status={status} />
+                                        </div>
+                                        <p className="text-xs text-slate-500 dark:text-slate-400 truncate" title={message}>
+                                            {message}
+                                        </p>
+                                    </div>
+                                );
+                            })}
                         </div>
                     </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {PROJECT_INTEGRATIONS_CONFIG.map((item) => {
-                        const info = projectState?.integrations_status?.[item.key];
-                        const status = info?.status || 'offline';
-                        const message = info?.message || (
-                            item.requiresIngressDomain && !selectedProject.ingress_domain
-                                ? 'Ingress domain not configured'
-                                : 'Not installed'
-                        );
-                        const isActiveIcon = status === 'online' || status === 'pending';
-
-                        return (
-                            <div
-                                key={item.key}
-                                id={`project-integration-${item.key}`}
-                                className="flex flex-col justify-between gap-3 p-4 bg-slate-50/70 dark:bg-slate-800/80 rounded-xl border border-slate-200 dark:border-slate-700"
-                            >
-                                <div className="flex items-start justify-between gap-2">
-                                    <div className="flex items-center gap-3 min-w-0">
-                                        <div className={cn(
-                                            "p-2 rounded-lg shrink-0",
-                                            isActiveIcon ? "bg-indigo-500 text-white" : "bg-slate-200 dark:bg-slate-700 text-slate-400"
-                                        )}>
-                                            {status === 'pending' ? (
-                                                <Loader2 size={16} className="animate-spin" />
-                                            ) : (
-                                                <Activity size={16} />
-                                            )}
-                                        </div>
-                                        <div className="min-w-0">
-                                            <p className="text-sm font-bold text-slate-700 dark:text-white truncate">{item.name}</p>
-                                            <p className="text-[11px] font-mono text-slate-400 truncate">{item.resource}</p>
-                                        </div>
-                                    </div>
-                                    <IntegrationStatusBadge status={status} />
-                                </div>
-                                <p className="text-xs text-slate-500 dark:text-slate-400 truncate" title={message}>
-                                    {message}
-                                </p>
-                            </div>
-                        );
-                    })}
-                </div>
-            </div>
+                );
+            })()}
 
             {/* Envoy Gateway Integration */}
             <div className="dxc-card p-8 space-y-6 animate-in slide-in-from-bottom duration-700">
@@ -1202,6 +1396,95 @@ const ServiceView = ({
                     )}
                 </Modal>
             )}
+
+            <Modal
+                isOpen={Boolean(selectedSyncTask)}
+                onClose={() => {
+                    setSelectedSyncTaskRef(null);
+                    setCopiedLogs(false);
+                }}
+                title={selectedSyncTask ? `${selectedSyncTask.name} Sync Details` : 'Sync Details'}
+                maxWidth="max-w-3xl"
+            >
+                {selectedSyncTask && (
+                    <div className="space-y-4">
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                                <span className="text-xs font-bold uppercase tracking-widest text-slate-400">Status</span>
+                                <span className={cn(
+                                    "px-2.5 py-0.5 rounded-full text-xs font-bold uppercase inline-flex items-center gap-1.5",
+                                    selectedSyncTask.status === 'failed' && "bg-red-500/10 text-red-500",
+                                    selectedSyncTask.status === 'completed' && "bg-green-500/10 text-green-500",
+                                    selectedSyncTask.status === 'running' && "bg-indigo-500/10 text-indigo-500",
+                                    selectedSyncTask.status === 'pending' && "bg-slate-200 dark:bg-slate-700 text-slate-500"
+                                )}>
+                                    {selectedSyncTask.status === 'running' && <Loader2 size={11} className="animate-spin" />}
+                                    {selectedSyncTask.status}
+                                </span>
+                                {selectedSyncTask.status === 'running' && (
+                                    <span className="text-[11px] font-medium text-indigo-500 flex items-center gap-1">
+                                        <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse" />
+                                        Streaming output
+                                    </span>
+                                )}
+                            </div>
+                            {(selectedSyncTask.logs || selectedSyncTask.message) && (
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        const text = [selectedSyncTask.message, selectedSyncTask.logs].filter(Boolean).join('\n\n');
+                                        navigator.clipboard?.writeText(text);
+                                        setCopiedLogs(true);
+                                        setTimeout(() => setCopiedLogs(false), 2000);
+                                    }}
+                                    className="dxc-btn-secondary px-3 py-1.5 text-xs flex items-center gap-1.5"
+                                >
+                                    {copiedLogs ? <Check size={14} className="text-green-500" /> : <Copy size={14} />}
+                                    {copiedLogs ? 'COPIED' : 'COPY LOGS'}
+                                </button>
+                            )}
+                        </div>
+
+                        {selectedSyncTask.message && (
+                            <div className={cn(
+                                "p-4 rounded-xl border text-sm font-mono whitespace-pre-wrap break-words",
+                                selectedSyncTask.status === 'failed'
+                                    ? "bg-red-500/10 border-red-500/20 text-red-500"
+                                    : "bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300"
+                            )}>
+                                {selectedSyncTask.message}
+                            </div>
+                        )}
+
+                        {selectedSyncTask.logs && (
+                            <div className="space-y-2">
+                                <p className="text-xs font-bold uppercase tracking-widest text-slate-400">Task Output (stdout / stderr)</p>
+                                <pre
+                                    ref={logContainerRef}
+                                    onScroll={(e) => {
+                                        const el = e.currentTarget;
+                                        const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 24;
+                                        shouldAutoScrollRef.current = nearBottom;
+                                    }}
+                                    className="p-4 bg-slate-950 text-slate-200 rounded-xl border border-slate-800 text-xs font-mono overflow-x-auto max-h-96 whitespace-pre-wrap break-words"
+                                >
+                                    {selectedSyncTask.logs}
+                                </pre>
+                            </div>
+                        )}
+
+                        {!selectedSyncTask.message && !selectedSyncTask.logs && (
+                            <p className="text-sm text-slate-500">
+                                {selectedSyncTask.status === 'running'
+                                    ? 'Task is running, waiting for output...'
+                                    : selectedSyncTask.status === 'pending'
+                                        ? 'Task is queued and waiting to start...'
+                                        : 'No additional logs recorded for this task.'}
+                            </p>
+                        )}
+                    </div>
+                )}
+            </Modal>
         </div>
     );
 };

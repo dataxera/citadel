@@ -443,5 +443,6 @@ class ProjectState(BaseState):
             "cluster_node_ips": cluster_node_ips,
             "ingress_ports": ingress_ports,
             "integrations_status": integrations_status,
+            "sync_state": self.model.sync_state or {},
         }
 

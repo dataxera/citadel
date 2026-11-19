@@ -26,8 +26,10 @@ export const projectNeedsIntegrationSync = (
     projectState,
     { certData = null } = {}
 ) => {
-    if (!project?.k8s_cluster_id || !project?.ingress_domain) return false;
+    if (!project?.k8s_cluster_id) return false;
     if (!projectState || projectState.cluster?.status !== 'online') return false;
+    if (projectState.sync_state?.status === 'in_progress') return false;
+    if (projectState.sync_state?.status === 'error') return true;
 
     const integrationsStatus = projectState.integrations_status;
     if (integrationsStatus && Object.keys(integrationsStatus).length > 0) {
