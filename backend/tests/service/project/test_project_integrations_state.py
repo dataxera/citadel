@@ -434,3 +434,118 @@ async def test_project_sync_orchestrator_and_subtasks_flow(client: TestClient):
     for key in ("namespace", *dispatched_keys):
         assert final_state["tasks"][key]["status"] == "completed"
         assert "configured" in (final_state["tasks"][key]["logs"] or "")
+
+
+@pytest.mark.asyncio
+async def test_project_state_envoy_gateway_stale_on_hostname_mismatch(client: TestClient):
+    """Project _state marks envoy_gateway as stale when Gateway listener hostname mismatches ingress_domain."""
+    cluster, project = _make_project_and_cluster_sync(
+        client, "gwstale", ingress_domain="225.home.kagesenshi.org"
+    )
+
+    engine = get_engine()
+    async with AsyncSession(engine) as session:
+        status_row = K8sClusterStatus(k8s_cluster_id=cluster["id"], status="online")
+        session.add(status_row)
+        await session.commit()
+
+    mock_core_v1 = MagicMock()
+    mock_core_v1.read_namespace.return_value = SimpleNamespace(
+        status=SimpleNamespace(phase="Active")
+    )
+    mock_core_v1.list_namespaced_service.return_value = SimpleNamespace(items=[])
+    mock_core_v1.list_namespaced_secret.return_value = SimpleNamespace(
+        items=[SimpleNamespace(metadata=SimpleNamespace(name="trusted-certs"))]
+    )
+
+    def _get_custom_object(group, version, namespace, plural, name):
+        if plural == "appprojects":
+            return {"metadata": {"name": name}}
+        if plural == "issuers":
+            return {"status": {"conditions": [{"type": "Ready", "status": "True"}]}}
+        if plural == "gateways":
+            return {
+                "spec": {
+                    "listeners": [
+                        {"name": "wildcard-https", "hostname": "*.224.home.kagesenshi.org"}
+                    ]
+                },
+                "status": {"conditions": [{"type": "Programmed", "status": "True"}]},
+            }
+        if plural == "certificates":
+            return {"status": {"conditions": [{"type": "Ready", "status": "True"}]}}
+        raise ApiException(status=404)
+
+    mock_custom_api = MagicMock()
+    mock_custom_api.get_namespaced_custom_object.side_effect = _get_custom_object
+
+    with (
+        patch("kubernetes.config.load_incluster_config"),
+        patch("kubernetes.client.ApiClient"),
+        patch("kubernetes.client.CoreV1Api", return_value=mock_core_v1),
+        patch("kubernetes.client.CustomObjectsApi", return_value=mock_custom_api),
+    ):
+        resp = client.get(f"/api/v1/projects/{project['id']}/_state")
+
+    assert resp.status_code == 200
+    gw_status = resp.json()["integrations_status"]["envoy_gateway"]
+    assert gw_status["status"] == "stale"
+    assert "*.224.home.kagesenshi.org" in gw_status["message"]
+    assert "*.225.home.kagesenshi.org" in gw_status["message"]
+
+
+@pytest.mark.asyncio
+async def test_project_state_envoy_gateway_online_when_hostname_matches(client: TestClient):
+    """Project _state reports envoy_gateway as online when Gateway listener hostname matches ingress_domain."""
+    cluster, project = _make_project_and_cluster_sync(
+        client, "gwmatch", ingress_domain="225.home.kagesenshi.org"
+    )
+
+    engine = get_engine()
+    async with AsyncSession(engine) as session:
+        status_row = K8sClusterStatus(k8s_cluster_id=cluster["id"], status="online")
+        session.add(status_row)
+        await session.commit()
+
+    mock_core_v1 = MagicMock()
+    mock_core_v1.read_namespace.return_value = SimpleNamespace(
+        status=SimpleNamespace(phase="Active")
+    )
+    mock_core_v1.list_namespaced_service.return_value = SimpleNamespace(items=[])
+    mock_core_v1.list_namespaced_secret.return_value = SimpleNamespace(
+        items=[SimpleNamespace(metadata=SimpleNamespace(name="trusted-certs"))]
+    )
+
+    def _get_custom_object(group, version, namespace, plural, name):
+        if plural == "appprojects":
+            return {"metadata": {"name": name}}
+        if plural == "issuers":
+            return {"status": {"conditions": [{"type": "Ready", "status": "True"}]}}
+        if plural == "gateways":
+            return {
+                "spec": {
+                    "listeners": [
+                        {"name": "wildcard-https", "hostname": "*.225.home.kagesenshi.org"}
+                    ]
+                },
+                "status": {"conditions": [{"type": "Programmed", "status": "True"}]},
+            }
+        if plural == "certificates":
+            return {"status": {"conditions": [{"type": "Ready", "status": "True"}]}}
+        raise ApiException(status=404)
+
+    mock_custom_api = MagicMock()
+    mock_custom_api.get_namespaced_custom_object.side_effect = _get_custom_object
+
+    with (
+        patch("kubernetes.config.load_incluster_config"),
+        patch("kubernetes.client.ApiClient"),
+        patch("kubernetes.client.CoreV1Api", return_value=mock_core_v1),
+        patch("kubernetes.client.CustomObjectsApi", return_value=mock_custom_api),
+    ):
+        resp = client.get(f"/api/v1/projects/{project['id']}/_state")
+
+    assert resp.status_code == 200
+    gw_status = resp.json()["integrations_status"]["envoy_gateway"]
+    assert gw_status["status"] == "online"
+

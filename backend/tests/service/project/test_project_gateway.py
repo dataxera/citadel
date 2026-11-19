@@ -156,6 +156,7 @@ async def test_project_deploy_gateway_with_nodeport(client):
             assert "EnvoyProxy" in manifest
             assert "project-envoy-proxy-config" in manifest
             assert "type: LoadBalancer" in manifest
+            assert "externalTrafficPolicy: Cluster" in manifest
             assert "nodePort" not in manifest
             assert "NodePort" not in manifest
             assert "infrastructure:" in manifest

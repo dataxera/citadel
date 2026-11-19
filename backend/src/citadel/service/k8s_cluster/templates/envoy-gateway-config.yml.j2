@@ -27,3 +27,4 @@ spec:
           image: {{ envoy_image }}
       envoyService:
         type: {{ service_type }}
+        externalTrafficPolicy: Cluster

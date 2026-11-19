@@ -542,6 +542,7 @@ async def test_install_envoy_gateway():
         config_manifest = applied_manifests[1]
         assert "kind: GatewayClass" in config_manifest
         assert "kind: EnvoyProxy" in config_manifest
+        assert "externalTrafficPolicy: Cluster" in config_manifest
 
 
 def test_install_envoy_gateway_action_triggers_task(client: TestClient):

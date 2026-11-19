@@ -41,7 +41,7 @@ export const projectNeedsIntegrationSync = (
             if (status === 'online' || status === 'pending') {
                 return false;
             }
-            return !status || status === 'offline' || status === 'error';
+            return !status || status === 'offline' || status === 'error' || status === 'stale';
         });
     }
 

@@ -18,6 +18,7 @@ const IntegrationStatusBadge = ({ status }) => {
     const styles = {
         online: 'dxc-badge-success',
         pending: 'dxc-badge-warning',
+        stale: 'dxc-badge-warning',
         offline: 'dxc-badge-neutral',
         error: 'dxc-badge-danger',
     };

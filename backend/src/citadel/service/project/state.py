@@ -163,9 +163,22 @@ def _check_project_integrations(
             plural="gateways",
             name="project-gateway",
         )
+        expected_hostname = f"*.{ingress_domain}"
+        listeners = gw.get("spec", {}).get("listeners") or []
+        mismatched_hostnames = [
+            listener.get("hostname")
+            for listener in listeners
+            if listener.get("hostname") != expected_hostname
+        ]
         programmed = _find_condition(gw, "Programmed")
         accepted = _find_condition(gw, "Accepted")
-        if programmed and programmed.get("status") == "True":
+        if mismatched_hostnames:
+            actual_hostname = mismatched_hostnames[0] or "<unset>"
+            integrations["envoy_gateway"] = {
+                "status": "stale",
+                "message": f"Gateway hostname '{actual_hostname}' does not match '{expected_hostname}'",
+            }
+        elif programmed and programmed.get("status") == "True":
             integrations["envoy_gateway"] = {
                 "status": "online",
                 "message": "Gateway 'project-gateway' programmed",
@@ -293,9 +306,7 @@ class ProjectState(BaseState):
                 status_data["last_update"] = status_model.last_update.isoformat()
                 cluster_node_ips = getattr(status_model, "node_ips", None) or []
 
-        # Dynamic check for project k8s integrations, ingress ports, and Dex OIDC
-        dex_installed = False
-        dex_version = None
+        # Dynamic check for project k8s integrations and ingress ports
         ingress_ports = []
         integrations_status = {}
         namespace = self.model.k8s_namespace or self.model.name
@@ -379,37 +390,13 @@ class ProjectState(BaseState):
                             logger.warning(f"Failed to list Envoy/gateway services: {e}")
 
                         secret_names = set()
-                        installed = False
-                        version = None
                         try:
                             secrets = core_v1.list_namespaced_secret(namespace=namespace)
                             for secret in secrets.items:
                                 secret_names.add(secret.metadata.name)
-                                if secret.metadata.name.startswith("sh.helm.release.v1.dex"):
-                                    installed = True
-                            if not installed:
-                                dex_svcs = core_v1.list_namespaced_service(
-                                    namespace=namespace,
-                                    label_selector="app.kubernetes.io/name=dex"
-                                )
-                                if dex_svcs.items:
-                                    installed = True
-
-                            if installed:
-                                pods = core_v1.list_namespaced_pod(
-                                    namespace=namespace,
-                                    label_selector="app.kubernetes.io/name=dex"
-                                )
-                                if pods.items:
-                                    pod = pods.items[0]
-                                    version = pod.metadata.labels.get("app.kubernetes.io/version")
-                                    if not version and pod.spec.containers:
-                                        image = pod.spec.containers[0].image
-                                        if ":" in image:
-                                            version = image.split(":")[-1]
-                        except Exception as dex_e:
-                            if not _is_not_found_error(dex_e):
-                                logger.warning(f"Failed to check project Dex/secrets status: {dex_e}")
+                        except Exception as sec_e:
+                            if not _is_not_found_error(sec_e):
+                                logger.warning(f"Failed to list project secrets: {sec_e}")
 
                         integrations = _check_project_integrations(
                             core_v1,
@@ -420,12 +407,12 @@ class ProjectState(BaseState):
                             secret_names=secret_names,
                             ports_info=ports_info,
                         )
-                        return installed, version, ports_info, integrations
+                        return ports_info, integrations
                     except Exception as e:
                         logger.warning(f"Failed to check project k8s status: {e}")
-                        return False, None, [], {}
+                        return [], {}
 
-                dex_installed, dex_version, ingress_ports, integrations_status = await asyncio.to_thread(
+                ingress_ports, integrations_status = await asyncio.to_thread(
                     _get_project_k8s_status
                 )
 
@@ -438,8 +425,6 @@ class ProjectState(BaseState):
             "kafka": kafka_count,
             "nifi": nifi_count,
             "cluster": status_data,
-            "dex_installed": dex_installed,
-            "dex_version": dex_version,
             "cluster_node_ips": cluster_node_ips,
             "ingress_ports": ingress_ports,
             "integrations_status": integrations_status,
